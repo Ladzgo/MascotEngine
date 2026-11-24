@@ -3,6 +3,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
+import {criticNotes, criticPass} from './critic.js';
 import {sourceFlags} from './lint.js';
 import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
@@ -35,8 +36,10 @@ try {
   const ep0 = await draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, model: process.env.DRAFT_MODEL ?? MODEL});
   const ep1 = values['no-expand'] ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const ep1b = values['no-expand'] ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
-  const ep = values['no-punchup'] ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL);
-  if (ep !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
+  const ep2 = values['no-punchup'] ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL);
+  const ep = await criticPass(client, ep2, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
+  if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);
   const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted});
   if (Object.keys(flags.notes).length) fs.writeFileSync(path.join(path.dirname(file), 'notes.json'), JSON.stringify({notes: flags.notes}, null, 2));

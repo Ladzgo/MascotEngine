@@ -1,4 +1,5 @@
 import type {Episode} from '../schema.js';
+import {scrubSlop} from './critic.js';
 
 const BANNED = [
   /guarantee/i, /risk[- ]free/i, /can'?t lose/i, /get rich quick/i, /you should (buy|sell|invest)/i,
@@ -25,7 +26,7 @@ export function lintEpisode(ep: Episode): string[] {
 /** Deterministic fixes for what small models get wrong: drop banned sentences, force the disclaimer, shorten a long hook. Never rewrites numbers. */
 export function autoFixEpisode(ep: Episode): Episode {
   const scenes = ep.scenes.map((s, i) => {
-    let n = s.narration;
+    let n = scrubSlop(s.narration);
     if (BANNED.some(re => re.test(n))) {
       const kept = (n.match(/[^.!?]+[.!?]*/g) ?? [n]).filter(x => !BANNED.some(re => re.test(x)));
       n = kept.join('').trim() || 'Here is what the numbers actually say.';
