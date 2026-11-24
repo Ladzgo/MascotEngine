@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {direct, distance, loadHistory, paceOf} from './direct.js';
+import {direct, distance, itemGap, loadHistory, paceOf} from './direct.js';
 import {episodeDir, loadEpisode} from '../schema.js';
 import {SilentTTS, writeTimings} from '../pipeline/tts.js';
 import type {HistoryEntry, EpisodeDecisions} from './types.js';
@@ -95,4 +95,9 @@ test('retention weights shorten/lengthen the still limit within 0.9-1.1; empty =
 test('channel accent preset: known accent wins, unknown or missing channel is ignored', async () => {
   const {channelAccent} = await import('./direct.js');
   assert.equal(channelAccent('no-such-channel-xyz'), null);
+});
+
+test('unvoiced list items keep >= 1.1 s spacing on short narration', () => {
+  assert.equal(itemGap(1.5, 3), 1.1);
+  assert.ok(Math.abs(itemGap(20, 4) - 4.25) < 1e-9);
 });

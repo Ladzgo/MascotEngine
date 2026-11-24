@@ -101,6 +101,8 @@ function paceCamera(cam: string, pace: Pace): number {
 }
 const HOOK_EMOTIONS = ['shocked', 'excited'];
 const MIN_TAIL = 0.2;
+export const itemGap = (speechDur: number, n: number) => Math.max(speechDur * 0.85 / n, 1.1);
+// // unvoiced list/timeline items must stay readable even when the narration is just "Three tips."
 const JCUT = 0.3;
 const MAX_STILL = 4.5;
 /** Longest picture hold for a scene type: retention weights (0.9-1.1, empty until 3 curves) shorten it for types viewers leave on. */
@@ -257,7 +259,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     let tail = MIN_TAIL;
     if (s.type === 'list') {
       const matched = s.items.map(it => findWord(it, words));
-      elements = matched.map((m, k) => m ?? lead + 0.3 + (k / s.items.length) * speechDur * 0.85); // unmatched items land during speech, not after it
+      elements = matched.map((m, k) => m ?? lead + 0.3 + k * itemGap(speechDur, s.items.length)); // unmatched items land during speech, not after it
       tail = 0.3;
     } else if (s.type === 'compare') {
       const l = findWord(s.left.title, words) ?? lead + speechDur * 0.3;
@@ -270,7 +272,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
       elements = [l, r];
       tail = 0.3;
     } else if (s.type === 'timeline') {
-      elements = s.events.map((e, k) => findWord(e.when, words) ?? findWord(e.what, words) ?? lead + 0.3 + (k / s.events.length) * speechDur * 0.85);
+      elements = s.events.map((e, k) => findWord(e.when, words) ?? findWord(e.what, words) ?? lead + 0.3 + k * itemGap(speechDur, s.events.length));
       tail = 0.3;
     } else if (s.type === 'chart') {
       elements = [lead + 0.5, Math.max(speechEnd, lead + 1.8)];
