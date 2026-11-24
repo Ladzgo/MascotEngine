@@ -1,0 +1,15 @@
+{
+  "id": "ep003-",
+  "channel": "default",
+  "title": "Untitled",
+  "series": "money-myths",
+  "scenes": [
+    {
+      "type": "title",
+      "narration": "Your hook goes here.",
+      "emotion": "smug"
+    }
+  ],
+  "sources": [],
+  "disclaimer": true
+}

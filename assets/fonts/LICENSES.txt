@@ -1,0 +1,2 @@
+Archivo Black (Omnibus-Type) and Poppins (Indian Type Foundry): SIL Open Font License 1.1.
+Source: @fontsource npm packages.

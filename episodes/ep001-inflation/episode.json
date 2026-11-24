@@ -1,0 +1,94 @@
+{
+  "id": "ep001-inflation",
+  "title": "Why Your Savings Are Quietly Shrinking",
+  "series": "money-myths",
+  "seed": 0,
+  "scenes": [
+    {
+      "type": "title",
+      "narration": "Your savings account is lying to you.",
+      "emotion": "explaining",
+      "emphasis": []
+    },
+    {
+      "type": "talk",
+      "narration": "The number goes up, but what it can buy goes down.",
+      "emotion": "thinking",
+      "emphasis": [
+        "goes down"
+      ]
+    },
+    {
+      "type": "big_number",
+      "narration": "At three percent inflation, ten thousand dollars buys about seven thousand four hundred dollars' worth of stuff ten years from now.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "value": 7441,
+      "prefix": "$",
+      "suffix": "",
+      "label": "real value of $10,000 after 10 years at 3% inflation",
+      "decimals": 0
+    },
+    {
+      "type": "chart",
+      "narration": "Here's what that slide looks like year by year.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "chart": {
+        "kind": "line",
+        "labels": [
+          "0",
+          "2",
+          "4",
+          "6",
+          "8",
+          "10"
+        ],
+        "values": [
+          10000,
+          9426,
+          8885,
+          8375,
+          7894,
+          7441
+        ],
+        "yLabel": "buying power ($)"
+      }
+    },
+    {
+      "type": "compare",
+      "narration": "Meanwhile the average savings account pays a fraction of that.",
+      "emotion": "angry",
+      "emphasis": [],
+      "left": {
+        "title": "Typical savings rate",
+        "value": "0.5%"
+      },
+      "right": {
+        "title": "Inflation",
+        "value": "3%"
+      }
+    },
+    {
+      "type": "list",
+      "narration": "So what can you actually do? Three things.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "items": [
+        "High-yield savings for your emergency fund",
+        "Invest long-term money",
+        "Stop letting cash pile up"
+      ]
+    },
+    {
+      "type": "talk",
+      "narration": "Let's go through each one.",
+      "emotion": "happy",
+      "emphasis": []
+    }
+  ],
+  "sources": [
+    "https://www.bls.gov/cpi/"
+  ],
+  "disclaimer": true
+}

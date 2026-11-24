@@ -1,0 +1,8 @@
+node_modules
+out
+episodes/*/build
+.env
+.DS_Store
+data/models
+.playwright
+.claude/settings.local.json

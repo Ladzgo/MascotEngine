@@ -1,0 +1,124 @@
+{
+  "episodes": [
+    {
+      "id": "ep001-inflation",
+      "channel": "default",
+      "accent": "violet",
+      "background": "plain",
+      "captionStyle": "bar",
+      "intro": "slide",
+      "music": "upbeat",
+      "scenes": [
+        {
+          "type": "title",
+          "layout": "center",
+          "camera": "static",
+          "transition": "cut",
+          "pose": "explain_left"
+        },
+        {
+          "type": "talk",
+          "layout": "keyword_side",
+          "camera": "slow_pull",
+          "transition": "slide",
+          "pose": "thinking"
+        },
+        {
+          "type": "big_number",
+          "layout": "char_right",
+          "camera": "slow_push",
+          "transition": "cut",
+          "pose": "shocked"
+        },
+        {
+          "type": "chart",
+          "layout": "char_corner",
+          "camera": "static",
+          "transition": "slide",
+          "pose": "pointing_up"
+        },
+        {
+          "type": "compare",
+          "layout": "split_char_center",
+          "camera": "static",
+          "transition": "wipe_ink",
+          "pose": "facepalm"
+        },
+        {
+          "type": "list",
+          "layout": "char_right",
+          "camera": "slow_push",
+          "transition": "zoom_through",
+          "pose": "thinking"
+        },
+        {
+          "type": "talk",
+          "layout": "keyword_side",
+          "camera": "pan_right",
+          "transition": "circle_reveal",
+          "pose": "happy"
+        }
+      ]
+    },
+    {
+      "id": "ep002-compound-interest",
+      "channel": "default",
+      "accent": "blue",
+      "background": "vignette",
+      "captionStyle": "bar",
+      "intro": "pop",
+      "music": "tense",
+      "scenes": [
+        {
+          "type": "title",
+          "layout": "closeup",
+          "camera": "drift",
+          "transition": "cut",
+          "pose": "smug"
+        },
+        {
+          "type": "big_number",
+          "layout": "center",
+          "camera": "slow_push",
+          "transition": "paper_flip",
+          "pose": "excited"
+        },
+        {
+          "type": "compare",
+          "layout": "split_char_center",
+          "camera": "slow_pull",
+          "transition": "wipe_ink",
+          "pose": "thumbs_up"
+        },
+        {
+          "type": "chart",
+          "layout": "fullscreen",
+          "camera": "static",
+          "transition": "wipe_ink",
+          "pose": "reading"
+        },
+        {
+          "type": "talk",
+          "layout": "keyword_side",
+          "camera": "slow_pull",
+          "transition": "cut",
+          "pose": "pointing_up"
+        },
+        {
+          "type": "list",
+          "layout": "char_left",
+          "camera": "static",
+          "transition": "paper_flip",
+          "pose": "explain_right"
+        },
+        {
+          "type": "talk",
+          "layout": "keyword_side",
+          "camera": "slow_pull",
+          "transition": "zoom_through",
+          "pose": "thumbs_up"
+        }
+      ]
+    }
+  ]
+}

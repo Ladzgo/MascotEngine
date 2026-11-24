@@ -1,0 +1,68 @@
+{
+  "id": "ep005-making-money",
+  "title": "Making Money Isn’t Always What It Seems",
+  "channel": "default",
+  "series": "money-myths",
+  "seed": 0,
+  "scenes": [
+    {
+      "type": "title",
+      "narration": "More money doesn’t always mean more happiness. Your income hasn’t kept up with costs.",
+      "emotion": "thinking",
+      "emphasis": []
+    },
+    {
+      "type": "talk",
+      "narration": "It’s easy to think more money equals more happiness.",
+      "emotion": "thinking",
+      "emphasis": []
+    },
+    {
+      "type": "big_number",
+      "narration": "In fact, a typical worker’s income has barely grown in 50 years.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "value": 3,
+      "prefix": "%",
+      "suffix": "",
+      "label": "average annual wage growth",
+      "decimals": 0
+    },
+    {
+      "type": "compare",
+      "narration": "Compare that to the price of living, which has gone up dramatically.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "left": {
+        "title": "Wages",
+        "value": "3%"
+      },
+      "right": {
+        "title": "Living Costs",
+        "value": "3.5%"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "So, even if you earn more, it might not buy you more stuff.",
+      "emotion": "thinking",
+      "emphasis": []
+    },
+    {
+      "type": "list",
+      "narration": "What can you do instead?",
+      "emotion": "explaining",
+      "emphasis": [],
+      "items": [
+        "Save for emergencies",
+        "Invest in yourself",
+        "Track your spending"
+      ]
+    }
+  ],
+  "sources": [
+    "https://www.bls.gov/cpi/",
+    "https://fred.stlouisfed.org/series/CPALTT01USM657N"
+  ],
+  "disclaimer": true
+}

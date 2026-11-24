@@ -1,0 +1,35 @@
+import React from 'react';
+type P = {size?: number};
+const I = (d: React.ReactNode) => ({size = 18}: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
+);
+export const Menu = I(<path d="M4 7h16M4 12h16M4 17h16" />);
+export const Play = I(<path d="M7 4.5v15l12-7.5-12-7.5z" />);
+export const Plus = I(<path d="M12 5v14M5 12h14" />);
+export const Check = I(<path d="M5 12.5l4.5 4.5L19 7.5" />);
+export const X = I(<path d="M6 6l12 12M18 6L6 18" />);
+export const Gear = I(<><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" /></>);
+export const Mic = I(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v3" /></>);
+export const Wand = I(<><path d="M5 19L16 8" /><path d="M14.5 5.5l1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 13l.6-1.3.6 1.3 1.3.6-1.3.6-.6 1.3-.6-1.3-1.3-.6 1.3-.6z" /></>);
+export const Film = I(<><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M8 5v14M16 5v14M3.5 10h4.5M3.5 14h4.5M16 10h4.5M16 14h4.5" /></>);
+export const Reel = I(<><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="6.8" r="1.2" /><circle cx="16.5" cy="14.6" r="1.2" /><circle cx="7.5" cy="14.6" r="1.2" /></>);
+export const Phone = I(<><rect x="7" y="3" width="10" height="18" rx="2.2" /><path d="M11 18h2" /></>);
+export const Trash = I(<path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7" />);
+export const Left = I(<path d="M15 5l-7 7 7 7" />);
+export const Right = I(<path d="M9 5l7 7-7 7" />);
+export const Download = I(<path d="M12 4v11M7.5 11l4.5 4.5 4.5-4.5M5 19.5h14" />);
+export const Alert = I(<><path d="M12 4l9 16H3L12 4z" /><path d="M12 10v4.5M12 17.2v.1" /></>);
+export const Title = I(<path d="M5 6.5h14M12 6.5V19M9 19h6" />);
+export const Talk = I(<path d="M4.5 6.5h15v9h-8l-4 3.5v-3.5h-3z" />);
+export const Number = I(<path d="M9 4L7.5 20M16.5 4L15 20M4.5 9h15M4 15h15" />);
+export const Chart = I(<path d="M4 19.5h16M6.5 16l4-5 3.5 3 4.5-7" />);
+export const Compare = I(<><rect x="3.5" y="5" width="7.5" height="14" rx="1.5" /><rect x="13" y="5" width="7.5" height="14" rx="1.5" /></>);
+export const List = I(<path d="M9.5 7h10M9.5 12h10M9.5 17h10M4.5 7h.1M4.5 12h.1M4.5 17h.1" />);
+export const Home = I(<path d="M4 11l8-6.5 8 6.5M6 9.5V20h12V9.5M10 20v-5h4v5" />);
+export const Bulb = I(<><path d="M9 17.5h6M10 20.5h4M12 3.5a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3.5z" /></>);
+export const Tv = I(<><rect x="3.5" y="6" width="17" height="12" rx="2" /><path d="M9 3.5l3 2.5 3-2.5" /></>);
+export const Copy = I(<><rect x="8.5" y="8.5" width="11" height="11" rx="2" /><path d="M15.5 8.5V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7.5a2 2 0 002 2h2.5" /></>);
+export const Pencil = I(<path d="M5 19l1-4L16.5 4.5a1.8 1.8 0 012.5 2.5L8.5 17.5 5 19zM14.5 6.5l3 3" />);
+export const Undo = I(<path d="M9 7L4.5 11.5 9 16M5 11.5h8.5a5 5 0 010 9H10" />);
+export const Send = I(<path d="M4 12l16-7-6 15-2.5-6.5L4 12z" />);
+export const typeIcon: Record<string, (p: P) => React.ReactElement> = {title: Title, talk: Talk, big_number: Number, chart: Chart, compare: Compare, list: List};

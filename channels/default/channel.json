@@ -1,0 +1,16 @@
+{
+  "id": "default",
+  "name": "Money Myths",
+  "description": "Short explainers that debunk personal finance myths, spoken by a cartoon mascot.",
+  "niche": "personal finance",
+  "audience": "Adults new to money topics who want plain explanations",
+  "tone": "Casual, dry humour, no hype. Smart friend over coffee. No promises of returns, no personalised advice. Every number sourced.",
+  "language": "en",
+  "bannedTopics": [
+    "guaranteed returns",
+    "get-rich-quick schemes",
+    "specific stock picks"
+  ],
+  "postingPerWeek": 2,
+  "createdAt": "2026-11-23T19:17:22.346Z"
+}
