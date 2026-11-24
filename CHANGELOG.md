@@ -1,0 +1,108 @@
+# Changelog
+
+Generated from `git log` (newest first). Subjects only; details in docs/DECISIONS.md.
+
+## 2026-11-24
+
+- npm run smoke:ui: headless Chrome (Remotion's) opens every Studio route, fails on console errors or empty pages
+- Studio: Loading skeleton component, error boundary around every page, phone-width findings
+- i18n: Pipeline, Publish, Analytics, Clipper, Calendar in HU; test that every t() literal has a HU entry
+- Audio: per-scene voice leveling, outro tail, language speech rate, qa pre-roll/outro/scene-spread checks
+- Thumbnail: min headline size warning, bolder variant A text, golden legibility test for 3 variants
+- DECISIONS item 56
+- Library: stale class for Out of date label; docs/UI_FINDINGS.md (CSS items)
+- Queue tests: 20-run limit, duplicate 409, interrupted-job restart (fake jobs)
+- Fix simile test fixture
+- First-run onboarding wizard (channel, language, voice, model, machine check)
+- Studio server: zod schemas for every JSON POST/PUT body, 400 on wrong types
+- Calendar: repeat weekday schedule for ready episodes, same-day conflict marker, tests
+- Channel preset editor: user presets (save/pick/delete), profile fields kept on save (accent, voice, branding)
+- Studio UI language HU/EN (dictionary, system default, rail toggle); Library search matches channel
+- Clipper captions: wider word gap (stroke+pop aware), layout test
+- Draft lint+autofix: talk-run merge, closing reversal, simile cap, chart grounding
+- CI workflow, npm run setup, macOS .command launcher
+- e2e --fixture (CI-friendly), USER_GUIDE.md (HU), README, DECISIONS item 55
+- Local crash log (data/logs) and npm run support-bundle with secret redaction
+- Library: page 100 rows at a time; endpoint timings (200 eps ~150 ms)
+- Server: object-only JSON bodies, render queue rate limit (20, no identical duplicates)
+- a11y: labels on Player videos
+- Palette: episode actions (full video, preview, step jump, export), g q / g k shortcuts
+- Episode ZIP export/import (script, audio, assets, decisions; no renders) with traversal tests, Library UI
+- Jobs: persist across restarts, interrupted runs become errors, Retry + log tail + step/percent in Queue
+- Director: unvoiced list/timeline items stay >= 1.1 s apart; DECISIONS item 54
+- Doctor: copyable fix commands in readiness panel
+- DECISIONS item 54: HU TTS/LLM measurements, render cache timings
+- Analytics import: title column beats video-id Content, semicolon CSV, hu headers, decimal comma
+- Hungarian payoff check accepts inflected/imperative closings (fewer false 'no takeaway' warnings)
+- Studio skin: align workspace stage track with main padding
+- Editor pass + deterministic fixers for small-model Hungarian, drop placeholder scenes
+- docs/ARCHITECTURE.md
+- Schedule CSV export, shorts --all, clip --dir batch
+- Golden frame QA (npm run qa:golden) with small JPEG references for every scene type
+- Render cache survives length changes: scene-local boil/captions, shift-invariant keys, frame-aligned scene lengths
+- Fix doodle/axis overlap, timeline fullscreen mascot, dense list sizing
+- Visual review: readable text on light accents, calmer chart annotation, bigger timeline labels
+- Lazy-load rarely used Studio pages, perf notes, still.ts accent override
+- Analytics page, calendar .ics export, Today onboarding, studio server endpoint tests
+- Render cache: per-scene chunk render + lossless concat (unchanged 27 s -> 5 s, one edit 11 s)
+- Draft in Hungarian (language-driven prompt/few-shot/slop/numbers), deterministic payoff closer, tests, decisions
+- TTS: per-scene audio cache (hash of engine, voice, language, aligner, text); one edited sentence re-voices one scene (8.8 s -> 1.9 s)
+- Language support: channel language drives TTS voice, whisper language, publish pack, scout and ideas; hu-finance preset; Hungarian verified end to end
+- GET .vtt is built in memory (no file writes)
+- Studio skin: no focus box on page headings
+- DECISIONS: draft length + real-render QA
+- Repo hygiene: ignore generated episode audio/history, e2e/tq episodes, batch report; README quick start (EN/HU)
+- TTS: mock espeak-ng/piper CLI tests cover the Linux voice branches without installs
+- Fix thumbScore test
+- Thumbnail: channel accent, question-style variant C, automatic best pick by 150px legibility score
+- Draft expand: 4-gram repeat check (3-gram rejected nearly every rewrite); fix tsc: Thumbnail variant c, duplicate import in publish test
+- Publish pack: channel-voice titles, YouTube category, pinned comment, channel tone in the AI prompt
+- Channel branding: watermark + CTA end screen for Shorts and Clipper (opt-in via channel.json)
+- Clipper: --lang and multilingual whisper models, latin-ext caption font (hu verified), Hungarian function words
+- Clipper: multi-speaker benchmark; crop follows the densest skin blob (error 373 -> 46 px), busy-scene fix
+- Studio security guard (host/origin/content-type, upload cap, clip path roots), doctor readiness, channel presets, retention weights
+- Director: never repeat a transition, practically never a layout (test was flaky-red); longer draft expansion
+- E2E smoke test script (npm run e2e) and docs
+- Guide: doctor/bundle/e2e; clipper snapClip test on real audio
+- README: new commands and guides
+- Docs: security review of studio/server.ts with proposed patch
+- Channel presets (finance, tech, history) with accent/voice style; npm run channel -- create --preset
+- Ideas: specificity scoring, stemmed dedup, top-up call; scout: niche seeds, dropUsed; tests with mocks
+- Offline bundle: npm run bundle (npm cache for linux, Chromium, whisper.cpp, Ollama model files, piper), setup-linux.sh, docs/OFFLINE.md (HU)
+- npm run doctor: shared readiness check (node, ffmpeg encoders, chromium, whisper, ollama, music, voice) with fixes
+- Docs: Hungarian user guide, compare-short note, tooling decisions
+- Render speed: Chromium gl=angle on macOS (preview 158 s -> 65 s end to end), x264 veryfast for previews, benchmark script
+- Friendly errors, Library batch mode, player scene stepping + VTT download
+- Scene types timeline + before_after, compare ghost slots and narrow-Short fix, still.ts frame tool
+- Analytics: YouTube Studio CSV import -> data/retention.json, scene-type/hook summary, read-only retentionWeights()
+- Batch runner (npm run batch) and SRT/VTT/chapters export (npm run subs)
+- Studio redesign: dark Linear-style UI (Inter, hairlines, single accent), replaces Exposure Sheet skin
+- QA: npm run qa (loudness, pauses, caption coverage, 5 real frame probes, stale-render check) + docs/QA.md
+- DECISIONS: real render check
+- Docs: clipper snap/crop/captions, studio integration plan, decisions
+- Publish pack: better offline titles/thumb text/tags, YouTube rule validation + fix, AI-disclosure upload notes
+- Thumbnail: width-fitted type, two A/B variants (--variants 2), keyword hook picker, 150px readability check
+- Shorts: paper veil in/out with shared easing, audio fade-in, real-frame check (first, 1.5 s hook, 15/50/90%, loop delta)
+- Clipper captions: Remotion transparent overlay replaces ImageMagick (word highlight, outline, shadow, safe zone)
+- Clipper crop: background-motion suppression (busy columns), skin-weighted centroid, synthetic tests for jumps/deadband
+- Studio: Clipper page + /api/clip endpoints
+- Clipper: snap cut points to real silence (whisper word times are contiguous across sentences)
+- Draft: chart/number repair, number grounding, stats script; docs on old decisions.json
+- Mood music beds (tense/upbeat/curious), director picks by emotion arc, SFX variant memory
+- QuoteCard on talk scenes (schema quote), callout font fit
+- Studio: readiness panel, stop-at-preview on Make video; npm test includes schema.test
+- Chart inflection annotation, source card position
+- Readiness endpoint, Linux offline install guide
+- Validate decisions.json with zod before render
+- Tempo: forced motion events, J-cut/L-cut offsets
+- Studio redesign: Exposure Sheet skin (pegbar rail, X-sheet ruled desk, stamps, Penny coin)
+- Add smart long-form clipper (src/clipper, npm run clip)
+- Shared easing, spring, caption function words, source/quote overlays
+- Anti-slop critic for drafts
+- Audio: voice highpass+compressor, tuned music duck; draft addScenes
+- Cut dead air between scenes: trim TTS silence, shorter tails
+- Fix draft retry test
+- Fix draft error message
+- Draft: anti-repetition, robust retries
+- Linux TTS engines (espeak-ng, piper) and auto engine
+- Initial commit: YouTube automation studio

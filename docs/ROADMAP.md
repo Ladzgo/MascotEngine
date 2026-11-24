@@ -1,5 +1,14 @@
 # Roadmap (planning agent, 2026-11)
 
+## Status 2026-11-24 (supersedes the task list below where they differ)
+Done: drafter (Ollama, HU), clipper, Shorts, Studio (Library, Pipeline, Queue, Calendar, Analytics, Clipper, onboarding wizard, ZIP export/import, palette actions, HU/EN UI incl. all pages), render cache, QA + golden frames, CI, `npm run smoke:ui`, loading skeletons + error boundary per page. See CHANGELOG.md and docs/DECISIONS.md.
+Open:
+- Library theme filter: needs `series` (or a topic field) in the episode summary in studio/server.ts, then a filter in Library.tsx.
+- CSS items in docs/UI_FINDINGS.md (skeletons, Pipeline board and stepper at phone width, density, contrast).
+- Real mascot art (T7), real YouTube analytics exports to validate the importer, a larger HU model (gemma3:12b) for publishable Hungarian scripts.
+- Zod per-route validation in studio/server.ts (in progress elsewhere).
+- Draft quality: stuttery runs of short talk scenes, ungrounded chart numbers (see DECISIONS item 54).
+
 State: M1-M5 done; ElevenLabs TTS, ffmpeg-letterbox Shorts and Studio UI done.
 Lanes: **A** = src/ (pipeline, director, scenes, character, schema). **B** = studio/ (server + web UI) and DESIGN.md.
 **C** = docs/, assets/, scripts/, data/ (content, no app logic). Lane files never overlap; a task needing another lane's file waits on a stated contract.
