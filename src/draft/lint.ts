@@ -21,6 +21,9 @@ export function lintEpisode(ep: Episode): string[] {
       if (re.test(s.narration)) errs.push(`Scene ${i + 1} uses banned advice/guarantee wording (${re}).`);
     }
   });
+  if (talkRuns(ep.scenes).length) errs.push('4 or more short talk scenes in a row; merge or vary them.');
+  if (closingContradiction(ep.scenes.at(-1)?.narration ?? '')) errs.push('The closing scene contradicts the video (reversal wording).');
+  if (similes(ep.scenes.map(s => s.narration)) > MAX_SIMILES) errs.push(`More than ${MAX_SIMILES} "like a X" similes; keep the best ones.`);
   if (!ep.disclaimer) errs.push('"disclaimer" must be true for finance content.');
   return errs;
 }
@@ -39,7 +42,61 @@ export function autoFixEpisode(ep: Episode): Episode {
     }
     return {...s, narration: n};
   }) as Episode['scenes'];
-  return groundNumbers({...ep, scenes, disclaimer: true});
+  return groundCharts(groundNumbers(limitSimiles(fixClosing(mergeTalkRuns({...ep, scenes, disclaimer: true})))));
+}
+
+const SHORT_TALK = 30;
+const isShortTalk = (s: Episode['scenes'][number]) => s.type === 'talk' && s.narration.trim().split(/\s+/).length < SHORT_TALK;
+/** Start indexes of runs of 4+ consecutive short talk scenes (the hook, scene 1, is never part of a run). */
+export function talkRuns(scenes: Episode['scenes']): number[] {
+  const out: number[] = []; let run = 0;
+  scenes.forEach((s, i) => { run = i > 0 && isShortTalk(s) ? run + 1 : 0; if (run === 4) out.push(i - 3); });
+  return out;
+}
+/** Merge neighbouring short talk scenes (text joined, never rewritten) until no run of 4 remains. */
+export function mergeTalkRuns(ep: Episode): Episode {
+  const scenes = [...ep.scenes];
+  for (let at = talkRuns(scenes)[0]; at !== undefined; at = talkRuns(scenes)[0]) {
+    const [a, b] = [scenes[at + 1], scenes[at + 2]]; // merge the middle pair so the run becomes 3
+    scenes.splice(at + 1, 2, {...a, narration: `${a.narration.trim()} ${b.narration.trim()}`, emphasis: [...((a as any).emphasis ?? []), ...((b as any).emphasis ?? [])]} as Episode['scenes'][number]);
+  }
+  return {...ep, scenes: scenes as Episode['scenes']};
+}
+
+const REVERSAL = /^\s*(but|however|actually|then again|on the other hand)\b|\b(just kidding|never ?mind|scratch that|forget (all of )?(that|what i said)|on second thought)\b/i;
+export const closingContradiction = (n: string) => (n.match(/[^.!?]+[.!?]*/g) ?? [n]).some(x => REVERSAL.test(x));
+/** Drop reversal sentences from the closing scene; if nothing is left the scene is kept untouched. */
+export function fixClosing(ep: Episode): Episode {
+  const last = ep.scenes.at(-1);
+  if (!last || !closingContradiction(last.narration)) return ep;
+  const kept = (last.narration.match(/[^.!?]+[.!?]*/g) ?? []).filter(x => !REVERSAL.test(x)).join('').trim();
+  return kept ? {...ep, scenes: [...ep.scenes.slice(0, -1), {...last, narration: kept}] as Episode['scenes']} : ep;
+}
+
+export const MAX_SIMILES = 2;
+const SIMILE = /\b(?:like|as) (?:a|an|the) [a-z-]+/gi;
+export const similes = (ns: string[]) => ns.reduce((n, t) => n + (t.match(SIMILE)?.length ?? 0), 0);
+/** Keep the first MAX_SIMILES similes; later sentences that carry one are dropped (unless that would empty the scene). */
+export function limitSimiles(ep: Episode): Episode {
+  let seen = 0;
+  const scenes = ep.scenes.map(s => {
+    const sents = s.narration.match(/[^.!?]+[.!?]*/g) ?? [s.narration];
+    const kept = sents.filter(x => { const c = x.match(SIMILE)?.length ?? 0; if (!c) return true; if (seen < MAX_SIMILES) { seen += c; return true; } return false; });
+    return kept.length && kept.length < sents.length ? {...s, narration: kept.join('').trim()} : s;
+  });
+  return {...ep, scenes: scenes as Episode['scenes']};
+}
+
+/** A chart must rest on a vetted source and on at least one value the narration says out loud; otherwise (invented data) it becomes a talk scene. */
+export function groundCharts(ep: Episode): Episode {
+  const vetted = ep.sources.some(isVettedSource);
+  const scenes = ep.scenes.map(s => {
+    if (s.type !== 'chart') return s;
+    const heard = spokenNumbers(s.narration);
+    const ok = vetted && s.chart.values.some(v => heard.some(n => Math.abs(n - v) <= 1e-9 * Math.max(1, Math.abs(v))));
+    return ok ? s : {type: 'talk' as const, narration: s.narration, emotion: s.emotion, emphasis: s.emphasis};
+  });
+  return {...ep, scenes: scenes as Episode['scenes']};
 }
 
 /** Hosts we trust for finance numbers: governments, central banks, statistics offices, international bodies, universities, major wires. */
