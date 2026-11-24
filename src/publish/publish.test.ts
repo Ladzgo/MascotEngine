@@ -134,3 +134,19 @@ test('publish pack follows the channel voice: titles, category, pinned comment, 
   assert.match(sys, /How It Works/);
   assert.match(sys, /Friendly and precise/);
 });
+
+test('Hungarian pack: description, chapters, titles, pinned comment and thumbnail text are Hungarian; accents survive', async () => {
+  const hu = Channel.parse({id: 'h', ...PRESETS['hu-finance']});
+  const ep = Episode.parse({id: 'h', title: 'A unalmas trükk, ami megduplázza a pénzed', series: 's', sources: ['https://example.org/a'], disclaimer: true, scenes: [
+    {type: 'title', narration: 'Mindenki szereti a gyors ötleteket.'},
+    {type: 'chart', narration: 'Nézd a görbét.', chart: {kind: 'bar', labels: ['a', 'b'], values: [1, 2], yLabel: 'megtakarítás (Ft)'}},
+    {type: 'compare', narration: 'Összehasonlítás.', left: {title: 'Készpénz', value: '1'}, right: {title: 'Befektetés', value: '2'}},
+    {type: 'talk', narration: 'Ez a lényeg.', emphasis: ['türelem']}]});
+  const p = await buildPack({ep, timings: [0, 12, 24, 36].map((s, index) => ({index, startSec: s})), totalSec: 50, channel: hu, warn: () => {}});
+  assert.match(p.description, /Források:/); assert.match(p.description, /nem minősül pénzügyi tanácsadásnak/); assert.match(p.description, /AI-hang/);
+  assert.ok(p.chapters.some(c => /Készpénz kontra Befektetés/.test(c.title)), JSON.stringify(p.chapters));
+  assert.ok(/[éáíóöőúüű]/.test(p.chapters[0].title));
+  assert.ok(p.titles.some(t => /érthetően|a számok nyelvén|amit a számok mondanak/.test(t)), p.titles.join(' | '));
+  assert.match(p.pinnedComment!, /Melyik szám lepett meg/);
+  assert.ok(p.thumbnailText.every(t => !/Fact Or Myth/.test(t)));
+});

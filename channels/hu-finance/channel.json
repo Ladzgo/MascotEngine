@@ -1,0 +1,25 @@
+{
+  "id": "hu-finance",
+  "name": "Pénz Mítoszok",
+  "description": "Rövid magyarázók, amelyek számokkal és forrásokkal cáfolnak meg elterjedt pénzügyi tévhiteket; egy rajzfilm-mascot mondja el.",
+  "niche": "személyes pénzügyek",
+  "audience": "Felnőttek, akik most ismerkednek a pénzügyekkel, és érthető magyarázatot szeretnének",
+  "tone": "Közvetlen, száraz humorú, hype nélkül; okos barát a kávé mellett, tegező. Nincs hozamígéret, nincs személyre szabott tanács, minden szám forrásolt. Magyar pénznem (forint) és magyar példák, ahol lehet.",
+  "language": "hu",
+  "accent": "green",
+  "sayVoice": "Tünde",
+  "branding": {
+    "cta": "Iratkozz fel a következő mítoszért",
+    "outroSec": 2,
+    "watermark": true
+  },
+  "voiceStyle": "nyugodt, szárazon humoros, közepes tempó (kb. 2,3 szó másodpercenként)",
+  "bannedTopics": [
+    "garantált hozam",
+    "gyorsan meggazdagodás",
+    "konkrét részvényajánlás",
+    "kriptó árfolyam-jóslat"
+  ],
+  "postingPerWeek": 2,
+  "createdAt": "2026-11-24T10:33:40.917Z"
+}

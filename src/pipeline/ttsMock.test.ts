@@ -69,3 +69,35 @@ test('auto engine on Linux: piper before espeak-ng before say; getEngine maps na
   assert.equal(getEngine('espeak-ng').name, 'espeak-ng');
   assert.throws(() => getEngine('nope'), /Unknown TTS engine/);
 });
+
+import {alignLang, episodeLang, pickSayVoice, piperModel} from './tts.js';
+import {saveChannel} from '../channel/channel.js';
+import {fromPreset} from '../channel/presets.js';
+const huEp = () => Episode.parse({id: 'h', title: 'h', channel: 'hu-finance', scenes: [{type: 'talk', narration: 'Ez egy magyar mondat, ékezetekkel: árvíztűrő tükörfúrógép.'}]});
+test('Hungarian channel: language, say voice Tünde, espeak -v hu, piper model per language, whisper language', async () => {
+  process.env.CHANNELS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ch-')) + '/';
+  saveChannel(fromPreset('hu-finance', 'hu-finance'));
+  assert.equal(episodeLang(huEp()), 'hu');
+  assert.equal(pickSayVoice(huEp(), {}), 'Tünde');
+  assert.equal(pickSayVoice(huEp(), {SAY_VOICE: 'Alex'}), 'Alex');
+  assert.equal(episodeLang(Episode.parse({id: 'x', title: 'x', scenes: [{type: 'talk', narration: 'hi'}]})), 'en');
+  // piper: PIPER_MODEL_HU beats PIPER_MODEL
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'pm-')); const en = path.join(d, 'en.onnx'), hu = path.join(d, 'hu.onnx'); fs.writeFileSync(en, ''); fs.writeFileSync(hu, '');
+  assert.equal(piperModel('hu', {PIPER_MODEL: en, PIPER_MODEL_HU: hu}), hu);
+  assert.equal(piperModel('hu', {PIPER_MODEL: en}), en);
+  assert.equal(piperModel('de', {PIPER_MODEL_HU: hu}), null);
+  // whisper language: English-only model cannot align Hungarian -> null (proportional timing), multilingual -> hu
+  const back = env({WHISPER_MODEL: path.join(d, 'ggml-base.en.bin')}); fs.writeFileSync(path.join(d, 'ggml-base.en.bin'), '');
+  const warn = console.warn; console.warn = () => {};
+  try { assert.equal(alignLang(huEp()), null); } finally { console.warn = warn; back(); }
+  fs.writeFileSync(path.join(d, 'ggml-base.bin'), '');
+  const back2 = env({WHISPER_MODEL: path.join(d, 'ggml-base.bin')});
+  try { assert.equal(alignLang(huEp()), 'hu'); } finally { back2(); }
+  // espeak mock receives -v hu
+  const bin = mockBin('espeak');
+  const back3 = env({PATH: `${bin}:${process.env.PATH}`, ESPEAK_VOICE: undefined, WHISPER_MODEL: '/nonexistent/m.bin'});
+  try {
+    await new CliTTS('espeak-ng').synthesize(huEp(), fs.mkdtempSync(path.join(os.tmpdir(), 'tts-')) + '/');
+    assert.match(fs.readFileSync(`${bin}/espeak.args`, 'utf8'), /^-v hu /);
+  } finally { back3(); }
+});

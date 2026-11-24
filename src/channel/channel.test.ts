@@ -53,7 +53,7 @@ test('voiceId: channel wins, env fallback', () => {
 import {PRESETS, fromPreset} from './presets.js';
 import {ACCENT_HEX} from '../accents.js';
 test('presets: three valid profiles with known accents; unknown preset errors; save/load works', () => {
-  assert.deepEqual(Object.keys(PRESETS).sort(), ['finance', 'history', 'tech']);
+  assert.deepEqual(Object.keys(PRESETS).sort(), ['finance', 'history', 'hu-finance', 'tech']);
   for (const k of Object.keys(PRESETS)) {
     const c = fromPreset(k, `my-${k}`);
     assert.ok(c.accent && ACCENT_HEX[c.accent], `${k} accent`);

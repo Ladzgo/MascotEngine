@@ -31,7 +31,7 @@ export function probeDuration(file: string): number {
 }
 
 const tokenize = (t: string) => t.split(/\s+/).filter(Boolean);
-const weightOf = (w: string) => Math.max(3, w.replace(/\W/g, '').length) + (/[.,!?;:]$/.test(w) ? 3 : 0);
+const weightOf = (w: string) => Math.max(3, w.replace(/[^\p{L}\p{N}]/gu, '').length) + (/[.,!?;:]$/.test(w) ? 3 : 0);
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Spread narration words over [from, to] by length weight (same idea as SilentTTS). */

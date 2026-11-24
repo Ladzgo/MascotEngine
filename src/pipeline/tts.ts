@@ -1,6 +1,9 @@
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import {loadChannel} from '../channel/channel.js';
+import {langCode, langInfo} from '../channel/lang.js';
+import {whisperModel} from './align.js';
+import {whisperLang} from '../clipper/lang.js';
 import type {Episode} from '../schema.js';
 import {detectAligner, mapToNarration, probeDuration, proportionalWords, runAligner, type AlignerName, type RelWord} from './align.js';
 
@@ -39,7 +42,7 @@ export class SilentTTS implements TTSAdapter {
     const scenes: SceneTiming[] = ep.scenes.map((s, index) => {
       const toks = tokenize(s.narration);
       // weight by length so long words take longer; add a small pause at punctuation
-      const weights = toks.map(w => Math.max(3, w.replace(/\W/g, '').length) + (/[.,!?;:]$/.test(w) ? 3 : 0));
+      const weights = toks.map(w => Math.max(3, w.replace(/[^\p{L}\p{N}]/gu, '').length) + (/[.,!?;:]$/.test(w) ? 3 : 0));
       const sum = weights.reduce((a, b) => a + b, 0);
       const speech = toks.length / WPS;
       let cursor = t;
@@ -58,11 +61,23 @@ export class SilentTTS implements TTSAdapter {
   }
 }
 
-/** macOS say voice: SAY_VOICE env, else the channel preset, else Samantha. */
+/** The episode's channel language code (en when the channel is unknown). */
+export function episodeLang(ep: Episode): string {
+  try { return langCode(loadChannel(ep.channel ?? 'default').language); } catch { return 'en'; }
+}
+
+/** whisper language for aligning this episode's audio, or null (with a warning) when the installed model cannot do it. */
+export function alignLang(ep: Episode): string | null {
+  const lang = episodeLang(ep), model = whisperModel();
+  try { return whisperLang(model ?? '', lang); }
+  catch (e) { console.warn(`Word timing for ${lang}: ${(e as Error).message} Using proportional timing.`); return null; }
+}
+
+/** macOS say voice: SAY_VOICE env, else the channel preset, else the language default (hu: Tünde), else Samantha. */
 export function pickSayVoice(ep: Episode, env: NodeJS.ProcessEnv = process.env): string {
   let v: string | undefined;
   try { v = loadChannel(ep.channel ?? 'default').sayVoice; } catch { /* unknown channel */ }
-  return env.SAY_VOICE || v || 'Samantha';
+  return env.SAY_VOICE || v || langInfo(episodeLang(ep)).say || 'Samantha';
 }
 
 /** Channel voiceId wins over ELEVENLABS_VOICE_ID. */
@@ -128,13 +143,14 @@ export class LocalRecordingTTS implements TTSAdapter {
     if (missing.length) throw new Error(`Missing recording(s): ${missing.join(', ')}`);
     const aligner = this.aligner === undefined ? detectAligner() : this.aligner;
     if (!aligner) console.warn('WARNING: no aligner found (whisper-cli / whisperx / whisper). Using proportional word timing; captions will be approximate.');
+    const lang = aligner === 'whisper-cli' ? alignLang(ep) : episodeLang(ep);
     let t = LEAD_IN;
     const scenes: SceneTiming[] = [];
     for (const [index, s] of ep.scenes.entries()) {
       const file = found[index]!;
       const dur = probeDuration(file);
       let rel: RelWord[] = [];
-      if (aligner) rel = mapToNarration(s.narration, runAligner(aligner, file));
+      if (aligner && lang) rel = mapToNarration(s.narration, runAligner(aligner, file, lang));
       if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
       const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
@@ -155,6 +171,7 @@ export class SayTTS implements TTSAdapter {
     }
     fs.mkdirSync(`${outDir}audio`, {recursive: true});
     const aligner = detectAligner();
+    const lang = aligner === 'whisper-cli' ? alignLang(ep) : episodeLang(ep);
     let t = LEAD_IN;
     const scenes: SceneTiming[] = [];
     for (const [index, s] of ep.scenes.entries()) {
@@ -167,7 +184,7 @@ export class SayTTS implements TTSAdapter {
       if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
       const dur = probeDuration(file);
       let rel: RelWord[] = [];
-      if (aligner) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, 'en')); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
+      if (aligner && lang) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, lang)); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
       if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
       const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
@@ -180,34 +197,37 @@ export class SayTTS implements TTSAdapter {
 
 const hasBin = (b: string) => spawnSync('sh', ['-c', `command -v "${b}"`], {stdio: 'ignore'}).status === 0;
 export const piperBin = () => (process.env.PIPER_BIN && hasBin(process.env.PIPER_BIN) ? process.env.PIPER_BIN : hasBin('piper') ? 'piper' : null);
-export const piperAvailable = () => !!piperBin() && !!process.env.PIPER_MODEL && fs.existsSync(process.env.PIPER_MODEL);
+/** piper voice model for a language: PIPER_MODEL_HU (etc.) wins, else PIPER_MODEL. */
+export const piperModel = (lang = 'en', env: NodeJS.ProcessEnv = process.env) => { const m = env[`PIPER_MODEL_${langCode(lang).toUpperCase()}`] || env.PIPER_MODEL; return m && fs.existsSync(m) ? m : null; };
+export const piperAvailable = (lang = 'en') => !!piperBin() && !!piperModel(lang);
 
 /** Keyless Linux voices: espeak-ng or piper -> wav -> mp3 (ffmpeg); whisper-aligned or proportional word timing. */
 export class CliTTS implements TTSAdapter {
   constructor(public name: 'espeak-ng' | 'piper') {}
-  private speak(text: string, wav: string) {
-    if (this.name === 'piper') return spawnSync(piperBin()!, ['--model', process.env.PIPER_MODEL!, '--output_file', wav], {input: text, encoding: 'utf8', timeout: 120000});
-    return spawnSync('espeak-ng', ['-v', process.env.ESPEAK_VOICE || 'en-us', '-s', process.env.ESPEAK_SPEED || '155', '-w', wav, '--', text], {encoding: 'utf8', timeout: 120000});
+  private speak(text: string, wav: string, lang: string) {
+    if (this.name === 'piper') return spawnSync(piperBin()!, ['--model', piperModel(lang)!, '--output_file', wav], {input: text, encoding: 'utf8', timeout: 120000});
+    return spawnSync('espeak-ng', ['-v', process.env.ESPEAK_VOICE || langInfo(lang).espeak, '-s', process.env.ESPEAK_SPEED || '155', '-w', wav, '--', text], {encoding: 'utf8', timeout: 120000});
   }
   async synthesize(ep: Episode, outDir: string): Promise<Timings> {
-    if (this.name === 'piper' ? !piperAvailable() : !hasBin('espeak-ng')) {
-      throw new Error(this.name === 'piper' ? 'piper not found: set PIPER_BIN (or put piper on PATH) and PIPER_MODEL to a .onnx voice.' : 'espeak-ng not found. Install it (apt install espeak-ng) or use --engine silent.');
+    if (this.name === 'piper' ? !piperAvailable(episodeLang(ep)) : !hasBin('espeak-ng')) {
+      throw new Error(this.name === 'piper' ? `piper not found or no voice model for "${episodeLang(ep)}": set PIPER_BIN (or put piper on PATH) and PIPER_MODEL (or PIPER_MODEL_${episodeLang(ep).toUpperCase()}) to a .onnx voice.` : 'espeak-ng not found. Install it (apt install espeak-ng) or use --engine silent.');
     }
     fs.mkdirSync(`${outDir}audio`, {recursive: true});
     const aligner = detectAligner();
+    const lang = aligner === 'whisper-cli' ? alignLang(ep) : episodeLang(ep);
     let t = LEAD_IN;
     const scenes: SceneTiming[] = [];
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`;
       const wav = `${outDir}audio/scene-${index + 1}.wav`;
-      const r = this.speak(s.narration, wav);
+      const r = this.speak(s.narration, wav, episodeLang(ep));
       if (r.error || r.status !== 0) throw new Error(`${this.name} failed on scene ${index + 1}: ${(r.stderr || r.error?.message || '').slice(0, 200)}`);
       const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', wav, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
       fs.rmSync(wav, {force: true});
       if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
       const dur = probeDuration(file);
       let rel: RelWord[] = [];
-      if (aligner) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, 'en')); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
+      if (aligner && lang) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, lang)); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
       if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
       const end = Math.max(t + dur + 0.05, t + MIN_SCENE);

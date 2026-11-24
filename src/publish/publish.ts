@@ -5,8 +5,26 @@ import {Episode, type Scene} from '../schema.js';
 import {MODEL} from '../draft/draft.js';
 import {NO_PROVIDER, extractJson, type Client} from '../llm/llm.js';
 import type {Channel} from '../channel/channel.js';
+import {langCode, langInfo} from '../channel/lang.js';
 
 export {MODEL};
+
+/** Text the pack writes into the video's own language (channel.language). Unknown languages fall back to English. */
+export const TXT = {
+  en: {intro: 'Intro', sources: 'Sources:', disclaimer: 'This video is for educational purposes only and is not financial advice.', ai: 'Altered or synthetic content: the narration uses an AI-generated voice and the visuals are computer-generated.',
+    overTime: (t: string) => `${t} over time`, numbersOverTime: 'The numbers over time', vs: 'vs', whatToDo: 'What to do', next: 'Next up', factOrMyth: 'Fact Or Myth?', thumbFallback: ['The Maths', 'Explained'],
+    sourcesInDesc: 'Sources are listed in the description.', minute: (n: number) => `${n} minute${n > 1 ? 's' : ''}`, explainedIn: 'explained in', stepByStep: 'the maths step by step', plain: 'in plain English',
+    q: {finance: 'Which number in this video surprised you most? Tell us below, and what myth should we check next?', tech: 'Which part of this did you not know how it worked? Tell us below, and what should we explain next?', history: 'Which part of this story did you hear differently before? Tell us below, and which period should we cover next?', generic: 'What surprised you most in this video? Tell us below, and what should we cover next?'},
+    tone: {finance: ['the maths', 'what the numbers say', 'in plain English'], tech: ['explained simply', 'what is really happening', 'the simple version'], history: ['the real story', 'myth versus evidence', 'what the sources say'], generic: ['explained', 'the short version', 'in plain English']},
+    pre: {tech: 'How it works: ', history: 'What really happened: '} as Record<string, string>},
+  hu: {intro: 'Bevezető', sources: 'Források:', disclaimer: 'Ez a videó kizárólag oktatási célú, nem minősül pénzügyi tanácsadásnak.', ai: 'Mesterséges vagy módosított tartalom: a narrációt AI-hang adja, a képi világ számítógéppel készült.',
+    overTime: (t: string) => `${t} az idő során`, numbersOverTime: 'A számok az idő során', vs: 'kontra', whatToDo: 'Mit tegyünk', next: 'Következik', factOrMyth: 'Tény vagy mítosz?', thumbFallback: ['A matek', 'Egyszerűen'],
+    sourcesInDesc: 'A források a leírásban vannak.', minute: (n: number) => `${n} perc`, explainedIn: 'érthetően, ennyi idő alatt:', stepByStep: 'a számítás lépésről lépésre', plain: 'érthetően',
+    q: {finance: 'Melyik szám lepett meg a legjobban ebben a videóban? Írd meg lent, és azt is, melyik mítoszt nézzük meg legközelebb!', tech: 'Melyik résznél nem tudtad, hogyan működik? Írd meg lent, és azt is, mit magyarázzunk el legközelebb!', history: 'Melyik rész volt új vagy más, mint amit eddig hallottál? Írd meg lent, és azt is, melyik korszakkal foglalkozzunk legközelebb!', generic: 'Mi lepett meg a legjobban ebben a videóban? Írd meg lent, és azt is, miről készítsünk legközelebb!'},
+    tone: {finance: ['a számok nyelvén', 'amit a számok mondanak', 'érthetően'], tech: ['egyszerűen elmagyarázva', 'mi történik valójában', 'a lényeg röviden'], history: ['a valódi történet', 'mítosz és bizonyíték', 'amit a források mondanak'], generic: ['elmagyarázva', 'röviden', 'érthetően']},
+    pre: {tech: 'Hogyan működik: ', history: 'Mi történt valójában: '} as Record<string, string>},
+};
+export const txt = (lang = 'en') => (TXT as Record<string, typeof TXT.en>)[lang.toLowerCase().split(/[-_]/)[0]] ?? TXT.en;
 
 export type Chapter = {startSec: number; title: string};
 export type Pack = {
@@ -26,7 +44,7 @@ const upFirst = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
 /** Strip units, digits, parentheses and dangling connector words so a title reads like a human wrote it. */
 function tidy(x: string, maxWords = 5): string {
-  const w = x.replace(/\([^)]*\)/g, ' ').replace(/[$%€£#]|\d[\d.,]*/g, ' ').replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(Boolean).slice(0, maxWords);
+  const w = x.replace(/\([^)]*\)/g, ' ').replace(/[$%€£#]|\d[\d.,]*/g, ' ').replace(/[^\p{L}\p{N}_\s'-]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, maxWords);
   while (w.length && TRAIL_STOP.has(w[w.length - 1].toLowerCase())) w.pop();
   return upFirst(w.join(' '));
 }
@@ -37,22 +55,23 @@ export function shortTitle(title: string): string {
   return tidy(w.join(' '), 5) || tidy(title, 5);
 }
 
-function sceneLabel(s: Scene, epTitle: string): string {
+function sceneLabel(s: Scene, epTitle: string, lang = 'en'): string {
+  const T = txt(lang);
   const talkish = () => tidy(s.emphasis.find(e => tidy(e)) ?? s.narration.split(/[.!?]/)[0], 5);
   switch (s.type) {
     case 'title': return shortTitle(epTitle);
     case 'big_number': return tidy(s.label.split(/\b(?:after|at|over|in|for|by|from)\b/i)[0]) || tidy(s.label) || talkish();
-    case 'chart': { const t = tidy(s.chart.yLabel, 4); return t ? `${t} over time` : 'The numbers over time'; }
-    case 'compare': return `${tidy(s.left.title, 4)} vs ${tidy(s.right.title, 4)}`;
-    case 'list': { const t = tidy(s.items[0].split(/\b(?:for|to|in|of|when|if)\b/i)[0], 4); return t ? `What to do: ${t}` : 'What to do'; }
-    default: return talkish() || 'Next up';
+    case 'chart': { const t = tidy(s.chart.yLabel, 4); return t ? T.overTime(t) : T.numbersOverTime; }
+    case 'compare': return `${tidy(s.left.title, 4)} ${T.vs} ${tidy(s.right.title, 4)}`;
+    case 'list': { const t = tidy(s.items[0].split(/\b(?:for|to|in|of|when|if)\b/i)[0], 4); return t ? `${T.whatToDo}: ${t}` : T.whatToDo; }
+    default: return talkish() || T.next;
   }
 }
 
 export const MIN_CHAPTER_SEC = 10;
 
 /** YouTube rules: first at 0:00, at least 3 chapters, each at least 10s. Returns [] if the video cannot satisfy them. */
-export function buildChapters(scenes: Scene[], timings: SceneTiming[], totalSec: number, epTitle = ''): Chapter[] {
+export function buildChapters(scenes: Scene[], timings: SceneTiming[], totalSec: number, epTitle = '', lang = 'en'): Chapter[] {
   const t = [...timings].sort((a, b) => a.index - b.index);
   if (!t.length) return [];
   const starts: number[] = [0];
@@ -62,10 +81,10 @@ export function buildChapters(scenes: Scene[], timings: SceneTiming[], totalSec:
   }
   if (starts.length < 3) return [];
   return starts.map((startSec, n) => {
-    if (n === 0) return {startSec: 0, title: scenes[0]?.type === 'title' && epTitle ? shortTitle(epTitle) : 'Intro'};
+    if (n === 0) return {startSec: 0, title: scenes[0]?.type === 'title' && epTitle ? shortTitle(epTitle) : txt(lang).intro};
     const timing = t.find(x => x.startSec === startSec)!;
     const sc = scenes[timing.index];
-    return {startSec: Math.floor(startSec), title: sc ? sceneLabel(sc, epTitle) : `Part ${n + 1}`};
+    return {startSec: Math.floor(startSec), title: sc ? sceneLabel(sc, epTitle, lang) : `Part ${n + 1}`};
   });
 }
 
@@ -75,24 +94,26 @@ export function fmtTime(sec: number): string {
   return h ? `${h}:${p(m)}:${p(r)}` : `${m}:${p(r)}`;
 }
 
-export const DISCLAIMER = 'This video is for educational purposes only and is not financial advice.';
-export const AI_DISCLOSURE = 'Altered or synthetic content: the narration uses an AI-generated voice and the visuals are computer-generated.';
+export const DISCLAIMER = TXT.en.disclaimer;
+export const AI_DISCLOSURE = TXT.en.ai;
 
-export function buildDescription(ep: Episode, chapters: Chapter[]): string {
+export function buildDescription(ep: Episode, chapters: Chapter[], lang = 'en'): string {
+  const T = txt(lang);
   const parts: string[] = [ep.scenes[0].narration.trim()];
   if (chapters.length) parts.push(chapters.map(c => `${fmtTime(c.startSec)} ${c.title}`).join('\n'));
-  if (ep.sources.length) parts.push('Sources:\n' + ep.sources.map((u, i) => `${i + 1}. ${u}`).join('\n'));
-  if (ep.disclaimer) parts.push(DISCLAIMER);
-  parts.push(AI_DISCLOSURE);
+  if (ep.sources.length) parts.push(T.sources + '\n' + ep.sources.map((u, i) => `${i + 1}. ${u}`).join('\n'));
+  if (ep.disclaimer) parts.push(T.disclaimer);
+  parts.push(T.ai);
   return parts.join('\n\n');
 }
 
-const STOP = new Set(['after','over','years','year','quietly','really','just','about','from','that','this','with','into','been','have','has','will','can','not','but','so','then','than','their','they','it','its','as','at','by','be','or','the','a','an','is','are','your','you','why','how','what','of','to','in','on','and','for','my','our','does','do','are','is']);
-const words = (x: string) => x.replace(/[^\w\s$%]/g, '').split(/\s+/).filter(Boolean);
-const cap = (x: string) => x.replace(/\b\w/g, c => c.toUpperCase());
+const STOP = new Set(['és','de','hogy','nem','egy','meg','még','már','ez','azt','mint','vagy','van','volt','ha','mert','csak','az','el','fel','ki','be','after','over','years','year','quietly','really','just','about','from','that','this','with','into','been','have','has','will','can','not','but','so','then','than','their','they','it','its','as','at','by','be','or','the','a','an','is','are','your','you','why','how','what','of','to','in','on','and','for','my','our','does','do','are','is']);
+const words = (x: string) => x.replace(/[^\p{L}\p{N}_\s$%]/gu, '').split(/\s+/).filter(Boolean);
+const cap = (x: string) => x.replace(/(^|\s)(\p{L})/gu, (_, a, c) => a + c.toUpperCase());
 
 /** 3 offline thumbnail options (max 4 words each), built from real content. */
-export function fallbackThumbs(ep: Episode): string[] {
+export function fallbackThumbs(ep: Episode, lang = 'en'): string[] {
+  const T = txt(lang);
   const out: string[] = [];
   const bn = ep.scenes.find(s => s.type === 'big_number');
   if (bn && bn.type === 'big_number') {
@@ -103,8 +124,8 @@ export function fallbackThumbs(ep: Episode): string[] {
   const emph = ep.scenes.flatMap(s => s.emphasis).find(e => words(e).length >= 1 && words(e).length <= 4);
   if (emph) out.push(cap(words(emph).join(' ')));
   const key = words(ep.title).filter(w => !STOP.has(w.toLowerCase()))[0];
-  out.push(key ? `${cap(key)}: Fact Or Myth?` : 'Fact Or Myth?');
-  for (const f of ['The Maths', 'Explained']) if (out.length < 3 && !out.includes(f)) out.push(f);
+  out.push(key ? `${cap(key)}: ${T.factOrMyth}` : T.factOrMyth);
+  for (const f of T.thumbFallback) if (out.length < 3 && !out.includes(f)) out.push(f);
   return out.slice(0, 3);
 }
 
@@ -138,42 +159,29 @@ export function fallbackTags(ep: Episode): string[] {
 
 export type Kind = 'finance' | 'tech' | 'history' | 'generic';
 /** Channel family from its niche text (the presets: finance, tech, history). */
-export const kindOf = (niche = ''): Kind => /finance|money|invest|saving|econom/i.test(niche) ? 'finance' : /tech|software|computer|gadget|\bai\b|internet/i.test(niche) ? 'tech' : /histor|ancient|empire|\bwar\b/i.test(niche) ? 'history' : 'generic';
+export const kindOf = (niche = ''): Kind => /finance|money|invest|saving|econom|pénz|befektet|megtakar/i.test(niche) ? 'finance' : /tech|software|computer|gadget|\bai\b|internet|számítógép|mesterséges/i.test(niche) ? 'tech' : /histor|ancient|empire|\bwar\b|történe|ókor|háború/i.test(niche) ? 'history' : 'generic';
 const CATEGORY: Record<Kind, {id: number; name: string}> = {finance: {id: 27, name: 'Education'}, tech: {id: 28, name: 'Science & Technology'}, history: {id: 27, name: 'Education'}, generic: {id: 27, name: 'Education'}};
 export const categoryFor = (k: Kind) => CATEGORY[k];
 
-/** Title endings per channel voice: dry maths for finance, "how it works" for tech, story framing for history. */
-const TITLE_TONE: Record<Kind, {pre?: (t: string) => string; post: string[]}> = {
-  finance: {post: ['the maths', 'what the numbers say', 'in plain English']},
-  tech: {pre: t => `How it works: ${t}`, post: ['explained simply', 'what is really happening', 'the simple version']},
-  history: {pre: t => `What really happened: ${t}`, post: ['the real story', 'myth versus evidence', 'what the sources say']},
-  generic: {post: ['explained', 'the short version', 'in plain English']},
-};
-
 /** Pinned-comment text: one question that invites replies, where the sources are, and the finance disclaimer when it applies. */
-export function pinnedComment(ep: Episode, kind: Kind): string {
-  const q: Record<Kind, string> = {
-    finance: 'Which number in this video surprised you most? Tell us below, and what myth should we check next?',
-    tech: 'Which part of this did you not know how it worked? Tell us below, and what should we explain next?',
-    history: 'Which part of this story did you hear differently before? Tell us below, and which period should we cover next?',
-    generic: 'What surprised you most in this video? Tell us below, and what should we cover next?',
-  };
-  return [q[kind], ep.sources.length ? 'Sources are listed in the description.' : '', kind === 'finance' && ep.disclaimer ? DISCLAIMER : ''].filter(Boolean).join('\n\n');
+export function pinnedComment(ep: Episode, kind: Kind, lang = 'en'): string {
+  const T = txt(lang);
+  return [T.q[kind], ep.sources.length ? T.sourcesInDesc : '', kind === 'finance' && ep.disclaimer ? T.disclaimer : ''].filter(Boolean).join('\n\n');
 }
 
-export function fallbackMeta(ep: Episode, totalSec = 0, kind: Kind = 'finance'): Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> {
+export function fallbackMeta(ep: Episode, totalSec = 0, kind: Kind = 'finance', lang = 'en'): Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> {
   const t = ep.title.trim().replace(/[.?!]+$/, '');
   const short = shortTitle(ep.title);
   const bn = ep.scenes.find(s => s.type === 'big_number');
   const num = bn && bn.type === 'big_number' ? `${bn.prefix}${bn.value.toLocaleString('en-US', {maximumFractionDigits: bn.decimals})}${bn.suffix}` : '';
   const mins = Math.max(1, Math.round(totalSec / 60));
-  const tone = TITLE_TONE[kind];
-  const cand = [ep.title.trim(), ...(tone.pre ? [tone.pre(t)] : []),
-    ...(num && bn?.type === 'big_number' && !/\d/.test(bn.label) ? [`${num} ${bn.label.replace(/\s+/g, ' ').trim().toLowerCase()}: the maths step by step`] : []),
-    ...(totalSec >= 90 ? [`${short || t} explained in ${mins} minute${mins > 1 ? 's' : ''}`] : []),
-    ...tone.post.map(x => `${short || t}: ${x}`), ...tone.post.map(x => `${t}: ${x}`)];
+  const T = txt(lang), post = T.tone[kind], pre = T.pre[kind];
+  const cand = [ep.title.trim(), ...(pre ? [pre + t] : []),
+    ...(num && bn?.type === 'big_number' && !/\d/.test(bn.label) ? [`${num} ${bn.label.replace(/\s+/g, ' ').trim().toLowerCase()}: ${T.stepByStep}`] : []),
+    ...(totalSec >= 90 ? [`${short || t} ${T.explainedIn} ${T.minute(mins)}`] : []),
+    ...post.map(x => `${short || t}: ${x}`), ...post.map(x => `${t}: ${x}`)];
   const titles = [...new Set(cand.map(x => clip(upFirst(x), 100)))].slice(0, 5);
-  return {titles, tags: fallbackTags(ep), thumbnailText: fallbackThumbs(ep)};
+  return {titles, tags: fallbackTags(ep), thumbnailText: fallbackThumbs(ep, lang)};
 }
 
 /** YouTube limits: title <= 100 (<= 70 reads fully on mobile), description <= 5000 bytes, no < >, tags <= 500 chars total and <= 30 each, chapters 0:00 / >= 3 / >= 10 s. */
@@ -229,7 +237,7 @@ const Meta = z.object({
 
 export function buildSystem(channel?: Channel): string {
   const voice = channel ? `Channel: ${channel.name} (${channel.niche}). Audience: ${channel.audience}. Voice: ${channel.tone}${channel.bannedTopics.length ? ` Never touch: ${channel.bannedTopics.join(', ')}.` : ''}` : 'Channel: educational explainers. Tone: casual, dry, no hype.';
-  return `You write YouTube packaging for an educational explainer channel. ${voice} Titles are specific and honest: no clickbait, no fear-baiting, no guarantees, no advice ("you should buy"), max 100 characters. thumbnailText options have at most 4 words each.
+  return `You write YouTube packaging for an educational explainer channel. ${voice} Write every title, tag and thumbnail text in ${langInfo(channel?.language).name}. Titles are specific and honest: no clickbait, no fear-baiting, no guarantees, no advice ("you should buy"), max 100 characters. thumbnailText options have at most 4 words each.
 Output ONLY one JSON object (no prose, no code fences): {"titles": [5 strings], "tags": [5-15 strings], "thumbnailText": [3 strings]}`;
 }
 
@@ -256,18 +264,18 @@ export async function aiMeta(client: Client, ep: Episode, model = MODEL, channel
 export async function buildPack(o: {
   ep: Episode; timings: SceneTiming[]; totalSec: number; client?: Client; model?: string; warn?: (m: string) => void; channel?: Channel;
 }): Promise<Pack> {
-  const kind = kindOf(o.channel?.niche);
+  const kind = kindOf(o.channel?.niche), lang = langCode(o.channel?.language);
   const warn = o.warn ?? console.error;
-  const chapters = buildChapters(o.ep.scenes, o.timings, o.totalSec, o.ep.title);
+  const chapters = buildChapters(o.ep.scenes, o.timings, o.totalSec, o.ep.title, lang);
   if (!chapters.length) warn('Warning: video too short for YouTube chapters (need 3 chapters of 10s+); chapters omitted.');
-  const description = buildDescription(o.ep, chapters);
-  let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep, o.totalSec, kind);
+  const description = buildDescription(o.ep, chapters, lang);
+  let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep, o.totalSec, kind, lang);
   let source: Pack['source'] = 'fallback';
   if (o.client) {
     try { meta = await aiMeta(o.client, o.ep, o.model, o.channel); source = 'ai'; }
     catch (e) { warn(`AI metadata failed, using fallback: ${(e as Error).message}`); }
   } else warn(`${NO_PROVIDER} Using offline fallback titles.`);
-  const pack = fixPack({...meta, description, chapters, source, uploadNotes: [...UPLOAD_NOTES, 'After publishing, post the text in pinnedComment as the first comment and pin it (Studio > Comments > three dots > Pin).', `Category: ${categoryFor(kind).name} (Studio > Details > Show more).`], category: categoryFor(kind), pinnedComment: pinnedComment(o.ep, kind)});
+  const pack = fixPack({...meta, description, chapters, source, uploadNotes: [...UPLOAD_NOTES, 'After publishing, post the text in pinnedComment as the first comment and pin it (Studio > Comments > three dots > Pin).', `Category: ${categoryFor(kind).name} (Studio > Details > Show more).`], category: categoryFor(kind), pinnedComment: pinnedComment(o.ep, kind, lang)});
   validatePack(pack).forEach(m => warn(`Publish pack: ${m}`));
   return pack;
 }

@@ -31,7 +31,7 @@ if (values.dry) {
 let focus = values.focus;
 if (values.scout) {
   const {fetchHeadlines, scoutFocus} = await import('../scout/scout.js');
-  const sf = scoutFocus(await fetchHeadlines({niche: channel.niche, banned: channel.bannedTopics}));
+  const sf = scoutFocus(await fetchHeadlines({niche: channel.niche, banned: channel.bannedTopics, lang: channel.language}));
   if (sf) focus = [focus, sf].filter(Boolean).join('\n'); else console.error('Scout: no headlines (offline?), continuing without.');
 }
 const client = await requireClient(die);

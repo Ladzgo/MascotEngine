@@ -10,7 +10,7 @@ export type Runner = (args: string[]) => Promise<{code: number; out: string}>;
 
 /** Episode id from a topic: [a-z0-9-], <= 40 chars, unique against `taken`. */
 export function slug(topic: string, taken: Set<string>): string {
-  const base = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 6).join('-').slice(0, 40).replace(/-+$/, '') || 'episode';
+  const base = topic.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 6).join('-').slice(0, 40).replace(/-+$/, '') || 'episode';
   let id = base, n = 2;
   while (taken.has(id)) id = `${base}-${n++}`;
   taken.add(id);

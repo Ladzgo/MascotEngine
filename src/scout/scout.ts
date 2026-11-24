@@ -1,3 +1,5 @@
+import {langInfo} from '../channel/lang.js';
+
 export type Headline = {title: string; url: string; source: string};
 
 const dec = (s: string) => s.replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
@@ -16,17 +18,18 @@ export function parseNewsRss(xml: string): Headline[] {
   return out;
 }
 
-const key = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 3).slice(0, 6).join(' ');
+const key = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').split(/\s+/).filter(w => w.length > 3).slice(0, 6).join(' ');
 
 /** Extra news queries per niche family (the niche text itself is always searched too). */
-export function nicheSeeds(niche: string): string[] {
-  if (/finance|money|invest|saving/i.test(niche)) return ['inflation savings rates', 'credit score debt', 'index fund retirement'];
-  if (/tech|software|ai\b|computer|gadget|internet/i.test(niche)) return ['how it works technology', 'chip semiconductor', 'cybersecurity breach explained'];
-  if (/histor|ancient|war|empire/i.test(niche)) return ['archaeology discovery', 'historians new evidence', 'anniversary history'];
+export function nicheSeeds(niche: string, lang = 'en'): string[] {
+  const L = langInfo(lang).seeds;
+  if (/finance|money|invest|saving|pénz|befektet|megtakar/i.test(niche)) return L.finance;
+  if (/tech|software|ai\b|computer|gadget|internet|számítógép|mesterséges/i.test(niche)) return L.tech;
+  if (/histor|ancient|war|empire|történe|ókor|háború/i.test(niche)) return L.history;
   return [];
 }
 
-const words = (t: string) => new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 3));
+const words = (t: string) => new Set(t.toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').split(/\s+/).filter(w => w.length > 3));
 /** Drops headlines that overlap an already used episode/idea title (>= 50% shared long words), so scout never re-suggests our own topics. */
 export function dropUsed(hs: Headline[], used: string[]): Headline[] {
   const u = used.map(words);
@@ -34,14 +37,14 @@ export function dropUsed(hs: Headline[], used: string[]): Headline[] {
 }
 
 /** Fresh headlines for a niche from Google News RSS (last 7 days). No key, no account. Drops banned topics and near-duplicates. */
-export async function fetchHeadlines(o: {niche: string; extra?: string[]; banned?: string[]; limit?: number; fetchFn?: typeof fetch}): Promise<Headline[]> {
+export async function fetchHeadlines(o: {niche: string; extra?: string[]; banned?: string[]; limit?: number; fetchFn?: typeof fetch; lang?: string}): Promise<Headline[]> {
   const f = o.fetchFn ?? fetch;
-  const seeds = nicheSeeds(o.niche);
+  const seeds = nicheSeeds(o.niche, o.lang), nw = langInfo(o.lang).news;
   const queries = [o.niche, ...seeds, ...(o.extra ?? [])].filter(Boolean).map(q => `${q} when:7d`);
   const seen = new Set<string>(), all: Headline[] = [];
   for (const q of queries) {
     try {
-      const r = await f(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`, {signal: AbortSignal.timeout(8000)});
+      const r = await f(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${nw.hl}&gl=${nw.gl}&ceid=${nw.ceid}`, {signal: AbortSignal.timeout(8000)});
       if (!r.ok) continue;
       for (const h of parseNewsRss(await r.text())) {
         const k = key(h.title);

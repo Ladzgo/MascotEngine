@@ -74,3 +74,11 @@ test('a failing top-up call does not lose the ideas already found', async () => 
   const r = await generateIdeas({client: c, channel: ch, count: 3, used: []});
   assert.equal(r.ideas.length, 1);
 });
+
+test('slug strips accents instead of cutting words; Hungarian titles dedupe', async () => {
+  assert.equal(slug('Miért marad szegény a legtöbb ember?'), 'miert-marad-szegeny-a-legtobb-ember');
+  const c = mk([JSON.stringify({ideas: [idea('Miért veszít értéket a megtakarításod évente'), idea('Miért veszít értéket a megtakarításod'), idea('Hogyan nő a havi 50 ezer forint 30 év alatt')]})]);
+  const r = await generateIdeas({client: c, channel: Channel.parse({id: 'h', name: 'H', language: 'hu'}), count: 3, used: []});
+  assert.equal(r.ideas.length, 2);
+  assert.match(c.calls[0].system, /channel's language/);
+});

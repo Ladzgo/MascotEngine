@@ -26,3 +26,13 @@ test('dropUsed removes headlines that overlap our own titles; niche seeds per fa
   assert.ok(nicheSeeds('ancient history').some(q => /archaeology/.test(q)));
   assert.deepEqual(nicheSeeds('cooking'), []);
 });
+
+test('Hungarian channel: news query uses hl=hu and Hungarian seeds; accented words count for dedup', async () => {
+  const urls: string[] = [];
+  const fetchFn = (async (u: string) => { urls.push(u); return {ok: true, text: async () => '<rss><channel><item><title>Infláció: mennyit ér a megtakarításod - Portfolio</title><link>l</link><source>Portfolio</source></item></channel></rss>'}; }) as unknown as typeof fetch;
+  const hs = await fetchHeadlines({niche: 'személyes pénzügyek', lang: 'hu', fetchFn});
+  assert.ok(urls.length >= 4 && urls.every(u => /hl=hu&gl=HU&ceid=HU:hu/.test(u)));
+  assert.ok(urls.some(u => /infl%C3%A1ci%C3%B3/.test(u)));
+  assert.equal(hs[0].title, 'Infláció: mennyit ér a megtakarításod');
+  assert.equal(dropUsed(hs, ['Mennyit ér a megtakarításod az infláció mellett']).length, 0);
+});

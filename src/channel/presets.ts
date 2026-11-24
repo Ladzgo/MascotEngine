@@ -3,6 +3,7 @@ import {Channel} from './channel.js';
 export type Preset = Omit<Channel, 'id' | 'createdAt'>;
 
 const base = {language: 'en', postingPerWeek: 2};
+const hu = {language: 'hu', postingPerWeek: 2};
 
 /** Ready-made channel profiles: niche, audience, tone, banned topics, accent colour and voice style. */
 export const PRESETS: Record<string, Preset> = {
@@ -13,6 +14,15 @@ export const PRESETS: Record<string, Preset> = {
     tone: 'Casual, dry humour, no hype. Smart friend over coffee. No promises of returns, no personalised advice. Every number sourced.',
     voiceStyle: 'calm, dry, mid pace (about 2.6 words per second)', branding: {cta: 'Subscribe for the next myth', outroSec: 2, watermark: true},
     bannedTopics: ['guaranteed returns', 'get-rich-quick schemes', 'specific stock picks', 'crypto price predictions'],
+  },
+  'hu-finance': {
+    ...hu, name: 'Pénz Mítoszok', niche: 'személyes pénzügyek', accent: 'green', sayVoice: 'Tünde',
+    description: 'Rövid magyarázók, amelyek számokkal és forrásokkal cáfolnak meg elterjedt pénzügyi tévhiteket; egy rajzfilm-mascot mondja el.',
+    audience: 'Felnőttek, akik most ismerkednek a pénzügyekkel, és érthető magyarázatot szeretnének',
+    tone: 'Közvetlen, száraz humorú, hype nélkül; okos barát a kávé mellett, tegező. Nincs hozamígéret, nincs személyre szabott tanács, minden szám forrásolt. Magyar pénznem (forint) és magyar példák, ahol lehet.',
+    voiceStyle: 'nyugodt, szárazon humoros, közepes tempó (kb. 2,3 szó másodpercenként)',
+    branding: {cta: 'Iratkozz fel a következő mítoszért', outroSec: 2, watermark: true},
+    bannedTopics: ['garantált hozam', 'gyorsan meggazdagodás', 'konkrét részvényajánlás', 'kriptó árfolyam-jóslat'],
   },
   tech: {
     ...base, name: 'How It Works', niche: 'consumer technology explained', accent: 'teal', sayVoice: 'Daniel',

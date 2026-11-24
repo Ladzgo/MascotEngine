@@ -23,7 +23,7 @@ export type Idea = z.infer<typeof Idea>;
 export type IdeasFile = {generatedAt: string; ideas: Idea[]};
 
 export function slug(s: string): string {
-  return s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'idea';
+  return s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'idea';
 }
 
 const ADVICE = [/guarantee/i, /risk[- ]free/i, /can'?t lose/i, /get rich/i, /you should (buy|sell|invest)/i, /sure thing/i, /will (double|triple)/i];
@@ -32,7 +32,7 @@ export function buildSystem(ch: ChannelInfo): string {
   return `You generate video ideas for a YouTube channel.
 ${channelContext(ch)}
 
-Rules: ideas must be specific (one concrete claim, number or situation, not a broad subject), surprising, and non-clickbait (no "you won't believe", no fear-baiting). Each has a clear opinion/angle. No guaranteed-returns or advice claims, never tell viewers what to buy, sell or hold. Every idea must be checkable: list what facts must be verified in needsSources. Do not repeat or lightly reword the titles listed as already used, and do not reuse their core claim in a new wrapper. Vary the formats across the batch; about a third of the titles should contain a concrete number, amount or timeframe; never write generic titles like "Everything you need to know about X".
+Rules: ideas must be specific (one concrete claim, number or situation, not a broad subject), surprising, and non-clickbait (no "you won't believe", no fear-baiting). Each has a clear opinion/angle. No guaranteed-returns or advice claims, never tell viewers what to buy, sell or hold. Every idea must be checkable: list what facts must be verified in needsSources. Write every field (title, angle, hook, whyInteresting) in the channel's language; keep the JSON keys and the format/difficulty values exactly as specified. Do not repeat or lightly reword the titles listed as already used, and do not reuse their core claim in a new wrapper. Vary the formats across the batch; about a third of the titles should contain a concrete number, amount or timeframe; never write generic titles like "Everything you need to know about X".
 
 Output ONLY one JSON object (no prose, no code fences):
 {"ideas": [{"title": string, "angle": string (the opinion/take), "hook": string (first spoken sentence, 15 words max), "whyInteresting": string (1-2 lines: curiosity gap, stakes, timeliness), "format": "explainer"|"myth_vs_fact"|"story"|"how_to"|"comparison", "difficulty": 1|2|3 (production effort), "needsSources": [string]}]}`;
@@ -44,7 +44,7 @@ export function buildUser(count: number, used: string[], focus?: string): string
 
 const STOPW = new Set(['the', 'and', 'for', 'why', 'how', 'what', 'your', 'you', 'are', 'is', 'to', 'of', 'in', 'on', 'a', 'an', 'do', 'does', 'really', 'actually']);
 const stem = (w: string) => w.replace(/(ing|ed|es|s)$/, '');
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOPW.has(w)).map(stem);
+const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').split(/\s+/).filter(w => w.length > 2 && !STOPW.has(w)).map(stem);
 function similar(a: string, b: string): boolean {
   const x = new Set(norm(a)), y = new Set(norm(b));
   if (!x.size || !y.size) return false;

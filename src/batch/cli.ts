@@ -17,7 +17,7 @@ if (values.topics) { if (!fs.existsSync(values.topics)) die(`No such file: ${val
 else if (values.scout) {
   const ch = loadChannel(channel);
   const have = new Set([...existingIds(root)].map(x => x.toLowerCase()));
-  topics = dropUsed(await fetchHeadlines({niche: ch.niche, banned: ch.bannedTopics, limit: 3 * Number(values.scout)}), episodeTitles(root, channel)).map(h => h.title).filter(t => !have.has(t.toLowerCase())).slice(0, Number(values.scout));
+  topics = dropUsed(await fetchHeadlines({niche: ch.niche, banned: ch.bannedTopics, lang: ch.language, limit: 3 * Number(values.scout)}), episodeTitles(root, channel)).map(h => h.title).filter(t => !have.has(t.toLowerCase())).slice(0, Number(values.scout));
 } else die('Usage: npm run batch -- --topics topics.txt | --scout N [--channel <id>] [--engine auto|say|espeak-ng|piper] [--qa]');
 if (!topics.length) die('No topics (empty file, or scout found nothing: offline?).');
 
