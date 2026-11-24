@@ -24,7 +24,8 @@
     "clip": "tsx src/clipper/cli.ts",
     "qa": "tsx scripts/qa/qa.ts",
     "batch": "tsx src/batch/cli.ts",
-    "subs": "tsx src/publish/subs-cli.ts"
+    "subs": "tsx src/publish/subs-cli.ts",
+    "analytics": "tsx src/analytics/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",
