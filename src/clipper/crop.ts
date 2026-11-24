@@ -21,15 +21,25 @@ export function centroidX(prev: Uint8Array, cur: Uint8Array, w: number, h: numbe
   // pass 1: is there real moving skin? then non-skin motion (screens, tickers, foliage) is ignored, else it only counts x0.35
   let skinE = 0, skinPx = 0;
   if (skin) for (let i = 0; i < w * h; i++) { if (skin[i]) skinPx++; const d = Math.abs(cur[i] - prev[i]); if (skin[i] && d > noise) skinE += d * (colW?.[i % w] ?? 1); }
+  // the person = the densest skin blob (best 20-column window); motion elsewhere (skin-coloured clutter) is ignored
+  let lo = 0, hi = w;
+  if (skin && skinPx >= 20) {
+    const hist = new Array(w).fill(0);
+    for (let i = 0; i < w * h; i++) if (skin[i]) hist[i % w]++;
+    let best = -1; const win = Math.max(8, Math.round(w / 5));
+    for (let x0 = 0; x0 + win <= w; x0++) { let c = 0; for (let k = 0; k < win; k++) c += hist[x0 + k]; if (c > best) { best = c; lo = x0; hi = x0 + win; } }
+    skinE = 0;
+    for (let i = 0; i < w * h; i++) { const x = i % w; if (skin[i] && x >= lo - 4 && x < hi + 4 && Math.abs(cur[i] - prev[i]) > noise) skinE += Math.abs(cur[i] - prev[i]) * (colW?.[x] ?? 1); }
+  }
   const person = skinPx >= 20; // a person-like blob is in frame: only their motion counts, otherwise the track holds
-  const other = skin ? (person ? 0.005 : 0.35) : 1;
+  const other = skin ? (person ? 0 : 0.35) : 1;
   let sum = 0, wx = 0, raw = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const d = Math.abs(cur[y * w + x] - prev[y * w + x]);
-    if (d > noise) { raw += d; const k = d * (colW?.[x] ?? 1) * (skin && !skin[y * w + x] ? other : 1); sum += k; wx += k * (x + 0.5); }
+    if (d > noise) { raw += d; const k = d * (colW?.[x] ?? 1) * (skin && person ? (skin[y * w + x] && x >= lo - 4 && x < hi + 4 ? 1 : 0) : skin && !skin[y * w + x] ? other : 1); sum += k; wx += k * (x + 0.5); }
   }
   // motion that is mostly suppressed background carries no confidence (the track holds)
-  return {x: sum ? wx / sum / w : 0.5, conf: raw && sum / raw >= 0.15 && !(person && skinE < 100) ? Math.min(1, sum / (w * h * 8)) : 0};
+  return {x: sum ? wx / sum / w : 0.5, conf: person ? (skinE >= 100 ? Math.max(0.02, Math.min(1, sum / (w * h * 8))) : 0) : raw && sum / raw >= 0.15 ? Math.min(1, sum / (w * h * 8)) : 0};
 }
 
 /** Column weights: columns that move in most frames (ticker, screen, fan, flashing light) are not the speaker. */

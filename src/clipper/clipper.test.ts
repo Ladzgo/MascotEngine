@@ -154,3 +154,15 @@ test('snapClip on real audio: cuts land inside the silent gap (1.0-1.6 s)', () =
   assert.ok(t.start >= 1.0 && t.start <= 1.62, `start ${t.start}`);
   fs.rmSync(path.dirname(f), {recursive: true, force: true});
 });
+
+test('person blob: motion of the densest skin cluster wins over louder skin-coloured clutter and non-skin motion', () => {
+  const W = 96, H = 54, a = new Uint8Array(W * H), b = new Uint8Array(W * H), skin = new Uint8Array(W * H);
+  for (let y = 10; y < 30; y++) for (let x = 10; x < 24; x++) { skin[y * W + x] = 1; a[y * W + x] = 100; b[y * W + x] = y < 12 ? 100 : 100 + (x < 12 ? 60 : 0); } // person, small motion
+  for (let y = 40; y < 43; y++) for (let x = 80; x < 90; x++) { skin[y * W + x] = 1; b[y * W + x] = 255; } // skin-coloured clutter, bigger change but sparse
+  for (let y = 0; y < H; y++) for (let x = 50; x < 70; x++) b[y * W + x] = 255; // non-skin background motion
+  const r = centroidX(a, b, W, H, 12, undefined, skin);
+  assert.ok(r.x < 0.3 && r.conf > 0, `x ${r.x}`);
+  // person present but motionless -> hold (conf 0), no pull from the background
+  const still = centroidX(a, a.map((v, i) => (i % W >= 50 && i % W < 70 ? 255 : v)), W, H, 12, undefined, skin);
+  assert.equal(still.conf, 0);
+});

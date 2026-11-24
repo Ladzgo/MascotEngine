@@ -30,3 +30,19 @@ Gaps and the endpoints that would close them (all JSON, local, no key):
 UI expectations: upload -> Clip (min/max/count) -> grid of 9:16 previews with score reasons; click opens transcript with draggable start/end handles (snap hint shown), crop track as a line over the source frame, captions toggle; export = download mp4 + publish pack. Timeline JSON is the single source of truth; the UI never edits mp4s.
 
 Other CLI facts for the UI thread: `npm run shorts -- <id>` now prints a real-frame check (first frame, 1.5 s hook, 15/50/90%, loop delta); `npm run thumbnail -- <id> --variants 2` writes `build/thumbnail.png` + `thumbnail-b.png` and prints a 150 px readability line; `build/publish.json` has `uploadNotes` (YouTube Studio steps incl. the altered/synthetic content question) next to titles/description/tags/chapters.
+
+## Benchmark: 3 voices, moving background (`npx tsx scripts/clipper-bench.ts`)
+
+macOS `say` voices Samantha, Daniel, Karen (en_US/en_GB/en_AU), six turns of 25-27 s with 0.6 s silence between turns, 1280x720 video: dimmed `testsrc2` as busy moving background (counters, bars, gradients everywhere) plus a skin-coloured bobbing box that jumps to the active speaker's position (x = 250 / 640 / 1030). Ground truth = who speaks when. Whisper `ggml-base.en`.
+
+| Measure | Result |
+|---|---|
+| clips found / ending on terminal punctuation | 3 / 3 (each one whole speaker turn, 27.5 s) |
+| cut end inside real silence (RMS < 12% of speech level) | 3 / 3 |
+| cut start inside silence | 3 / 3 |
+| crop centre error vs. speaker centre (px, crop width 404, excluding 3 s after a speaker change) | before: 373 (background pulled the track to the centre), 204 (skin boost only), 122 (skin-only motion), **46** (densest skin blob only) |
+| mean jerk (second difference, px/s^2) | 21 |
+| max speed | 142 px/s (limit 0.35 x 404 = 141) |
+| direction reversals | 1 in 3 clips |
+
+What changed because of the benchmark (`crop.ts`): (1) when everything moves (busy scene) no column stands out, so the background filter is switched off instead of muting the whole frame; (2) if a person-like skin blob is in frame, only motion of the densest skin cluster (best 20-column window) counts, motion elsewhere (screens, skin-coloured clutter) is ignored, and a motionless person holds the track; (3) frames with no skin at all (cartoons, slides) fall back to the old rule (non-skin motion x0.35, background-column filter). Limits: the person finder is colour based (dark skin tones under strange lighting, a beige wall that moves, two people talking at once pick the denser blob); no face detection (ONNX not wired).
