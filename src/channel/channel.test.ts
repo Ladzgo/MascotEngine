@@ -65,3 +65,18 @@ test('presets: three valid profiles with known accents; unknown preset errors; s
   saveChannel(fromPreset('history', 'hist'));
   assert.equal(loadChannel('hist').niche, 'history and ancient civilisations');
 });
+
+import {loadBranding} from './branding.js';
+test('branding is opt-in: none without config, accent/handle/cta/image when configured, bad values rejected', () => {
+  tmp();
+  assert.equal(loadBranding('default'), null);
+  const c = Channel.parse({id: 'b', name: 'B', accent: 'teal', branding: {handle: '@b', cta: 'Subscribe'}});
+  assert.equal(c.branding?.outroSec, 2);
+  saveChannel(c);
+  fs.writeFileSync(path.join(process.env.CHANNELS_DIR!, 'b/watermark.png'), Buffer.from([137, 80, 78, 71]));
+  const b = loadBranding('b')!;
+  assert.deepEqual([b.handle, b.cta, b.accent, b.outroSec], ['@b', 'Subscribe', ACCENT_HEX.teal, 2]);
+  assert.match(b.image!, /^data:image\/png;base64,/);
+  assert.equal(loadBranding('nope'), null);
+  assert.throws(() => Channel.parse({id: 'x', name: 'X', branding: {outroSec: 30}}));
+});

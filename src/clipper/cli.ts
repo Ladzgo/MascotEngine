@@ -6,7 +6,8 @@ import {spawnSync} from 'node:child_process';
 import {findCandidates} from './segment.js';
 import {cropPath, cropWidth, sampleTrack} from './crop.js';
 import {renderClip} from './render.js';
-import {cleanupCaptions, renderCaptionVideos} from './captions.js';
+import {cleanupCaptions, renderBrandLayers, renderCaptionVideos} from './captions.js';
+import {loadBranding} from '../channel/branding.js';
 import {snapClip} from './snap.js';
 import {TimelineSchema, WordSchema, type Timeline} from './timeline.js';
 
@@ -14,7 +15,7 @@ function arg(name: string, def: string) { const i = process.argv.indexOf(`--${na
 
 async function main() {
   const file = process.argv.slice(2).find(a => !a.startsWith('--') && !/^\d+(\.\d+)?$/.test(a));
-  if (!file || !fs.existsSync(file)) throw new Error('usage: npm run clip -- <file> [--min 20 --max 60 --count 5] [--lang auto|hu|en] [--words words.json] [--no-render]');
+  if (!file || !fs.existsSync(file)) throw new Error('usage: npm run clip -- <file> [--min 20 --max 60 --count 5] [--lang auto|hu|en] [--channel <id>] [--words words.json] [--no-render]');
   const min = +arg('min', '20'), max = +arg('max', '60'), count = +arg('count', '5');
   const dir = path.resolve(arg('out', `out/clips/${path.basename(file, path.extname(file))}`));
   fs.mkdirSync(dir, {recursive: true});
@@ -43,11 +44,14 @@ async function main() {
   if (!cands.length) console.warn('no clip candidates found (try wider --min/--max)');
   const render = !process.argv.includes('--no-render');
   const caps = render && !process.argv.includes('--no-captions') ? await renderCaptionVideos(tl.clips, dir) : new Map<string, string | null>();
+  const branding = render && arg('channel', '') ? loadBranding(arg('channel', '')) : null; // opt-in: --channel <id> with branding in channel.json
+  const brand = branding ? {...(await renderBrandLayers(branding, dir)), outroSec: branding.outroSec} : null;
   for (const c of tl.clips) {
-    if (render) { c.file = path.join(dir, `${c.id}.mp4`); renderClip(file, c, c.file, caps.get(c.id) ?? null); }
+    if (render) { c.file = path.join(dir, `${c.id}.mp4`); renderClip(file, c, c.file, caps.get(c.id) ?? null, brand); }
     console.log(`${c.id} ${c.start.toFixed(1)}-${c.end.toFixed(1)}s score ${c.score} [${c.reasons.join(', ')}]`);
   }
   cleanupCaptions(caps);
+  for (const f of [brand?.watermark, brand?.cta]) if (f) fs.rmSync(f, {force: true});
   fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(TimelineSchema.parse(tl), null, 2));
   console.log(`timeline: ${path.join(dir, 'timeline.json')}`);
 }

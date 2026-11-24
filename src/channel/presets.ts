@@ -11,7 +11,7 @@ export const PRESETS: Record<string, Preset> = {
     description: 'Short explainers that debunk personal finance myths with clear, sourced numbers, spoken by a cartoon mascot.',
     audience: 'Adults new to money topics who want plain explanations',
     tone: 'Casual, dry humour, no hype. Smart friend over coffee. No promises of returns, no personalised advice. Every number sourced.',
-    voiceStyle: 'calm, dry, mid pace (about 2.6 words per second)',
+    voiceStyle: 'calm, dry, mid pace (about 2.6 words per second)', branding: {cta: 'Subscribe for the next myth', outroSec: 2, watermark: true},
     bannedTopics: ['guaranteed returns', 'get-rich-quick schemes', 'specific stock picks', 'crypto price predictions'],
   },
   tech: {
@@ -19,7 +19,7 @@ export const PRESETS: Record<string, Preset> = {
     description: 'Explainers on how everyday technology actually works, from Wi-Fi to chips to AI, with simple analogies.',
     audience: 'Curious non-engineers who use technology every day and want to understand it',
     tone: 'Friendly and precise. One clear analogy per idea, plain words before jargon, honest about what is simplified. No product hype, no fear about gadgets.',
-    voiceStyle: 'warm, clear, slightly quicker pace (about 2.9 words per second)',
+    voiceStyle: 'warm, clear, slightly quicker pace (about 2.9 words per second)', branding: {cta: 'Follow to see how the next one works', outroSec: 2, watermark: true},
     bannedTopics: ['product reviews', 'affiliate recommendations', 'unverified leaks', 'security exploits step by step'],
   },
   history: {
@@ -27,7 +27,7 @@ export const PRESETS: Record<string, Preset> = {
     description: 'Short, story-driven histories that separate popular myths from what evidence actually shows.',
     audience: 'Adults who like history and enjoy hearing what really happened',
     tone: 'Storyteller with a wry edge: concrete scenes, dates and people, clear about what is known versus debated. Never glorify atrocities, no partisan takes on current politics.',
-    voiceStyle: 'measured, narrative, a little slower (about 2.4 words per second)',
+    voiceStyle: 'measured, narrative, a little slower (about 2.4 words per second)', branding: {cta: 'Subscribe for the next story', outroSec: 2, watermark: true},
     bannedTopics: ['conspiracy theories presented as fact', 'current election politics', 'graphic violence detail'],
   },
 };

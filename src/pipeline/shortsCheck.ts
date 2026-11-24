@@ -31,7 +31,7 @@ function frameAt(file: string, t: number): Rgb {
 }
 
 /** Real frame check of a rendered Short: first, 1.5 s (hook), 15/50/90 %, last. */
-export function checkShort(file: string): ShortReport {
-  const d = probeDuration(file), at = (t: number) => frameAt(file, Math.min(Math.max(0, t), d - 0.04));
-  return judge({first: at(0), hook: at(1.5), p15: at(d * 0.15), p50: at(d * 0.5), p90: at(d * 0.9), last: at(d - 0.05)});
+export function checkShort(file: string, outroSec = 0): ShortReport {
+  const d = probeDuration(file), body = Math.max(1, d - outroSec), at = (t: number) => frameAt(file, Math.min(Math.max(0, t), d - 0.04)); // percent probes stay inside the content, not on the CTA card
+  return judge({first: at(0), hook: at(1.5), p15: at(body * 0.15), p50: at(body * 0.5), p90: at(body * 0.9), last: at(d - 0.05)});
 }

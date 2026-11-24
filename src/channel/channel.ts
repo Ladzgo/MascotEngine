@@ -4,6 +4,15 @@ import path from 'node:path';
 
 export const DEFAULT_CHANNEL_ID = 'default';
 
+/** Optional watermark + end-screen for Shorts and Clipper clips. Absent = no branding (output unchanged). */
+export const BrandingConfig = z.object({
+  handle: z.string().max(40).optional(),    // shown in the corner and on the end card, e.g. "@MoneyMyths"
+  cta: z.string().max(60).optional(),       // end-card line, e.g. "Subscribe for the next myth"
+  outroSec: z.number().min(0).max(6).default(2), // end-card length (0 = no end card)
+  watermark: z.boolean().default(true),
+});
+export type BrandingConfig = z.infer<typeof BrandingConfig>;
+
 export const Channel = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1),
@@ -15,6 +24,7 @@ export const Channel = z.object({
   voiceId: z.string().optional(),
   accent: z.string().optional(),     // episode accent colour name (src/accents.ts); read by the drafter/director once wired
   sayVoice: z.string().optional(),   // macOS `say` voice for this channel (SAY_VOICE overrides)
+  branding: BrandingConfig.optional(),
   voiceStyle: z.string().optional(), // speaking-style note for the script prompt and for picking a TTS voice
   bannedTopics: z.array(z.string()).default([]),
   postingPerWeek: z.number().default(2),

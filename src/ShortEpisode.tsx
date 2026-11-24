@@ -6,6 +6,7 @@ import {Paper} from './fx/paper';
 import {Captions, buildPhrases} from './fx/captions';
 import {SceneView, type Place} from './scenes/SceneView';
 import {ACCENT_HEX} from './accents';
+import {CtaCard, Watermark, type Branding} from './Branding';
 import {H, INK, W, clamp, easeInOut, easeOut, loadFonts} from './theme';
 
 export const SHORT_W = 1080;
@@ -18,7 +19,8 @@ const PLACE: Place = {char: {cx: VW / 2, h: 760}, content: {x: 70, y: 150, w: VW
 const FLOOR = 1590;
 const CAPTION_BOTTOM = 380; // real px; keeps clear of Shorts UI
 
-export type ShortProps = EpisodeProps & {sceneIndexes: number[]};
+export type ShortProps = EpisodeProps & {sceneIndexes: number[]; branding?: Branding | null};
+export const outroFrames = (b: Branding | null | undefined, fps: number) => (b && b.outroSec > 0 ? Math.round(b.outroSec * fps) : 0);
 const END_FADE = 9; // frames: ease to paper at the end and from paper at the start, so the loop reads as one continuous beat
 const START_VEIL = 5;
 
@@ -58,6 +60,8 @@ export const ShortVideo: React.FC<ShortProps> = props => {
       <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${SHORT_H / H})`, transformOrigin: '0 0'}}><Paper variant={props.decisions.background} /></div>
       {props.sceneIndexes.map((si, k) => { const from = at; at += lens[k]; return (
         <Sequence key={k} from={from} durationInFrames={lens[k]}><ShortScene {...props} sceneIndex={si} /></Sequence>); })}
+      {props.branding?.watermark && <Watermark b={props.branding} />}
+      {outroFrames(props.branding, fps) > 0 && <Sequence from={at} durationInFrames={outroFrames(props.branding, fps)}><CtaCard b={props.branding!} progress={Math.min(1, (g - at) / 12)} /></Sequence>}
       <AbsoluteFill style={{background: '#f6f1e4', opacity: Math.max(easeInOut(clamp((g - (durationInFrames - END_FADE)) / END_FADE)), 1 - easeOut(clamp(g / START_VEIL))), pointerEvents: 'none'}} />
     </AbsoluteFill>
   );
