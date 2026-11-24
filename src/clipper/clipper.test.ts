@@ -91,3 +91,15 @@ test('timeline schema validates and rejects bad clips', () => {
   assert.throws(() => TimelineSchema.parse({...tl, clips: [{...clip, end: 0.5}]}));
   assert.throws(() => TimelineSchema.parse({...tl, clips: [{...clip, crop: {...clip.crop, path: []}}]}));
 });
+
+import {snapCut} from './snap.js';
+test('snapCut moves an end onto the following silence and a start onto the preceding one', () => {
+  // frames: speech 0-1.0 s, silence 1.0-1.4 s, speech 1.4-2.0 s
+  const rms = Array.from({length: 200}, (_, i) => (i >= 100 && i < 140 ? 0.0005 : 0.1));
+  const e = {t0: 0, rms};
+  const end = snapCut(e, 0.98, 'end');
+  assert.ok(end >= 1.0 && end <= 1.3, `end ${end}`);
+  const start = snapCut(e, 1.42, 'start');
+  assert.ok(start >= 1.1 && start <= 1.4, `start ${start}`);
+  assert.equal(snapCut({t0: 0, rms: rms.map(() => 0.1)}, 1, 'end'), 1); // no silence -> unchanged
+});

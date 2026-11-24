@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {findCandidates} from './segment.js';
 import {cropPath, cropWidth, sampleTrack} from './crop.js';
 import {renderClip} from './render.js';
+import {snapClip} from './snap.js';
 import {TimelineSchema, WordSchema, type Timeline} from './timeline.js';
 
 function arg(name: string, def: string) { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : def; }
@@ -30,7 +31,8 @@ function main() {
   const [W, H] = dims;
   if (!W || !H) throw new Error('cannot read video size');
   const cw = cropWidth(W, H);
-  const cands = findCandidates(words, {min, max, count}, probeDuration(file));
+  const dur = probeDuration(file);
+  const cands = findCandidates(words, {min, max, count}, dur).map(c => { const s = snapClip(file, c.start, c.end); return {...c, start: s.start, end: Math.min(dur, s.end)}; });
   const tl: Timeline = {version: 1, source: path.resolve(file), width: W, height: H, clips: cands.map((c, i) => ({
     id: `clip${i + 1}`, start: +c.start.toFixed(3), end: +c.end.toFixed(3), score: c.score, reasons: c.reasons,
     text: c.words.map(w => w.w).join(' '), words: c.words,
