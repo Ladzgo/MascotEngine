@@ -103,3 +103,28 @@ test('snapCut moves an end onto the following silence and a start onto the prece
   assert.ok(start >= 1.1 && start <= 1.4, `start ${start}`);
   assert.equal(snapCut({t0: 0, rms: rms.map(() => 0.1)}, 1, 'end'), 1); // no silence -> unchanged
 });
+
+test('background filter: a constantly flashing far-right light does not pull the track off a slow speaker', () => {
+  const W = 96, H = 54, hz = 4, n = 60;
+  const frames: Uint8Array[] = [];
+  for (let i = 0; i < n; i++) {
+    const f = new Uint8Array(W * H);
+    for (let y = 10; y < 40; y++) for (let x = 20 + (i % 4 < 2 ? 0 : 1); x < 32 + (i % 4 < 2 ? 0 : 1); x++) f[y * W + x] = 200; // speaker, motion every 2nd frame
+    if (i % 2) for (let y = 5; y < 25; y++) for (let x = 84; x < 94; x++) f[y * W + x] = 255; // blinking light
+    frames.push(f);
+  }
+  const raw = frames.slice(1).map((f, i) => centroidX(frames[i], f, W, H).x);
+  assert.ok(raw.every(x => x > 0.5), 'unfiltered, the light dominates');
+  const t = trackFrames(frames, W, H, hz);
+  assert.ok(t.slice(4).every(p => p.x < 0.45), 'filtered track stays on the speaker');
+});
+
+test('crop path: jumping track is rate-limited, jitter inside the deadband holds still', () => {
+  const srcW = 1920, cw = 606;
+  const jump: Pt[] = Array.from({length: 80}, (_, i) => ({t: i / 4, x: i % 2 ? 0.85 : 0.15}));
+  const p = cropPath(jump, srcW, cw);
+  for (let i = 1; i < p.length; i++) assert.ok(Math.abs(p[i].x - p[i - 1].x) / (p[i].t - p[i - 1].t) <= 0.35 * cw + 5, 'max speed');
+  const jitter: Pt[] = Array.from({length: 80}, (_, i) => ({t: i / 4, x: 0.5 + (i % 2 ? 0.004 : -0.004)}));
+  const q = cropPath(jitter, srcW, cw);
+  assert.ok(Math.max(...q.map(r => r.x)) - Math.min(...q.map(r => r.x)) <= 2, 'deadband holds');
+});
