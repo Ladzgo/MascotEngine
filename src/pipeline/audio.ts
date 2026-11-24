@@ -67,6 +67,9 @@ const add = (dst: Float32Array, src: Float32Array, at: number, gain = 1) => {
   for (let i = 0; i < src.length && o + i < dst.length; i++) if (o + i >= 0) dst[o + i] += src[i] * gain;
 };
 
+/** Narration clean-up: rumble cut + gentle compression so quiet words stay audible under music. */
+const VOICE_FX = 'highpass=f=80,acompressor=threshold=0.125:ratio=3:attack=5:release=120:makeup=2,';
+
 /**
  * Builds the final audio: narration (if audio/scene-N.wav exists) + SFX + music bed (if assets/music has a track,
  * ducked under the voice with sidechain compression), then loudnorm to about -14 LUFS.
@@ -102,11 +105,11 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   if (track) {
     args.push('-stream_loop', '-1', '-i', `${musicDir}${track}`);
     // music at -22 dB, sidechain-ducked by the voice, then summed with voice + ducked sfx
-    filter = '[0:a]asplit=3[v][k1][k2];[1:a][k1]' + sfxDuck + '[sfxd];' +
-      '[2:a]volume=0.12,atrim=0:' + totalSec.toFixed(3) + '[m];[m][k2]sidechaincompress=threshold=0.02:ratio=10:attack=20:release=400[duck];' +
+    filter = '[0:a]' + VOICE_FX + 'asplit=3[v][k1][k2];[1:a][k1]' + sfxDuck + '[sfxd];' +
+      '[2:a]volume=0.12,atrim=0:' + totalSec.toFixed(3) + '[m];[m][k2]sidechaincompress=threshold=0.02:ratio=2.6:attack=20:release=400:makeup=1[duck];' +
       '[v][sfxd][duck]amix=inputs=3:normalize=0[o]';
   } else {
-    filter = '[0:a]asplit=2[v][k1];[1:a][k1]' + sfxDuck + '[sfxd];[v][sfxd]amix=inputs=2:normalize=0[o]';
+    filter = '[0:a]' + VOICE_FX + 'asplit=2[v][k1];[1:a][k1]' + sfxDuck + '[sfxd];[v][sfxd]amix=inputs=2:normalize=0[o]';
   }
   execFileSync('ffmpeg', [...args, '-filter_complex', filter, '-map', '[o]', '-t', totalSec.toFixed(3), mixed]);
 
@@ -120,7 +123,7 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
     if (Number.isFinite(Number(j.input_i)))
       norm += `:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true`;
   }
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', mixed, '-af', `${pre}${norm},aresample=44100,alimiter=limit=0.74:level=disabled:attack=5:release=50`, '-ar', '44100', out]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', mixed, '-af', `${pre}${norm},aresample=44100,alimiter=limit=0.7:level=disabled:attack=5:release=50`, '-ar', '44100', out]);
   void hasVoice;
   return out;
 }

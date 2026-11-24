@@ -84,3 +84,14 @@ test('expandThin lengthens thin scenes, never the hook, rejects new numbers', as
   assert.equal(out.scenes[1].narration, long);
   assert.equal(out.scenes[2].narration, 'Another short.');
 });
+
+test('addScenes inserts before the closing scene, rejects new numbers', async () => {
+  const {addScenes} = await import('./draft.js');
+  const ep: any = {...good, scenes: [...good.scenes, {type: 'talk', emotion: 'neutral', emphasis: [], narration: 'So keep it simple.'}], disclaimer: true};
+  const ok = JSON.stringify({narration: 'Think of a grocery bill that creeps up a little every month until nobody remembers the old total. That slow creep is the whole story here, and it hides well.', emotion: 'explaining'});
+  const bad = JSON.stringify({narration: 'It cost 99 dollars more last week, which is quite a lot to absorb for most ordinary families, and then some more besides.', emotion: 'worried'});
+  const out = await addScenes(mk([ok, bad]), ep, {minWords: 500, max: 2});
+  assert.equal(out.scenes.length, 4);
+  assert.equal(out.scenes[2].narration.startsWith('Think of a grocery'), true);
+  assert.equal(out.scenes[3].narration, 'So keep it simple.');
+});

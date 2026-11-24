@@ -47,7 +47,7 @@ Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact 
 }
 
 export function buildUser(topic: string, id: string, angle?: string): string {
-  return `Topic: ${topic}\nEpisode id: ${id}${angle ? `\nAngle: ${angle}` : ''}\nWrite the episode JSON about THIS topic only. Do not reuse sentences or numbers from the voice guide examples; every scene must be about "${topic}". Use 9 to 12 scenes, narration 2 short sentences each, about 180 to 260 words in total (a 1.5 to 2 minute video). Include at least one compare or chart scene.`;
+  return `Topic: ${topic}\nEpisode id: ${id}${angle ? `\nAngle: ${angle}` : ''}\nWrite the episode JSON about THIS topic only. Do not reuse sentences or numbers from the voice guide examples; every scene must be about "${topic}". Use 9 to 12 scenes, narration 2 or 3 short sentences each (25 to 40 words), about 260 to 340 words in total (a 2 minute video). Order: hook, why it matters, how it works, a concrete example, a common mistake, what to do about it. Every scene, including list, needs real spoken narration (never "..."); the last scene is a calm one-line takeaway. Use a different image or comparison in every scene. Include at least one compare or chart scene.`;
 }
 
 const EMO_ALIAS: Record<string, string> = {surprised: 'shocked', anxious: 'worried', nervous: 'worried', concerned: 'worried', curious: 'thinking', serious: 'neutral', calm: 'neutral', playful: 'smug', ironic: 'smug', sarcastic: 'smug', cynical: 'smug', mad: 'angry', frustrated: 'angry', upset: 'sad', confident: 'smug', amused: 'happy', hopeful: 'happy', skeptical: 'thinking'};
@@ -61,7 +61,7 @@ export function repairDraft(raw: any): any {
   raw.scenes = raw.scenes.filter((sc: any) => sc && typeof sc === 'object').map((sc: any) => {
     const e = str(sc.emotion).toLowerCase().trim();
     sc.emotion = EMOTIONS.includes(e) ? e : EMO_ALIAS[e] ?? 'neutral';
-    if (typeof sc.narration !== 'string' || !sc.narration.trim()) sc.narration = str(sc.text ?? sc.script ?? sc.label ?? '...');
+    if (typeof sc.narration !== 'string' || !sc.narration.trim() || /^[.\s…]+$/.test(sc.narration)) sc.narration = str(sc.text ?? sc.script ?? sc.label ?? (Array.isArray(sc.items) ? sc.items.map(str).join('. ') + '.' : '...'));
     if (!['title', 'talk', 'big_number', 'chart', 'compare', 'list'].includes(sc.type)) sc.type = 'talk';
     for (const k of ['left', 'right']) if (sc.type === 'compare') { const x = sc[k] && typeof sc[k] === 'object' ? sc[k] : {}; sc[k] = {title: str(x.title ?? x.label ?? x.name), value: str(x.value ?? x.number ?? x.amount)}; }
     if (sc.type === 'big_number') { if (typeof sc.value === 'string') sc.value = Number(sc.value.replace(/[^0-9.\-]/g, '')); sc.label = str(sc.label); }
@@ -160,6 +160,32 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
       if (repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length) { o.log?.(`expand: scene ${i + 1} repeats a phrase, kept as is`); continue; }
       if (fixed === cand) scenes[i] = {...s, narration: cand} as Episode['scenes'][number];
     } catch { /* keep the thin scene */ }
+  }
+  return {...ep, scenes: scenes as Episode['scenes']};
+}
+
+/**
+ * Last resort for very short drafts: ask (one narrow call each) for extra talk scenes that explain the topic further.
+ * Kept only if 25+ words, no new numbers, no banned wording and no repeated phrase; inserted before the closing scene.
+ */
+export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void} = {}): Promise<Episode> {
+  const scenes = [...ep.scenes];
+  const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
+  const asks = ['a concrete everyday example (no new numbers)', 'the most common mistake people make', 'what a sensible person does about it (no advice phrasing)', 'why it feels different from what people expect'];
+  for (let k = 0; k < (o.max ?? 3) && count() < (o.minWords ?? 200) && scenes.length >= 3; k++) {
+    try {
+      const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
+        system: 'You add one scene to an explainer video script. Output ONLY JSON: {"narration": string, "emotion": string}. 2 or 3 short spoken sentences, 28 to 40 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Do not add any number, name or statistic. Never reuse a metaphor or phrase from the existing lines.',
+        messages: [{role: 'user', content: `Video: ${ep.title}\nExisting lines: ${scenes.map(x => x.narration).join(' ').slice(0, 1800)}\nWrite one new scene about: ${asks[k % asks.length]}.`}]});
+      const j = extractJson(res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('')) as {narration?: unknown; emotion?: unknown};
+      const cand = String(j.narration ?? '').trim();
+      const known = new Set([...scenes.flatMap(x => numsIn(x.narration)), ...numsIn(ep.title)]);
+      const others = scenes.map(x => x.narration);
+      const emo = EMOTIONS.includes(String(j.emotion)) ? String(j.emotion) : 'explaining';
+      const fixed = autoFixEpisode({...ep, scenes: [{...scenes[0], narration: 'x'}, {type: 'talk', emotion: emo, emphasis: [], narration: cand}] as Episode['scenes']}).scenes[1].narration;
+      if (cand.split(/\s+/).length < 25 || cand.split(/\s+/).length > 70 || numsIn(cand).some(n => !known.has(n)) || fixed !== cand || repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length) { o.log?.(`addScenes: rejected candidate ${k + 1} (${cand.split(/\s+/).length}w${fixed !== cand ? ', banned wording' : ''}${numsIn(cand).some(n => !known.has(n)) ? ', new number' : ''}${repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length ? ', repeat' : ''}): ${cand.slice(0, 80)}`); continue; }
+      scenes.splice(scenes.length - 1, 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
+    } catch { /* skip */ }
   }
   return {...ep, scenes: scenes as Episode['scenes']};
 }
