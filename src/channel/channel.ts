@@ -13,6 +13,9 @@ export const Channel = z.object({
   tone: z.string().default(''),
   language: z.string().default('en'),
   voiceId: z.string().optional(),
+  accent: z.string().optional(),     // episode accent colour name (src/accents.ts); read by the drafter/director once wired
+  sayVoice: z.string().optional(),   // macOS `say` voice for this channel (SAY_VOICE overrides)
+  voiceStyle: z.string().optional(), // speaking-style note for the script prompt and for picking a TTS voice
   bannedTopics: z.array(z.string()).default([]),
   postingPerWeek: z.number().default(2),
   createdAt: z.string().default(() => new Date().toISOString()),

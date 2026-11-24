@@ -49,3 +49,19 @@ test('voiceId: channel wins, env fallback', () => {
   assert.equal(pickVoiceId(ep(), env), 'ENV');
   assert.equal(pickVoiceId(ep('missing'), env), 'ENV');
 });
+
+import {PRESETS, fromPreset} from './presets.js';
+import {ACCENT_HEX} from '../accents.js';
+test('presets: three valid profiles with known accents; unknown preset errors; save/load works', () => {
+  assert.deepEqual(Object.keys(PRESETS).sort(), ['finance', 'history', 'tech']);
+  for (const k of Object.keys(PRESETS)) {
+    const c = fromPreset(k, `my-${k}`);
+    assert.ok(c.accent && ACCENT_HEX[c.accent], `${k} accent`);
+    assert.ok(c.tone.length > 40 && c.bannedTopics.length >= 2 && c.voiceStyle);
+  }
+  assert.equal(fromPreset('tech', 'x', {name: 'My Tech'}).name, 'My Tech');
+  assert.throws(() => fromPreset('cooking', 'x'), /Unknown preset/);
+  tmp();
+  saveChannel(fromPreset('history', 'hist'));
+  assert.equal(loadChannel('hist').niche, 'history and ancient civilisations');
+});
