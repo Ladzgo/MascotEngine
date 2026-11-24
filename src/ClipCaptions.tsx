@@ -29,6 +29,13 @@ export function captionChunks(words: CapWord[]): Chunk[] {
   return out;
 }
 
+/** Font size and word gap (in px). Gap leaves room for the stroke (0.16 em) and the 8% pop scale, so neighbouring words never touch. */
+export function captionLayout(ws: CapWord[]): {size: number; gap: number} {
+  const GAP_EM = 0.6, letters = ws.reduce((a, w) => a + w.w.length, 0);
+  const size = Math.min(92, Math.floor(920 / (letters * 0.84 * 1.08 + Math.max(0, ws.length - 1) * GAP_EM)));
+  return {size, gap: size * GAP_EM};
+}
+
 let extLoaded = false;
 /** Latin Extended-A (Hungarian ő/ű, Czech, Polish...) for the caption font; theme.ts only ships the basic latin subset. */
 function loadLatinExt() {
@@ -45,11 +52,10 @@ export const ClipCaptions: React.FC<ClipCaptionProps> = ({words}) => {
   const t = useCurrentFrame() / useVideoConfig().fps;
   const chunk = captionChunks(words).find(c => t >= c.from && t < c.to);
   if (!chunk) return <AbsoluteFill />;
-  const chars = chunk.words.reduce((a, w) => a + w.w.length + 1, 0);
-  const size = Math.min(92, Math.floor(920 / (chars * 0.84))); // fits the 960 px safe width
+  const {size, gap} = captionLayout(chunk.words); // fits the 960 px safe width
   return (
     <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center'}}>
-      <div style={{fontFamily: DISPLAY, fontSize: size, textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: 1, display: 'flex', gap: size * 0.4}}>
+      <div style={{fontFamily: DISPLAY, fontSize: size, textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: 1, display: 'flex', gap}}>
         {chunk.words.map((w, k) => {
           const next = chunk.words[k + 1];
           const active = t >= w.start && (next ? t < next.start : t < w.end + 0.15) && !isFn(w.w);

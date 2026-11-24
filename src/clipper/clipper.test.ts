@@ -176,3 +176,13 @@ test('whisperLang: en for .en models, auto for multilingual, errors on mismatch 
   assert.throws(() => whisperLang('/m/ggml-base.en.bin', 'hu'), /English-only/);
   assert.throws(() => whisperLang('/m/ggml-base.bin', 'hu; rm'), /--lang must be/);
 });
+
+test('captionLayout keeps a gap wider than stroke + pop and fits the safe width', async () => {
+  const {captionLayout} = await import('../ClipCaptions.js');
+  for (const ws of [['I', 'QUIT', 'MY'], ['CHICKENS', 'EVERYWHERE', 'NOW'], ['ELSŐ', 'MILLIÓ', 'FORINT']]) {
+    const {size, gap} = captionLayout(ws.map(w => ({w, start: 0, end: 1})));
+    assert.ok(gap >= size * (0.16 + 0.08 * 2) + 1);
+    const width = ws.reduce((a, w) => a + w.length * 0.84 * size * 1.08, 0) + gap * (ws.length - 1);
+    assert.ok(width <= 960, `${ws} ${width}`);
+  }
+});
