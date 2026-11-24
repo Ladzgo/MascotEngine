@@ -132,3 +132,6 @@ hr { border: 0; border-top: 1px solid var(--line); }
 #root input[type='checkbox'], #root input[type='radio'] { accent-color: var(--accent); }
 #root h1[tabindex]:focus, #root h1[tabindex]:focus-visible, #root h2[tabindex]:focus-visible { outline: none; }
 #root h1 + p, #root h1 + .muted { margin-top: 4px; }
+/* workspace stage track: align with the 28px/48px main padding, opaque, pinned to the viewport bottom */
+#root .ws .track { margin: 24px -28px -48px; background: var(--paper-2); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 24px -12px rgba(0, 0, 0, .6); }
+@media (max-width: 820px) { #root .ws .track { margin: 16px -16px -16px; } }
