@@ -16,3 +16,7 @@ Runs on `episodes/<id>/build/<id>-final.mp4` (else `-preview.mp4`), needs `decis
 | frames at 10/30/50/70/90% (centred on the nearest spoken word) | not blank (std dev >= 4), side margin strips (2% each) edge density <= 12%, caption zone (y 86-99%) edge density >= 2% | catches empty scenes, content cut by the frame edge, missing captions |
 
 Known limit: the frame checks are heuristics (gradient density), not OCR; a transition wipe sampled mid-frame can trip the margin check, re-run or look at the frame. Silent (`--engine silent`) episodes have no speech, so pause and caption checks are not meaningful.
+
+## E2E smoke test (`npm run e2e -- ["topic"] [--keep] [--strict] [--engine auto]`)
+
+`scripts/e2e.ts` runs a fresh topic through draft, voice, direct, preview render, QA and subtitle export (via the same stage runner as `npm run batch`) and exits 1 if a stage fails, an output (`-preview.mp4`, `.srt`, `.vtt`, `qa.json`) is missing or empty. QA findings are printed as warnings; `--strict` makes them fail the run. The temporary episode is deleted on success (`--keep` keeps it, a failed run is always kept for inspection). It needs the local LLM (Ollama) and takes about 2 minutes on the 8-core Mac (draft 65 s, voice 14 s, preview 29 s).
