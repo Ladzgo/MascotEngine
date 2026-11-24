@@ -17,3 +17,4 @@ batch-report.json
 data/retention.json
 scripts/qa/golden/FAIL-*
 out-golden-*
+data/jobs.json

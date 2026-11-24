@@ -3,7 +3,7 @@ import {useEffect, useState} from 'react';
 export type EpStatus = {state: 'draft' | 'scheduled' | 'published'; youtubeUrl?: string; publishedAt?: string; scheduledFor?: string; archived?: boolean};
 export type Card = {id: string; title: string; channel: string; kind: 'idea' | 'episode'; angle?: string; scenes?: number; totalSec?: number | null; state?: EpStatus['state']; stale?: {preview: boolean; final: boolean}; scheduledFor?: string; publishedAt?: string};
 export type Columns = Record<'idea' | 'script' | 'voiced' | 'rendered' | 'published', Card[]>;
-export type JobBrief = {jobId: string; episode: string; stages: string[]; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'; current: string | null; done: string[]; progress: number; error?: string; engine: string; createdAt: number; position?: number};
+export type JobBrief = {jobId: string; episode: string; stages: string[]; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'; current: string | null; done: string[]; progress: number; error?: string; log?: string[]; step?: string; engine: string; createdAt: number; position?: number};
 export type QueueState = {running: JobBrief | null; queued: JobBrief[]; recent: JobBrief[]};
 export type VersionRow = {id: string; at: string; scenes: number; titleChanged: boolean};
 export type SearchResult = {episodes: {id: string; title: string; channel: string; status: string}[]; ideas: {id: string; title: string; channel: string; status: string}[]; scenes: {ep: string; n: number; text: string}[]};

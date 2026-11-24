@@ -81,6 +81,17 @@ function episodeSummary(id: string) {
 type Stage = 'voice' | 'direct' | 'preview' | 'final' | 'shorts';
 type Job = {id: string; episode: string; stages: Stage[]; current: Stage | null; done: Stage[]; log: string[]; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'; engine: string; createdAt: number; error?: string; progress: number; clients: Set<http.ServerResponse>; child?: ReturnType<typeof spawn>};
 const jobs = new Map<string, Job>();
+// Jobs survive a Studio restart: a run that was mid-flight becomes an error with a Retry button, queued runs resume.
+const JOBS_FILE = `${ROOT}data/jobs.json`;
+let jobsTimer: ReturnType<typeof setTimeout> | undefined;
+const persistJobs = () => { jobsTimer ??= setTimeout(() => { jobsTimer = undefined; try { fs.mkdirSync(`${ROOT}data`, {recursive: true}); fs.writeFileSync(JOBS_FILE, JSON.stringify([...jobs.values()].slice(-40).map(({clients, child, ...j}) => ({...j, log: j.log.slice(-200)})))); } catch { /* best effort */ } }, 500); };
+function loadJobs() {
+  const saved = (() => { try { return JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8')) as Omit<Job, 'clients'>[]; } catch { return []; } })();
+  for (const j of saved) {
+    if (j.status === 'running') { j.status = 'error'; j.current = null; j.error = 'Interrupted: the Studio restarted during this run. Press Retry.'; }
+    jobs.set(j.id, {...j, clients: new Set()});
+  }
+}
 
 const STAGE_CMD: Record<Stage, (id: string, o: {engine: string; final: boolean}) => string[]> = {
   voice: (id, o) => ['tts', id, '--engine', o.engine],
@@ -93,7 +104,7 @@ const STAGE_CMD: Record<Stage, (id: string, o: {engine: string; final: boolean})
 function emit(job: Job) {
   const payload = `data: ${JSON.stringify({id: job.id, episode: job.episode, status: job.status, current: job.current, done: job.done, stages: job.stages, progress: job.progress, error: job.error, log: job.log.slice(-60)})}\n\n`;
   for (const c of job.clients) c.write(payload);
-  broadcastQueue();
+  persistJobs(); broadcastQueue();
 }
 
 // ---------- readiness (src/doctor/doctor.ts) ----------
@@ -115,7 +126,7 @@ function listClips() {
 
 // ---------- queue (one job runs, the rest wait) ----------
 const queueClients = new Set<http.ServerResponse>();
-const jobBrief = (j: Job) => ({jobId: j.id, episode: j.episode, stages: j.stages, status: j.status, current: j.current, done: j.done, progress: j.progress, error: j.error, engine: j.engine, createdAt: j.createdAt});
+const jobBrief = (j: Job) => ({jobId: j.id, episode: j.episode, stages: j.stages, status: j.status, current: j.current, done: j.done, progress: j.progress, error: j.error, engine: j.engine, createdAt: j.createdAt, log: j.status === 'error' ? j.log.slice(-40) : undefined, step: j.current ? `${j.done.length + 1}/${j.stages.length}` : undefined});
 function queueState() {
   const all = [...jobs.values()].sort((a, b) => a.createdAt - b.createdAt);
   return {
@@ -812,4 +823,5 @@ const server = http.createServer((req, res) => {
   vite.middlewares(req, res);
 });
 ensureDefaultChannel();
+loadJobs(); pump();
 server.listen(PORT, '127.0.0.1', () => { console.log(`Mascot Engine Studio: http://localhost:${PORT}`); if (!process.env.STUDIO_TEST) void ensureOllama().catch(e => console.log(`Local AI: ${(e as Error).message}`)); });
