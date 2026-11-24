@@ -52,3 +52,16 @@ test('mixAudio with synthetic music bed: -14 LUFS, TP <= -1.5', async () => {
   assert.ok(tp <= -1.4, `TP=${tp}`);
   fs.rmSync(tmp, {recursive: true, force: true});
 });
+
+test('sceneGains levels scenes to the median, clamps at 6 dB, respects peaks and silence', async () => {
+  const {sceneGains, activeRmsDb} = await import('./audio.js');
+  const tone = (amp: number) => Float32Array.from({length: 4000}, (_, i) => amp * Math.sin(i / 5));
+  const sc = [tone(0.1), tone(0.14), tone(0.2), new Float32Array(100), tone(0.01)];
+  const g = sceneGains(sc);
+  assert.equal(g[3], 1);
+  const lv = sc.map((x, i) => activeRmsDb(x) + 20 * Math.log10(g[i]));
+  assert.ok(Math.abs(lv[0] - lv[1]) < 0.2 && Math.abs(lv[1] - lv[2]) < 0.2);
+  assert.ok(Math.abs(g[4] - 1.995) < 0.01 && g[2] < 1); // very quiet scene boosted by at most 6 dB, loud one lowered
+  assert.deepEqual(sceneGains([tone(0.5)]), [1]);
+  assert.ok(sceneGains([tone(0.5), tone(0.5), tone(0.2)])[2] * 0.2 <= 1 && sceneGains([tone(0.9), tone(0.9), tone(0.3)])[2] * 0.3 <= 0.945); // no clipping
+});

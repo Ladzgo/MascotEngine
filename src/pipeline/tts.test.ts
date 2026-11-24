@@ -87,3 +87,10 @@ test('auto engine resolves to a registered engine; CliTTS errors clearly without
   try { await assert.rejects(new CliTTS('espeak-ng').synthesize(localEp(1), '/tmp/x/'), /espeak-ng not found/); }
   finally { process.env.PATH = old; }
 });
+
+test('sayRate: language default (hu slower, en system default), SAY_RATE wins', async () => {
+  const {sayRate} = await import('./tts.js');
+  const ep: any = {channel: 'no-such-channel'};
+  assert.equal(sayRate(ep, {}), undefined); // unknown channel -> en
+  assert.equal(sayRate(ep, {SAY_RATE: '150'}), 150);
+});

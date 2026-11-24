@@ -100,6 +100,7 @@ function paceCamera(cam: string, pace: Pace): number {
   return 1;
 }
 const HOOK_EMOTIONS = ['shocked', 'excited'];
+const OUTRO_TAIL = 0.7;
 const MIN_TAIL = 0.2;
 export const itemGap = (speechDur: number, n: number) => Math.max(speechDur * 0.85 / n, 1.1);
 // // unvoiced list/timeline items must stay readable even when the narration is just "Three tips."
@@ -288,6 +289,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
       tail *= pace === 'punchy' ? 0.8 : pace === 'explain' ? 1.2 : 1;
     }
     tail = Math.max(tail, MIN_TAIL);
+    if (i === ep.scenes.length - 1) tail = Math.max(tail, OUTRO_TAIL); // quiet outro: the video never ends on the last syllable
     if (i < ep.scenes.length - 1) tail += JCUT; // next scene's voice starts early, so this scene's picture holds on (L-cut feel)
     // whole frames: every scene starts on a frame, so a chunk's frame layout never depends on rounding of earlier scenes (render cache)
     const durSec = Math.ceil(Math.max(speechEnd + tail, elements.length ? Math.max(...elements) + 0.3 + (i < ep.scenes.length - 1 ? JCUT : 0) : 0) * 30 - 1e-6) / 30;

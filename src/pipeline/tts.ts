@@ -83,6 +83,9 @@ export function alignLang(ep: Episode): string | null {
   catch (e) { console.warn(`Word timing for ${lang}: ${(e as Error).message} Using proportional timing.`); return null; }
 }
 
+/** macOS say speech rate in words per minute: SAY_RATE env, else the language default (English: the system default). */
+export const sayRate = (ep: Episode, env: NodeJS.ProcessEnv = process.env): number | undefined => (Number(env.SAY_RATE) || langInfo(episodeLang(ep)).sayRate);
+
 /** macOS say voice: SAY_VOICE env, else the channel preset, else the language default (hu: Tünde), else Samantha. */
 export function pickSayVoice(ep: Episode, env: NodeJS.ProcessEnv = process.env): string {
   let v: string | undefined;
@@ -187,10 +190,10 @@ export class SayTTS implements TTSAdapter {
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`;
       const aiff = `${outDir}audio/scene-${index + 1}.aiff`;
-      const key = audioKey('say', voice, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
+      const rate = sayRate(ep), key = audioKey('say', `${voice}@${rate ?? ''}`, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
       let dur: number, rel: RelWord[];
       if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
-        const r = spawnSync('say', ['-v', voice, '-o', aiff, '--', s.narration], {encoding: 'utf8'});
+        const r = spawnSync('say', ['-v', voice, ...(rate ? ['-r', String(rate)] : []), '-o', aiff, '--', s.narration], {encoding: 'utf8'});
         if (r.error || r.status !== 0) throw new Error(`say failed on scene ${index + 1} (voice "${voice}"): ${(r.stderr || r.error?.message || '').slice(0, 200)}. List voices with: say -v '?'`);
         const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', aiff, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
         fs.rmSync(aiff, {force: true});
@@ -221,7 +224,7 @@ export class CliTTS implements TTSAdapter {
   constructor(public name: 'espeak-ng' | 'piper') {}
   private speak(text: string, wav: string, lang: string) {
     if (this.name === 'piper') return spawnSync(piperBin()!, ['--model', piperModel(lang)!, '--output_file', wav], {input: text, encoding: 'utf8', timeout: 120000});
-    return spawnSync('espeak-ng', ['-v', process.env.ESPEAK_VOICE || langInfo(lang).espeak, '-s', process.env.ESPEAK_SPEED || '155', '-w', wav, '--', text], {encoding: 'utf8', timeout: 120000});
+    return spawnSync('espeak-ng', ['-v', process.env.ESPEAK_VOICE || langInfo(lang).espeak, '-s', process.env.ESPEAK_SPEED || String(langInfo(lang).espeakSpeed), '-w', wav, '--', text], {encoding: 'utf8', timeout: 120000});
   }
   async synthesize(ep: Episode, outDir: string): Promise<Timings> {
     if (this.name === 'piper' ? !piperAvailable(episodeLang(ep)) : !hasBin('espeak-ng')) {
@@ -236,7 +239,7 @@ export class CliTTS implements TTSAdapter {
       const file = `${outDir}audio/scene-${index + 1}.mp3`;
       const wav = `${outDir}audio/scene-${index + 1}.wav`;
       const L = episodeLang(ep);
-      const key = audioKey(this.name, this.name === 'piper' ? piperModel(L) ?? '' : `${process.env.ESPEAK_VOICE || langInfo(L).espeak}/${process.env.ESPEAK_SPEED || '155'}`, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
+      const key = audioKey(this.name, this.name === 'piper' ? piperModel(L) ?? '' : `${process.env.ESPEAK_VOICE || langInfo(L).espeak}/${process.env.ESPEAK_SPEED || langInfo(L).espeakSpeed}`, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
       let dur: number, rel: RelWord[];
       if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
         const r = this.speak(s.narration, wav, L);

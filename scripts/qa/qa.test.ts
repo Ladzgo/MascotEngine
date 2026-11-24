@@ -23,3 +23,13 @@ test('captionCoverage counts words inside phrase windows', () => {
   const words = [{start: 0, end: 1}, {start: 1, end: 2}, {start: 5, end: 6}];
   assert.equal(captionCoverage(words, [{start: 0, end: 2}]), 2 / 3);
 });
+
+test('edgeSilence reads pre-roll and an unterminated outro; sceneLevels gates silence', async () => {
+  const {edgeSilence, sceneLevels} = await import('./qa.js');
+  const log = 'silence_start: 0\nsilence_end: 0.31 | silence_duration: 0.31\nsilence_start: 5.2\nsilence_end: 5.9\nsilence_start: 9.4';
+  const e = edgeSilence(log, 10);
+  assert.ok(Math.abs(e.lead - 0.31) < 1e-9 && Math.abs(e.tail - 0.6) < 1e-9);
+  assert.deepEqual(edgeSilence('silence_start: 5\nsilence_end: 6', 10), {lead: 0, tail: 0});
+  const v = new Float32Array(1000).map((_, i) => (i < 500 ? 0.2 * Math.sin(i) : 0));
+  assert.equal(sceneLevels(v, 100, [{startSec: 0, durSec: 5}, {startSec: 5, durSec: 5}]).length, 1);
+});

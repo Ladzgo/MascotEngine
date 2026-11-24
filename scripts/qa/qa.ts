@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {episodeDir, loadEpisode} from '../../src/schema.js';
 import {buildPhrases} from '../../src/fx/captions.js';
+import {activeRmsDb} from '../../src/pipeline/audio.js';
 
 /** Thresholds (documented in docs/QA.md). */
 export const LIMITS = {
@@ -9,6 +10,7 @@ export const LIMITS = {
   maxPause: 1.5, pauseShare: 0.25, // voice track: longest silence, silence / total
   blankStd: 4, marginEdge: 0.12, captionEdge: 0.02, captionCover: 0.9,
   minSec: 45, maxSec: 20 * 60,
+  preRoll: [0.15, 1.0], outro: 0.5, sceneSpreadDb: 4, // voice: first word start (s), silence after the last word (s), max level gap between scenes (dB)
 };
 export type Check = {name: string; ok: boolean; value: string; limit?: string};
 
@@ -27,6 +29,24 @@ export function parseSilence(log: string): {start: number; end: number}[] {
     if (b && s >= 0) { out.push({start: s, end: +b[1]}); s = -1; }
   }
   return out;
+}
+
+/** Silence before the first and after the last speech, from a silencedetect log (an unterminated final silence runs to `total`). */
+export function edgeSilence(log: string, total: number): {lead: number; tail: number} {
+  let lead = 0, tail = 0, open = -1;
+  for (const l of log.split('\n')) {
+    const a = l.match(/silence_start: (-?[\d.]+)/), b = l.match(/silence_end: ([\d.]+)/);
+    if (a) open = Math.max(0, +a[1]);
+    if (b && open === 0) lead = +b[1];
+    if (b) open = -1;
+  }
+  if (open >= 0) tail = total - open;
+  return {lead, tail};
+}
+
+/** Active speech level (dB RMS) per scene from the voice track samples. */
+export function sceneLevels(voice: Float32Array, sr: number, scenes: {startSec: number; durSec: number}[]): number[] {
+  return scenes.map(d => activeRmsDb(voice.subarray(Math.floor(d.startSec * sr), Math.floor((d.startSec + d.durSec) * sr)))).filter(Number.isFinite);
 }
 
 /** Pause stats between speech: leading/trailing silence is ignored. */
@@ -102,6 +122,15 @@ export function qa(id: string, fileArg?: string) {
   const P = pauseStats(sil, vdur);
   add('longest pause', P.max <= LIMITS.maxPause, `${P.max.toFixed(2)} s (${P.count} pauses, avg ${P.avg.toFixed(2)})`, `<= ${LIMITS.maxPause} s`);
   add('pause share', P.share <= LIMITS.pauseShare, `${(P.share * 100).toFixed(1)}%`, `<= ${LIMITS.pauseShare * 100}%`);
+
+  const edge = edgeSilence((run('ffmpeg', ['-hide_banner', '-nostats', '-i', voice, '-vn', '-af', 'silencedetect=n=-38dB:d=0.1', '-f', 'null', '-']).err), vdur);
+  add('pre-roll', edge.lead >= LIMITS.preRoll[0] && edge.lead <= LIMITS.preRoll[1], `${edge.lead.toFixed(2)} s before the first word`, `${LIMITS.preRoll[0]}..${LIMITS.preRoll[1]} s`);
+  add('outro silence', voice === file || edge.tail >= LIMITS.outro, // with no voice.wav the music bed fills the tail: not measurable
+    voice === file ? 'not measured (no voice.wav)' : `${edge.tail.toFixed(2)} s after the last word`, `>= ${LIMITS.outro} s`);
+  const pcm = run('ffmpeg', ['-v', 'error', '-i', voice, '-f', 's16le', '-ac', '1', '-ar', '16000', '-']).out;
+  const lv = sceneLevels(Float32Array.from(new Int16Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.byteLength / 2)), x => x / 32768), 16000, dec.scenes);
+  const spread = lv.length ? Math.max(...lv) - Math.min(...lv) : 0;
+  add('scene loudness spread', spread <= LIMITS.sceneSpreadDb, `${spread.toFixed(1)} dB between scenes`, `<= ${LIMITS.sceneSpreadDb} dB`);
 
   // captions vs speech (data) and in real frames (at the middle of spoken words)
   const sceneWords = dec.scenes.map((d: any, i: number) => tim.scenes[i].words.map((w: any) => ({w: w.w, start: d.startSec + w.start - tim.scenes[i].start + d.speechStart, end: d.startSec + w.end - tim.scenes[i].start + d.speechStart})));

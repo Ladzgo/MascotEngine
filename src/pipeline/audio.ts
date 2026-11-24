@@ -67,6 +67,28 @@ const add = (dst: Float32Array, src: Float32Array, at: number, gain = 1) => {
   for (let i = 0; i < src.length && o + i < dst.length; i++) if (o + i >= 0) dst[o + i] += src[i] * gain;
 };
 
+/** RMS in dB over the active samples only (above a -45 dBFS gate), so pauses do not make a scene look quiet. -Infinity when there is no speech. */
+export function activeRmsDb(x: Float32Array): number {
+  const gate = 10 ** (-45 / 20);
+  let sum = 0, n = 0;
+  for (const v of x) if (Math.abs(v) > gate) { sum += v * v; n++; }
+  return n ? 10 * Math.log10(sum / n) : -Infinity;
+}
+
+/** Linear gains that pull every scene's speech level to the episode median (clamped to +-6 dB, never past -0.5 dBFS peak). Silent scenes get 1. */
+export function sceneGains(scenes: Float32Array[]): number[] {
+  const db = scenes.map(activeRmsDb), live = db.filter(Number.isFinite).sort((a, b) => a - b);
+  if (live.length < 2) return scenes.map(() => 1);
+  const target = live[Math.floor((live.length - 1) / 2)];
+  return scenes.map((x, i) => {
+    if (!Number.isFinite(db[i])) return 1;
+    let g = 10 ** (Math.max(-6, Math.min(6, target - db[i])) / 20), peak = 0;
+    for (const v of x) peak = Math.max(peak, Math.abs(v));
+    if (peak * g > 0.944) g = Math.max(0.5, 0.944 / peak);
+    return g;
+  });
+}
+
 /** Narration clean-up: rumble cut + gentle compression so quiet words stay audible under music. */
 const VOICE_FX = 'highpass=f=80,acompressor=threshold=0.125:ratio=3:attack=5:release=120:makeup=2,';
 
@@ -80,14 +102,15 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   const voice = new Float32Array(n);
   const cache = new Map<string, Float32Array>();
   let hasVoice = false;
+  const takes = dec.scenes.map((_, i) => { const f = ['wav', 'mp3', 'm4a'].map(e => `${dir}audio/scene-${i + 1}.${e}`).find(p => fs.existsSync(p)); return f ? readWav16(f) : null; });
+  const gains = sceneGains(takes.map(t => t ?? new Float32Array(0))); // voice level consistency between scenes
   dec.scenes.forEach((d, i) => {
     for (const c of d.sfx) {
       const k = `${c.kind}${c.variant}`;
       if (!cache.has(k)) cache.set(k, synth(c.kind, c.variant));
       add(sfx, cache.get(k)!, d.startSec + c.t, c.kind === 'tick' ? 0.3 : 0.5);
     }
-    const f = ['wav', 'mp3', 'm4a'].map(e => `${dir}audio/scene-${i + 1}.${e}`).find(p => fs.existsSync(p));
-    if (f) { hasVoice = true; add(voice, readWav16(f), d.startSec + d.speechStart, 1); }
+    if (takes[i]) { hasVoice = true; add(voice, takes[i]!, d.startSec + d.speechStart, gains[i]); }
   });
   void timings; void ep;
 
