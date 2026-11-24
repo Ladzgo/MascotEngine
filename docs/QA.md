@@ -20,3 +20,6 @@ Known limit: the frame checks are heuristics (gradient density), not OCR; a tran
 ## E2E smoke test (`npm run e2e -- ["topic"] [--keep] [--strict] [--engine auto]`)
 
 `scripts/e2e.ts` runs a fresh topic through draft, voice, direct, preview render, QA and subtitle export (via the same stage runner as `npm run batch`) and exits 1 if a stage fails, an output (`-preview.mp4`, `.srt`, `.vtt`, `qa.json`) is missing or empty. QA findings are printed as warnings; `--strict` makes them fail the run. The temporary episode is deleted on success (`--keep` keeps it, a failed run is always kept for inspection). It needs the local LLM (Ollama) and takes about 2 minutes on the 8-core Mac (draft 65 s, voice 14 s, preview 29 s).
+
+## Golden frames (`npm run qa:golden`)
+One 480x270 still per scene type (title, talk, talk with quote, big_number, chart, compare, list, timeline, before_after) from a pinned fixture (`scripts/qa/golden/episode.json`, silent voice, pinned accent/background), compared by SSIM with `scripts/qa/golden/*.jpg` (threshold 0.985; an accent change scores 0.93 to 0.98, an identical render 1.0000). Exit 1 and `FAIL-*.jpg` (git-ignored) on a visible change. After an intended visual change run `npm run qa:golden -- --update` and commit the new references (about 160 KB in total). Not part of `npm test` (about 40 s, needs Chromium).
