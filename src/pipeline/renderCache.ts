@@ -40,12 +40,35 @@ export function codeHash(root: string): string {
  * every episode-level setting. Editing one sentence therefore invalidates that scene and its neighbours, plus every later scene whose
  * start frame moved because the edited scene got longer or shorter.
  */
-export function chunkKeys(o: {ranges: Range[]; episode: any; decisions: any; timings: any; code: string; mode: string; extra?: unknown}): string[] {
+export function chunkKeys(o: {ranges: Range[]; episode: any; decisions: any; timings: any; code: string; mode: string; extra?: unknown; layout?: {froms: number[]; ends: number[]; starts?: number[]; ts?: number[]}}): string[] {
   const {episode, decisions, timings} = o;
-  const global = sha({...episode, scenes: undefined}, {...decisions, scenes: undefined}, o.code, o.mode, o.extra ?? null, timings.fps);
-  const per = (i: number) => (i < 0 || i >= episode.scenes.length ? null : {s: episode.scenes[i], d: decisions.scenes[i], t: timings.scenes[i]});
+  // totalSec / hook / music do not change how a chunk looks; leaving them out is what lets chunks survive a length change elsewhere
+  const global = sha({...episode, scenes: undefined}, {...decisions, scenes: undefined, totalSec: undefined, hook: undefined, music: undefined}, o.code, o.mode, o.extra ?? null, timings.fps);
+  const L = o.layout, fps = timings.fps ?? 30;
+  const abs = (d: any) => (typeof d?.startSec === 'number' ? d.startSec : 0);
+  const round3 = (v: any): any => (typeof v === 'number' ? +v.toFixed(3) : Array.isArray(v) ? v.map(round3) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round3(x)])) : v); // float noise must not change a key
+  /** One scene, without anything that depends on where in the video it sits. */
+  const per = (j: number) => {
+    if (j < 0 || j >= episode.scenes.length) return null;
+    const d = decisions.scenes[j], t = timings.scenes[j];
+    return {s: episode.scenes[j], d: round3({...d, startSec: undefined, sfx: undefined}), t: t && Array.isArray(t.words) ? {...t, start: undefined, end: undefined, words: t.words.map((w: any) => [w.w, +(w.start - t.start).toFixed(3), +(w.end - t.start).toFixed(3)])} : t};
+  };
+  /** Frame layout around scene i relative to its own first frame, plus caption word frames: shift-invariant. */
+  const around = (i: number) => {
+    if (!L) return null;
+    const base = i >= L.froms.length ? L.ends[L.ends.length - 1] : L.froms[i], out: unknown[] = [];
+    for (let j = i - 1; j <= i + 1; j++) {
+      if (j < 0 || j >= L.froms.length) { out.push(null); continue; }
+      const d = decisions.scenes[j], t = timings.scenes[j];
+      out.push([L.froms[j] - base, L.ends[j] - base, (L.starts?.[j] ?? 0) - base, L.ts?.[j] ?? 0,
+        t && Array.isArray(t.words) ? t.words.map((w: any) => [Math.round((abs(d) + w.start - t.start + (d.speechStart ?? 0)) * fps) - base, Math.round((abs(d) + w.end - t.start + (d.speechStart ?? 0)) * fps) - base]) : null]);
+    }
+    return out;
+  };
   return o.ranges.map(r => {
     const i = r.scene === 'end' ? decisions.scenes.length : r.scene;
-    return sha(global, r.from, r.to, r.scene === 'end' ? null : per(i), per(i - 1), per(i + 1));
+    const parts = [global, L ? r.to - r.from : [r.from, r.to], r.scene === 'end' ? null : per(i), per(i - 1), per(i + 1), around(i)];
+    if (process.env.RENDER_CACHE_DEBUG) fs.writeFileSync(`${process.env.RENDER_CACHE_DEBUG}.${r.scene}.json`, JSON.stringify(parts, null, 1));
+    return sha(...parts);
   });
 }

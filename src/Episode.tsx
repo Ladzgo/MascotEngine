@@ -30,6 +30,15 @@ export function frameLayout(decisions: EpisodeDecisions, fps: number) {
   return {starts, ts, froms, ends};
 }
 
+/** First frame of the render chunk (scene) that frame g belongs to; frames after the last scene belong to the end-card chunk. */
+export function chunkBase(L: {froms: number[]; ends: number[]}, g: number): number {
+  if (!L.froms.length) return 0;
+  if (g >= L.ends[L.ends.length - 1]) return L.ends[L.ends.length - 1];
+  let b = L.froms[0];
+  for (const f of L.froms) if (f <= g) b = f;
+  return b;
+}
+
 export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decisions, assets}) => {
   loadFonts();
   const g = useCurrentFrame();
@@ -44,6 +53,11 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
   const phrases = useMemo(() => buildPhrases(
     decisions.scenes.map((d, i): CaptionWord[] => sceneWordsRel[i].map(w => ({w: w.w, start: d.startSec + w.start, end: d.startSec + w.end}))),
   ), [decisions, sceneWordsRel]);
+
+  // Everything that animates with time uses the frame relative to its chunk (scene), so a chunk looks the same wherever it sits in the video: the render cache survives edits that move later scenes.
+  const base = chunkBase(L, g);
+  const shift = base / fps;
+  const phrasesLocal = useMemo(() => phrases.map(p => ({start: p.start - shift, end: p.end - shift, words: p.words.map(w => ({...w, start: w.start - shift, end: w.end - shift}))})), [phrases, shift]);
 
   const host0 = (() => { try { return new URL(episode.sources[0]).hostname.replace(/^www\./, ''); } catch { return ''; } })();
   const view = (i: number, frame: number, preroll = 0) => (
@@ -60,7 +74,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
 
   return (
     <AbsoluteFill>
-      <BoilDefs frame={g} />
+      <BoilDefs frame={g - base} />
       <Paper variant={decisions.background} />
       {decisions.scenes.map((d, i) => (
         <Sequence key={i} from={L.froms[i]} durationInFrames={Math.max(1, L.ends[i] - L.froms[i])} layout="none">
@@ -68,7 +82,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
             kind={d.transition} accent={accent} view={view} />
         </Sequence>
       ))}
-      <Captions phrases={phrases} t={g / fps} accent={accent} style={decisions.captionStyle} />
+      <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} />
       {episode.disclaimer && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
           <EndCard episode={episode} accent={accent} />

@@ -284,4 +284,4 @@ export function writeTimings(dir: string, t: Timings) {
   fs.writeFileSync(`${dir}build/timings.json`, JSON.stringify(t, null, 2));
 }
 
-const round = (n: number) => Math.round(n * 1000) / 1000;
+const round = (n: number) => Math.round(n * 1e9) / 1e9; // nanosecond precision: relative word times stay identical when a scene moves (render cache keys)

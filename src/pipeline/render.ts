@@ -88,7 +88,7 @@ export async function render(idArg: string, mode: 'preview' | 'final') {
     // scene chunks: unchanged chunks come from episodes/<id>/build/chunks/<mode>/<key>.mp4, the rest are rendered (one shared browser) and the lot is concatenated losslessly
     const cdir = `${dir}build/chunks/${mode}/`;
     fs.mkdirSync(cdir, {recursive: true});
-    const keys = chunkKeys({ranges, episode: ep, decisions, timings, code: codeHash(ROOT), mode, extra: [assets, process.env.RENDER_GL ?? '']});
+    const keys = chunkKeys({ranges, layout: L, episode: ep, decisions, timings, code: codeHash(ROOT), mode, extra: [assets, process.env.RENDER_GL ?? '']});
     const todo = ranges.map((r, i) => ({r, file: `${cdir}${keys[i]}.mp4`})).filter(x => !fs.existsSync(x.file));
     const framesTodo = todo.reduce((a, x) => a + x.r.to - x.r.from + 1, 0);
     console.log(`render cache: ${ranges.length - todo.length}/${ranges.length} chunks reused, ${framesTodo}/${totalFrames} frames to render`);
