@@ -5,7 +5,7 @@ import {ACCENT_HEX} from './accents';
 import {DISPLAY, INK, PAPER, loadFonts} from './theme';
 
 export const THUMB_W = 1280, THUMB_H = 720;
-export type ThumbProps = {text: string; accent: string; pose: string; assets: CharacterAssets; variant?: 'a' | 'b'};
+export type ThumbProps = {text: string; accent: string; pose: string; assets: CharacterAssets; variant?: 'a' | 'b' | 'c'};
 
 // Archivo Black is ~0.74 em per capital: shrink until the longest word fits `budget` px (never over the mascot)
 const fit = (words: string[], max: number, budget: number) => Math.min(max, Math.floor(budget / (Math.max(...words.map(w => w.length), 3) * 0.74)));
@@ -20,6 +20,22 @@ export const Thumbnail: React.FC<ThumbProps> = ({text, accent, pose, assets, var
   const hex = ACCENT_HEX[accent] ?? ACCENT_HEX.violet;
   const words = text.toUpperCase().split(/\s+/).filter(Boolean).slice(0, 4);
   const last = words.length - 1;
+  if (variant === 'c') { // question style: ink field, giant accent question mark behind the mascot, white question text
+    const size = fit(words, 190, 700);
+    return (
+      <AbsoluteFill style={{background: INK}}>
+        <div style={{position: 'absolute', right: 40, top: -120, fontFamily: DISPLAY, fontSize: 900, lineHeight: 1, color: hex, opacity: 0.95}}>?</div>
+        <div style={{position: 'absolute', right: 60, bottom: -40}}>
+          <Mascot pose={pose} talking={false} accent={accent} frame={0} height={600} assets={assets} enter={1} />
+        </div>
+        <div style={{position: 'absolute', left: 52, top: 0, bottom: 0, width: 740, display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+          {words.map((w, i) => (
+            <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 0.98, letterSpacing: -2, color: i === last ? '#ffe14d' : '#fff', WebkitTextStroke: `${Math.round(size * 0.05)}px #000`, paintOrder: 'stroke fill'}}>{w}</span>
+          ))}
+        </div>
+      </AbsoluteFill>
+    );
+  }
   if (variant === 'b') {
     const size = fit(words, 220, 730);
     return (

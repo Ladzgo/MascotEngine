@@ -176,7 +176,7 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
       if (!cand || words <= s.narration.trim().split(/\s+/).length || words > 85 || numsIn(cand).some(n => !known.has(n))) { o.log?.(`expand: kept scene ${i + 1} as is`); continue; }
       const fixed = autoFixEpisode({...ep, scenes: [{...s, narration: 'x'}, {...s, narration: cand}] as Episode['scenes']}).scenes[1].narration; // slot 0 is a dummy: the fixer treats it as the hook
       const others = scenes.filter((_, j) => j !== i).map(x => x.narration);
-      if (repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length) { o.log?.(`expand: scene ${i + 1} repeats a phrase, kept as is`); continue; }
+      if (repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length) { o.log?.(`expand: scene ${i + 1} repeats a phrase, kept as is`); continue; }
       if (fixed === cand) scenes[i] = {...s, narration: cand} as Episode['scenes'][number];
     } catch { /* keep the thin scene */ }
   }
@@ -202,7 +202,7 @@ export async function addScenes(client: Client, ep: Episode, o: {model?: string;
       const others = scenes.map(x => x.narration);
       const emo = EMOTIONS.includes(String(j.emotion)) ? String(j.emotion) : 'explaining';
       const fixed = autoFixEpisode({...ep, scenes: [{...scenes[0], narration: 'x'}, {type: 'talk', emotion: emo, emphasis: [], narration: cand}] as Episode['scenes']}).scenes[1].narration;
-      if (cand.split(/\s+/).length < 25 || cand.split(/\s+/).length > 70 || numsIn(cand).some(n => !known.has(n)) || fixed !== cand || repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length) { o.log?.(`addScenes: rejected candidate ${k + 1} (${cand.split(/\s+/).length}w${fixed !== cand ? ', banned wording' : ''}${numsIn(cand).some(n => !known.has(n)) ? ', new number' : ''}${repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length ? ', repeat' : ''}): ${cand.slice(0, 80)}`); continue; }
+      if (cand.split(/\s+/).length < 25 || cand.split(/\s+/).length > 70 || numsIn(cand).some(n => !known.has(n)) || fixed !== cand || repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length) { o.log?.(`addScenes: rejected candidate ${k + 1} (${cand.split(/\s+/).length}w${fixed !== cand ? ', banned wording' : ''}${numsIn(cand).some(n => !known.has(n)) ? ', new number' : ''}${repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length ? ', repeat' : ''}): ${cand.slice(0, 80)}`); continue; }
       scenes.splice(scenes.length - 1, 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
     } catch { /* skip */ }
   }

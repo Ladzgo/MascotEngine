@@ -106,7 +106,7 @@ test('vtt: header, timestamps with dots, word tags', () => {
   assert.match(v, /^WEBVTT\n\n00:00:01\.000 --> 00:00:02\.200\nHello <00:00:01\.500><c>world\.<\/c>/);
 });
 
-import {buildPack, categoryFor, kindOf, pinnedComment} from './publish.js';
+import {categoryFor, kindOf, pinnedComment} from './publish.js';
 import {PRESETS} from '../channel/presets.js';
 import {Channel} from '../channel/channel.js';
 test('publish pack follows the channel voice: titles, category, pinned comment, AI prompt', async () => {

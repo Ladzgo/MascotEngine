@@ -57,12 +57,12 @@ const STOP = new Set('a an the of to in on at for and or but is are was were be 
 const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9'\s-]/g, ' ').split(/\s+/).filter(Boolean);
 
 /** Repeated 3-word phrases (with at least 2 content words) and repeated "like a X" similes across different scenes. Advisory: never blocks a draft. */
-export function repeatedPhrases(narrations: string[]): string[] {
+export function repeatedPhrases(narrations: string[], size = 3): string[] {
   const seen = new Map<string, Set<number>>();
   narrations.forEach((n, i) => {
     const w = words(n);
-    for (let k = 0; k + 3 <= w.length; k++) {
-      const g = w.slice(k, k + 3);
+    for (let k = 0; k + size <= w.length; k++) {
+      const g = w.slice(k, k + size);
       if (g.filter(x => !STOP.has(x)).length < 2) continue;
       const key = g.join(' ');
       (seen.get(key) ?? seen.set(key, new Set()).get(key)!).add(i);
