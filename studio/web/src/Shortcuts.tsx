@@ -26,7 +26,7 @@ export function useModal(ref: React.RefObject<HTMLElement | null>, open: boolean
 }
 
 const typing = (t: EventTarget | null) => { const e = t as HTMLElement | null; return !!e && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable); };
-const GO: Record<string, Parameters<typeof setRoute>[0]> = {t: {page: 'today'}, p: {page: 'pipeline'}, l: {page: 'library'}, i: {page: 'ideas'}, c: {page: 'channels'}, s: {page: 'settings'}};
+const GO: Record<string, Parameters<typeof setRoute>[0]> = {t: {page: 'today'}, p: {page: 'pipeline'}, l: {page: 'library'}, i: {page: 'ideas'}, c: {page: 'channels'}, s: {page: 'settings'}, q: {page: 'queue'}, k: {page: 'calendar'}};
 
 /** Global keys: Cmd/Ctrl+K palette, ? sheet, `g` then t/p/l/i/s. Plain keys are ignored while typing. */
 export function useGlobalShortcuts(openPalette: () => void, toggleHelp: () => void) {
@@ -47,7 +47,7 @@ export function useGlobalShortcuts(openPalette: () => void, toggleHelp: () => vo
 
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const GROUPS: {title: string; rows: [string[], string][]}[] = [
-  {title: 'Go to', rows: [[['g', 't'], 'Today'], [['g', 'p'], 'Pipeline'], [['g', 'l'], 'Library'], [['g', 'i'], 'Ideas'], [['g', 'c'], 'Channels'], [['g', 's'], 'Settings']]},
+  {title: 'Go to', rows: [[['g', 't'], 'Today'], [['g', 'p'], 'Pipeline'], [['g', 'l'], 'Library'], [['g', 'i'], 'Ideas'], [['g', 'c'], 'Channels'], [['g', 's'], 'Settings'], [['g', 'q'], 'Queue'], [['g', 'k'], 'Calendar']]},
   {title: 'Anywhere', rows: [[[mod, 'K'], 'Command palette'], [['?'], 'This sheet'], [['Esc'], 'Close dialog or palette']]},
   {title: 'Palette prefixes', rows: [[['>'], 'Actions only'], [['#'], 'Ideas only'], [['@'], 'Channels only']]},
   {title: 'Episode', rows: [[['1', '–', '5'], 'Jump to step'], [['[', ']'], 'Previous or next scene'], [[mod, 'Enter'], 'Generate'], [[mod, '⇧', 'Enter'], 'Preview'], [[mod, 'Z'], 'Undo'], [[mod, '⇧', 'Z'], 'Redo'], [[mod, 'D'], 'Duplicate scene'], [['Alt', '↑↓'], 'Move scene']]},

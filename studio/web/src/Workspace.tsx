@@ -8,6 +8,7 @@ import {Player} from './Player';
 import {Publish} from './Publish';
 import {ScriptEditor} from './ScriptEditor';
 import {StageTrack} from './StageTrack';
+import {registerActions} from './router';
 import {STEPS, Stepper, type StepAction, type StepId, type StepState} from './Stepper';
 import {Storyboard} from './Storyboard';
 import {readiness} from './Settings';
@@ -170,6 +171,12 @@ export default function Workspace({id, step, scene, onRoute}: WorkspaceProps) {
     };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, []);
+  useEffect(() => registerActions([
+    {id: 'ws-generate', label: 'This episode: make full video', hint: '⌘↵', run: () => void kb.current.generate()},
+    {id: 'ws-preview', label: 'This episode: make preview only', hint: '⌘⇧↵', run: () => void kb.current.generate(PREVIEW)},
+    ...STEPS.map(st => ({id: `ws-go-${st.id}`, label: `This episode: go to ${st.label}`, run: () => kb.current.go(st.id)})),
+    {id: 'ws-export', label: 'This episode: export ZIP', run: () => { location.href = `/api/episodes/${id}/export`; }},
+  ]), [id]);
   useEffect(() => { if (menu !== 'menu') return; const f = (e: MouseEvent) => { if (!(e.target as Element).closest('.ws-menu')) setMenu(null); }; document.addEventListener('mousedown', f); return () => document.removeEventListener('mousedown', f); }, [menu]);
 
   if (!data || !doc) return <div className="ws"><p className={err ? 'err-text pad' : 'muted pad'} role={err ? 'alert' : 'status'}>{err ?? 'Loading…'}</p></div>;
