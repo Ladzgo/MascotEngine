@@ -64,7 +64,7 @@ test('talk-run merge, closing reversal, simile cap, chart grounding', async () =
   assert.equal(talkRuns(m.scenes).length, 0); assert.equal(m.scenes.map((s: any) => s.narration).join(' ').replace(/\s+/g, ' '), 'Hook. A one. B two. C three. D four. E five.');
   assert.ok(closingContradiction('Save early. But actually, never mind.'));
   assert.equal(fixClosing({...ep, scenes: [sc('talk', 'Save early. However, forget it.')]}).scenes[0].narration, 'Save early.');
-  const sim = limitSimiles({...ep, scenes: [sc('talk', 'It is like a tide. Fine.'), sc('talk', 'It is like a fog. Plain fact.'), sc('talk', 'It is like a storm. Another fact.'), sc('talk', 'Like a rock.')]});
+  const sim = limitSimiles({...ep, scenes: [sc('talk', 'It is like a tide. Fine.'), sc('talk', 'It is like a fog. Plain fact.'), sc('talk', 'It is like a storm. Another fact.'), sc('talk', 'Plain. Like a rock.')]});
   assert.equal(similes(sim.scenes.map((s: any) => s.narration)), 2);
   const chart = (narr: string) => sc('chart', narr, {chart: {kind: 'line', labels: ['a', 'b'], values: [3, 5], yLabel: ''}});
   assert.deepEqual(groundCharts({...ep, scenes: [chart('Rates went from three to five percent.'), chart('Rates rose a lot.')]}).scenes.map((s: any) => s.type), ['chart', 'talk']);
