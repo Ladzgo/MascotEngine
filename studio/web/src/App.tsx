@@ -96,7 +96,7 @@ export function App() {
     let page: React.ReactNode;
     switch (route.page) {
       case 'today': page = <Overview ch={route.ch} chans={chans} eps={eps} cfg={cfg} onChanged={changed} />; break;
-      case 'library': page = <Library route={route} eps={eps} chans={chans} loaded={epsLoaded} />; break;
+      case 'library': page = <Library route={route} eps={eps} chans={chans} loaded={epsLoaded} onChanged={changed} />; break;
       case 'ideas': page = <Ideas channel={active} cfg={cfg} chans={chans} f={route.f} />; break;
       case 'channels': page = <Channels route={route} active={route.ch} onPick={onPick} onChanged={changed} />; break;
       case 'settings': page = <Settings onSaved={loadCfg} />; break;

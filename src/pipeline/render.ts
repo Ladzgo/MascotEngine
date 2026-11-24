@@ -10,6 +10,7 @@ import type {EpisodeDecisions} from '../director/types.js';
 import type {CharacterAssets} from '../character/Mascot.js';
 import {buildPhrases, toSrt} from '../fx/captions.js';
 import {mixAudio} from './audio.js';
+import {chromiumTuning} from './renderOpts.js';
 import {frameLayout, ENDCARD_FRAMES} from '../Episode.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
@@ -71,7 +72,7 @@ export async function render(idArg: string, mode: 'preview' | 'final') {
   let lastPct = -1;
   await renderMedia({
     composition: comp, serveUrl: bundled, codec: 'h264', outputLocation: silent, inputProps,
-    scale, muted: true, crf: mode === 'final' ? 18 : 24, pixelFormat: 'yuv420p',
+    scale, muted: true, crf: mode === 'final' ? 18 : 24, pixelFormat: 'yuv420p', chromiumOptions: chromiumTuning(), ...(mode === 'preview' ? {x264Preset: 'veryfast' as const} : {}),
     onProgress: ({progress}) => {
       const pct = Math.floor(progress * 10) * 10;
       if (pct !== lastPct) { lastPct = pct; process.stdout.write(`render ${pct}%\n`); }

@@ -1,4 +1,6 @@
 try { process.loadEnvFile(); } catch { /* .env optional */ }
+import {exportSubtitles} from '../src/publish/subtitles.js';
+import {friendlyError} from '../src/errors.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -143,7 +145,7 @@ function pump() {
   const next = [...jobs.values()].filter(j => j.status === 'queued').sort((a, b) => a.createdAt - b.createdAt)[0];
   if (!next) { broadcastQueue(); return; }
   next.status = 'running';
-  void runJob(next, next.engine).catch(e => { next.status = 'error'; next.error = String(e); emit(next); }).finally(pump);
+  void runJob(next, next.engine).catch(e => { next.status = 'error'; next.error = friendlyError(String(e)); emit(next); }).finally(pump);
 }
 /** Validate a generate/queue request and add the job. Throws HttpError. */
 function enqueue(id: string, b: {stages?: unknown; engine?: unknown}) {
@@ -183,7 +185,7 @@ async function runJob(job: Job, engine: string) {
       child.stdout.on('data', onData); child.stderr.on('data', onData);
       child.on('close', code => {
         if (job.status === 'cancelled') return ok();
-        if (code !== 0) { job.status = 'error'; const last = job.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? `exit ${code}`; job.error = `${stage} failed: ${/ENOENT.*episode\.json/.test(last) ? 'episode.json is missing for this episode' : last}`; }
+        if (code !== 0) { job.status = 'error'; const last = job.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? `exit ${code}`; job.error = `${stage} failed: ${/ENOENT.*episode\.json/.test(last) ? 'episode.json is missing for this episode' : friendlyError(job.log.slice(-12).join('\n')) !== job.log.slice(-12).join('\n') ? friendlyError(job.log.slice(-12).join('\n')) : last}`; }
         else job.done.push(stage);
         ok();
       });
@@ -228,7 +230,7 @@ function runNpm(args: string[]) {
 const runDraft = (topic: string, id: string, angle: string, channel: string) =>
   runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : [])]);
 const scriptInstalled = (name: string) => !!readJson<{scripts?: Record<string, string>}>(`${ROOT}package.json`)?.scripts?.[name];
-const cliMessage = (out: string[], code: number | null) => out.filter(l => !l.startsWith('>') && !/^npm (warn|notice)/.test(l)).slice(-6).join('\n') || `Command failed (exit ${code}).`;
+const cliMessage = (out: string[], code: number | null) => friendlyError(out.filter(l => !l.startsWith('>') && !/^npm (warn|notice)/.test(l)).slice(-6).join('\n')) || `Command failed (exit ${code}).`;
 /** One AI command at a time (draft, ideas, publish pack). Returns a release function. */
 let aiBusy = false;
 const lockAi = () => { if (aiBusy) throw new HttpError(409, 'Another AI task is already running. Wait for it to finish.'); aiBusy = true; return () => { aiBusy = false; }; };
@@ -303,7 +305,7 @@ function overview() {
 // ---------- media (Range) ----------
 function sendFile(req: http.IncomingMessage, res: http.ServerResponse, file: string) {
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end(); }
-  const size = fs.statSync(file).size, type = file.endsWith('.mp4') ? 'video/mp4' : file.endsWith('.png') ? 'image/png' : AUDIO_EXT[file.split('.').pop() ?? ''] ?? (file.endsWith('.srt') ? 'text/plain' : 'application/octet-stream');
+  const size = fs.statSync(file).size, type = file.endsWith('.mp4') ? 'video/mp4' : file.endsWith('.png') ? 'image/png' : AUDIO_EXT[file.split('.').pop() ?? ''] ?? (file.endsWith('.vtt') ? 'text/vtt; charset=utf-8' : file.endsWith('.srt') ? 'text/plain' : 'application/octet-stream');
   const range = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/);
   let start = 0, end = size - 1, partial = false;
   if (range && (range[1] || range[2])) {
@@ -692,6 +694,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         if (code === 0 && out.some(l => l.startsWith('THUMB_OK'))) return json(res, 200, {ok: true, at: Date.now()});
         return json(res, 422, {error: cliMessage(out, code)});
       }
+      if (p[2] === 'media' && p[3]?.endsWith('.vtt')) { try { exportSubtitles(ROOT, id); } catch (e) { return json(res, 422, {error: `Subtitles need a voiced and directed episode: ${(e as Error).message}`}); } }
       if (p[2] === 'media' && p[3]) return sendFile(req, res, `${d}build/${path.basename(p[3])}`);
       if (p[2] === 'shorts' && p[3]) return sendFile(req, res, `${d}build/shorts/${path.basename(p[3])}`);
     }
@@ -785,8 +788,8 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     }
     json(res, 404, {error: 'Not found.'});
   } catch (e) {
-    if (e instanceof HttpError) return json(res, e.code, {error: e.message});
-    json(res, 500, {error: e instanceof Error ? e.message : String(e)});
+    if (e instanceof HttpError) return json(res, e.code, {error: friendlyError(e.message)});
+    json(res, 500, {error: friendlyError(e instanceof Error ? e.message : String(e))});
   }
 }
 const has = (bin: string) => new Promise<boolean>(ok => { const c = spawn(bin, ['-version']); c.on('error', () => ok(false)); c.on('close', code => ok(code === 0)); });

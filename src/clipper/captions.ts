@@ -3,6 +3,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
 import type {Clip} from './timeline.js';
+import {chromiumTuning} from '../pipeline/renderOpts.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 
@@ -20,7 +21,7 @@ export async function renderCaptionVideos(clips: Clip[], dir: string): Promise<M
     try {
       const inputProps = {words: c.words.map(w => ({w: w.w, start: +(w.start - c.start).toFixed(3), end: +(w.end - c.start).toFixed(3)})), durationSec: c.end - c.start};
       const composition = await selectComposition({serveUrl, id: 'ClipCaptions', inputProps});
-      await renderMedia({composition, serveUrl, inputProps, codec: 'prores', proResProfile: '4444', pixelFormat: 'yuva444p10le', imageFormat: 'png', outputLocation: file, muted: true});
+      await renderMedia({composition, serveUrl, inputProps, codec: 'prores', proResProfile: '4444', pixelFormat: 'yuva444p10le', imageFormat: 'png', outputLocation: file, muted: true, chromiumOptions: chromiumTuning()});
       out.set(c.id, file);
     } catch (e) {
       console.warn(`captions failed for ${c.id} (${(e as Error).message.slice(0, 120)}); rendering without`);

@@ -7,6 +7,7 @@ import type {EpisodeDecisions} from '../director/types.js';
 import type {Timings} from './tts.js';
 import {loadCharacterAssets} from './render.js';
 import {checkShort} from './shortsCheck.js';
+import {chromiumTuning} from './renderOpts.js';
 
 const WEIGHT: Record<string, number> = {big_number: 5, compare: 4, before_after: 4, timeline: 3, chart: 3, list: 2, title: 1, talk: 1};
 const MAX_SEC = 55;
@@ -37,7 +38,7 @@ export async function shorts(idArg: string, count = 3) {
     const silent = `${outDir}.silent-${s.index}.mp4`;
     const inputProps = {episode: ep, timings, decisions: dec, assets, sceneIndexes: idx};
     const comp = await selectComposition({serveUrl: bundled, id: 'Short', inputProps});
-    await renderMedia({composition: comp, serveUrl: bundled, codec: 'h264', outputLocation: silent, inputProps, muted: true, crf: 18, pixelFormat: 'yuv420p'});
+    await renderMedia({composition: comp, serveUrl: bundled, codec: 'h264', outputLocation: silent, inputProps, muted: true, crf: 18, pixelFormat: 'yuv420p', chromiumOptions: chromiumTuning()});
     // audio: the same slices of the final mix, joined, with a short fade-out for a clean loop
     const segs = idx.map(i => dec.scenes[i]);
     const total = segs.reduce((a, x) => a + x.durSec, 0);
