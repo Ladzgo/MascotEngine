@@ -16,13 +16,13 @@ export const SourceCard: React.FC<{host: string; t: number; at?: number; accent:
 };
 
 /** Quote card: a short pulled line with an attribution; enters with the shared ease. */
-export const QuoteCard: React.FC<{text: string; by?: string; t: number; at?: number; accent: string; width?: number}> = ({text, by, t, at = 0, accent, width = 1100}) => {
+export const QuoteCard: React.FC<{text: string; by?: string; t: number; at?: number; accent: string; width?: number; x?: number; y?: number}> = ({text, by, t, at = 0, accent, width = 1100, x = (1920 - width) / 2, y = 280}) => {
   const e = easeOut((t - at) / 0.5);
   if (e <= 0) return null;
   return (
-    <div style={{position: 'absolute', left: (1920 - width) / 2, top: 280, width, ...CARD, padding: '44px 64px', opacity: clamp(e * 1.5), transform: `translateY(${(1 - e) * 40}px) rotate(${(1 - e) * -1.5}deg)`}}>
+    <div style={{position: 'absolute', left: x, top: y, width, ...CARD, padding: width < 1000 ? '28px 44px' : '44px 64px', opacity: clamp(e * 1.5), transform: `translateY(${(1 - e) * 40}px) rotate(${(1 - e) * -1.5}deg)`}}>
       <div style={{fontFamily: DISPLAY, fontSize: 120, lineHeight: 0.6, color: accent}}>&ldquo;</div>
-      <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 56, lineHeight: 1.2, color: INK}}>{text}</div>
+      <div style={{fontFamily: SANS, fontWeight: 700, fontSize: width < 1000 ? (text.length > 70 ? 42 : 50) : 56, lineHeight: 1.2, color: INK}}>{text}</div>
       {by && <div style={{fontFamily: SANS, fontWeight: 500, fontSize: 32, color: INK, opacity: 0.7, marginTop: 24}}>{by}</div>}
     </div>
   );

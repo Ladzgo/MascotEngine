@@ -68,6 +68,7 @@ const surprising = (s: Scene) =>
 
 function fitLayout(layout: string, s: Scene): number {
   if (s.type === 'big_number' && s.emotion === 'shocked' && layout === 'center') return 1.6;
+  if (s.type === 'talk' && s.quote) return layout === 'keyword_side' ? 8 : 0.05; // quote card lives in the keyword_side content box
   if (s.type === 'talk' && s.emphasis.length && layout === 'keyword_side') return 1.8;
   if (s.type === 'talk' && ['worried', 'sad', 'sweating'].includes(s.emotion) && layout === 'closeup') return 1.6;
   if (s.type === 'chart' && layout === 'fullscreen') return 0.7;

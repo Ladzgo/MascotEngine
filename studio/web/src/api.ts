@@ -6,7 +6,7 @@ export type Scene = {
   value?: number; prefix?: string; suffix?: string; label?: string; decimals?: number;
   chart?: {kind: 'line' | 'bar'; labels: string[]; values: number[]; yLabel: string};
   left?: {title: string; value: string}; right?: {title: string; value: string};
-  items?: string[];
+  items?: string[]; quote?: {text: string; by?: string};
 };
 export type EpisodeDoc = {id: string; channel?: string; title: string; series: string; seed: number; scenes: Scene[]; sources: string[]; disclaimer: boolean};
 export type SceneDecision = {index: number; type: string; layout: string; pose: string; camera: string; transition: string; startSec: number; durSec: number};

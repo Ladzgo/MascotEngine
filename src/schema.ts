@@ -27,7 +27,7 @@ const Side = z.object({title: z.string(), value: z.string()});
 
 export const Scene = z.discriminatedUnion('type', [
   z.object({type: z.literal('title'), ...base}),
-  z.object({type: z.literal('talk'), ...base}),
+  z.object({type: z.literal('talk'), ...base, quote: z.object({text: z.string().min(1).max(140), by: z.string().max(60).optional()}).optional()}),
   z.object({
     type: z.literal('big_number'), ...base,
     value: z.number(), prefix: z.string().default(''), suffix: z.string().default(''),

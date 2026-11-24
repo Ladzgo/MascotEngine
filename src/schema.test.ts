@@ -43,3 +43,8 @@ test('parseDecisions accepts a director output and rejects overlapping scenes', 
   assert.equal(parseDecisions(JSON.stringify(d)).scenes.length, 2);
   assert.throws(() => parseDecisions(JSON.stringify({...d, scenes: [sc(0, 0), sc(1, 1)]})), /before the previous/);
 });
+
+test('talk scene accepts an optional quote, rejects an overlong one', () => {
+  assert.ok(Episode.safeParse(ep([{...scene, quote: {text: 'Short line.', by: 'Someone'}}])).success);
+  assert.ok(!Episode.safeParse(ep([{...scene, quote: {text: 'x'.repeat(141)}}])).success);
+});
