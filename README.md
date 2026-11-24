@@ -1,5 +1,29 @@
 # Mascot Engine
 
+## Quick start / Gyorsindítás
+
+**EN**
+```bash
+npm ci                        # once
+npm run doctor                # shows what is missing (ffmpeg, Chromium, Ollama model, voice...) with fixes
+npm run app                   # Studio at http://localhost:4177 -> Today -> "Make video"
+# or from the terminal: draft -> voice -> direct -> preview in one go
+npm run batch -- --topics topics.txt --qa
+```
+Offline Linux machine: `npm run bundle` on a machine with internet, then `./setup-linux.sh` on the target (see `docs/OFFLINE.md`).
+
+**HU**
+```bash
+npm ci                        # egyszer
+npm run doctor                # kiírja, mi hiányzik (ffmpeg, Chromium, Ollama modell, hang...) és a javítást
+npm run app                   # Studio: http://localhost:4177 -> Today -> "Make video"
+# vagy terminálból: script -> hang -> rendezés -> előnézet egyben
+npm run batch -- --topics temak.txt --qa
+```
+Offline Linux gép: `npm run bundle` az internetes gépen, majd `./setup-linux.sh` a célgépen (`docs/OFFLINE.md`, részletes magyar útmutató: `docs/GUIDE.md`).
+
+---
+
 Local pipeline and web Studio that turn a script (`episode.json`) into a finished English personal-finance explainer video, plus Shorts. A cartoon mascot narrates; the voice is the free macOS `say` engine (ElevenLabs optional); the director picks layouts, camera and SFX from the content; Remotion renders; ffmpeg mixes audio. Runs on your machine, no hosting.
 
 ## Requirements

@@ -8,3 +8,10 @@ data/models
 .claude/settings.local.json
 data/uploads
 dist/
+episodes/tq*
+episodes/e2e-*
+episodes/_trash
+episodes/*/audio
+episodes/*/history
+batch-report.json
+data/retention.json
