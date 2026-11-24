@@ -98,3 +98,10 @@ test('validatePack flags YouTube rule violations; fixPack repairs the fixable on
   const fixed = fixPack({...bad, thumbnailText: [], source: 'fallback'});
   assert.ok(!validatePack({...fixed, chapters: []}).some(x => /max 100|< or >|max 5000|over 30/.test(x)));
 });
+
+import {toVtt, vttTime} from './subtitles.js';
+test('vtt: header, timestamps with dots, word tags', () => {
+  assert.equal(vttTime(3723.5), '01:02:03.500');
+  const v = toVtt([{start: 1, end: 2, words: [{w: 'Hello', start: 1, end: 1.4}, {w: 'world.', start: 1.5, end: 2}]}]);
+  assert.match(v, /^WEBVTT\n\n00:00:01\.000 --> 00:00:02\.200\nHello <00:00:01\.500><c>world\.<\/c>/);
+});
