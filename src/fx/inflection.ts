@@ -6,5 +6,5 @@ export function inflectionIndex(values: number[]): number {
     const m = Math.abs(values[i + 1] - 2 * values[i] + values[i - 1]) / span;
     if (m > mag * 1) { if (m > mag) { mag = m; best = i; } }
   }
-  return values.length >= 4 && mag > 0.02 ? best : -1;
+  return values.length >= 4 && mag > 0.12 ? best : -1;
 }

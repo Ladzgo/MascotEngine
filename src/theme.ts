@@ -3,6 +3,12 @@ import {continueRender, delayRender, staticFile} from 'remotion';
 export const W = 1920;
 export const H = 1080;
 export const PAPER = '#f6f1e4';
+/** Readable text colour on an accent fill: white when it has >= 3:1 contrast (large display type), else ink (mustard and other light accents). */
+export function onAccent(hex: string): string {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  return 1.05 / (L + 0.05) >= 3 ? '#fffdf6' : '#1a1a1a';
+}
 export const INK = '#1b1b1f';
 export const DISPLAY = '"Archivo Black", sans-serif';
 export const SANS = '"Poppins", sans-serif';
