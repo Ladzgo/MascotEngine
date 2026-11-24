@@ -1,0 +1,25 @@
+name: CI
+on:
+  push: {branches: [main]}
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - name: System tools (ffmpeg, zip, espeak-ng)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg zip unzip espeak-ng
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.remotion
+          key: remotion-browser-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Remotion browser
+        run: npx remotion browser ensure
+      - name: e2e fixture (no LLM, silent voice)
+        run: npm run e2e -- --fixture

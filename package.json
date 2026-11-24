@@ -29,6 +29,7 @@
     "subs": "tsx src/publish/subs-cli.ts",
     "analytics": "tsx src/analytics/cli.ts",
     "doctor": "tsx src/doctor/cli.ts",
+    "setup": "tsx scripts/setup.ts",
     "bundle": "bash scripts/bundle-offline.sh",
     "e2e": "tsx scripts/e2e.ts",
     "support-bundle": "tsx src/support/cli.ts"
