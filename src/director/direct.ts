@@ -91,7 +91,7 @@ function paceCamera(cam: string, pace: Pace): number {
   return 1;
 }
 const HOOK_EMOTIONS = ['shocked', 'excited'];
-const MIN_TAIL = 0.5;
+const MIN_TAIL = 0.2;
 function fitCamera(cam: string, s: Scene): number {
   if (s.type === 'list' || s.type === 'chart') return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
   if (s.type === 'compare') return cam === 'static' ? 1.4 : cam.startsWith('pan') ? 0.3 : 0.9;
@@ -229,36 +229,35 @@ export async function direct(idArg: string, opts: {final: boolean}) {
 
     // timing (relative to scene start)
     const speechDur = tm.end - tm.start;
-    const lead = 0.3;
+    const lead = i === 0 ? 0.3 : 0.1;
     const words = tm.words.map(w => ({w: w.w, start: w.start - tm.start + lead, end: w.end - tm.start + lead}));
     const speechEnd = lead + speechDur;
     let elements: number[] = [];
     let tail = MIN_TAIL;
     if (s.type === 'list') {
       const matched = s.items.map(it => findWord(it, words));
-      let extra = 0;
-      elements = matched.map(m => m ?? speechEnd + 0.3 + extra++ * 0.9);
-      tail = extra ? extra * 0.9 + 0.8 : 0.8;
+      elements = matched.map((m, k) => m ?? lead + 0.3 + (k / s.items.length) * speechDur * 0.85); // unmatched items land during speech, not after it
+      tail = 0.3;
     } else if (s.type === 'compare') {
       const l = findWord(s.left.title, words) ?? lead + speechDur * 0.3;
       const r = findWord(s.right.title, words) ?? Math.max(l + 0.8, lead + speechDur * 0.65);
       elements = [l, r];
-      tail = 1.4;
+      tail = 0.3;
     } else if (s.type === 'chart') {
-      elements = [lead + 0.5, Math.max(speechEnd, lead + 2.5)];
-      tail = 2.0;
+      elements = [lead + 0.5, Math.max(speechEnd, lead + 1.8)];
+      tail = 0.35;
     } else if (s.type === 'big_number') {
       const cs = 0.7;
       elements = [cs, cs + 2.2];
-      tail = Math.max(1.5, elements[1] + 1.2 - speechEnd);
-    } else if (s.type === 'title') tail = 0.9;
-    else tail = pace === 'punchy' ? MIN_TAIL : pace === 'explain' ? 0.85 : 0.6;
+      tail = Math.min(0.8, Math.max(0.3, elements[1] + 0.3 - speechEnd));
+    } else if (s.type === 'title') tail = 0.25;
+    else tail = pace === 'punchy' ? MIN_TAIL : pace === 'explain' ? 0.3 : 0.2;
     // pacing tweak on type tails (never below the minimum tail, so audio is never cut)
     if (s.type !== 'big_number' && s.type !== 'list' && s.type !== 'talk') {
       tail *= pace === 'punchy' ? 0.8 : pace === 'explain' ? 1.2 : 1;
     }
     tail = Math.max(tail, MIN_TAIL);
-    const durSec = Math.max(speechEnd + tail, elements.length ? Math.max(...elements) + 1.2 : 0);
+    const durSec = Math.max(speechEnd + tail, elements.length ? Math.max(...elements) + 0.3 : 0);
 
     // punch-ins: emphasis words + surprising numbers
     const punchIns: SceneDecision['punchIns'] = [];

@@ -59,7 +59,7 @@ test('distance', () => {
 
 test('audio never truncated, hook recorded, old shape loads', async () => {
   const d: EpisodeDecisions = JSON.parse(await run());
-  for (const sc of d.scenes) assert.ok(sc.durSec >= sc.speechEnd + 0.5 - 1e-6, `scene ${sc.index} cuts audio`);
+  for (const sc of d.scenes) assert.ok(sc.durSec >= sc.speechEnd + 0.2 - 1e-6, `scene ${sc.index} cuts audio`);
   assert.ok(d.hook && d.hook.atSec <= 2 && ['punch_in', 'slow_open'].includes(d.hook.kind));
   assert.deepEqual(d.scenes[0].hook, d.hook);
   // old shape: no hook fields anywhere

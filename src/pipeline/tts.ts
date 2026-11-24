@@ -23,7 +23,9 @@ export interface TTSAdapter {
 const WPS = 2.6; // words per second for estimates
 const LEAD_IN = 0.4;
 const SCENE_GAP = 0.5;
-const MIN_SCENE = 2.5;
+const MIN_SCENE = 1.2;
+/** Cut leading/trailing silence of synthesized speech (keeps pauses between sentences short). */
+const TRIM_AF = 'silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.03,areverse,silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.05,areverse';
 export const FPS = 30;
 
 export function tokenize(text: string): string[] {
@@ -47,7 +49,7 @@ export class SilentTTS implements TTSAdapter {
         cursor += d;
         return wt;
       });
-      const end = Math.max(cursor + 0.3, t + MIN_SCENE);
+      const end = Math.max(cursor + 0.05, t + MIN_SCENE);
       const st: SceneTiming = {index, start: round(t), end: round(end), words};
       t = end + SCENE_GAP;
       return st;
@@ -98,7 +100,7 @@ export class ElevenLabsTTS implements TTSAdapter {
         cur.w += c; cur.end = round(t + ce[i]);
       });
       if (cur) words.push(cur);
-      const end = Math.max((words.at(-1)?.end ?? t) + 0.3, t + MIN_SCENE);
+      const end = Math.max((words.at(-1)?.end ?? t) + 0.05, t + MIN_SCENE);
       scenes.push({index, start: round(t), end: round(end), audioFile: file, words});
       t = end + SCENE_GAP;
     }
@@ -128,7 +130,7 @@ export class LocalRecordingTTS implements TTSAdapter {
       if (aligner) rel = mapToNarration(s.narration, runAligner(aligner, file));
       if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
-      const end = Math.max(t + dur + 0.3, t + MIN_SCENE);
+      const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
       scenes.push({index, start: round(t), end: round(end), audioFile: file, words});
       t = end + SCENE_GAP;
     }
@@ -153,7 +155,7 @@ export class SayTTS implements TTSAdapter {
       const aiff = `${outDir}audio/scene-${index + 1}.aiff`;
       const r = spawnSync('say', ['-v', voice, '-o', aiff, '--', s.narration], {encoding: 'utf8'});
       if (r.error || r.status !== 0) throw new Error(`say failed on scene ${index + 1} (voice "${voice}"): ${(r.stderr || r.error?.message || '').slice(0, 200)}. List voices with: say -v '?'`);
-      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', aiff, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
+      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', aiff, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
       fs.rmSync(aiff, {force: true});
       if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
       const dur = probeDuration(file);
@@ -161,7 +163,7 @@ export class SayTTS implements TTSAdapter {
       if (aligner) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, 'en')); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
       if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
-      const end = Math.max(t + dur + 0.3, t + MIN_SCENE);
+      const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
       scenes.push({index, start: round(t), end: round(end), audioFile: file, words});
       t = end + SCENE_GAP;
     }
@@ -193,7 +195,7 @@ export class CliTTS implements TTSAdapter {
       const wav = `${outDir}audio/scene-${index + 1}.wav`;
       const r = this.speak(s.narration, wav);
       if (r.error || r.status !== 0) throw new Error(`${this.name} failed on scene ${index + 1}: ${(r.stderr || r.error?.message || '').slice(0, 200)}`);
-      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', wav, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
+      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', wav, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
       fs.rmSync(wav, {force: true});
       if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
       const dur = probeDuration(file);
@@ -201,7 +203,7 @@ export class CliTTS implements TTSAdapter {
       if (aligner) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, 'en')); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
       if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
-      const end = Math.max(t + dur + 0.3, t + MIN_SCENE);
+      const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
       scenes.push({index, start: round(t), end: round(end), audioFile: file, words});
       t = end + SCENE_GAP;
     }
