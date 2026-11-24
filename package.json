@@ -30,7 +30,8 @@
     "analytics": "tsx src/analytics/cli.ts",
     "doctor": "tsx src/doctor/cli.ts",
     "bundle": "bash scripts/bundle-offline.sh",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "tsx scripts/e2e.ts",
+    "support-bundle": "tsx src/support/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",

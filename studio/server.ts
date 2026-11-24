@@ -6,6 +6,7 @@ import {summarize} from '../src/analytics/summary.js';
 import {checkReadiness} from '../src/doctor/doctor.js';
 import {checkRequest, underRoots} from '../src/guard.js';
 import {exportEpisodeZip, importEpisodeZip} from './archive.js';
+import {logLine} from '../src/support/log.js';
 import {friendlyError} from '../src/errors.js';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -188,6 +189,7 @@ async function runJob(job: Job, engine: string) {
         if (job.status === 'cancelled') return ok();
         if (code !== 0) { job.status = 'error'; const last = job.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? `exit ${code}`; job.error = `${stage} failed: ${/ENOENT.*episode\.json/.test(last) ? 'episode.json is missing for this episode' : friendlyError(job.log.slice(-12).join('\n')) !== job.log.slice(-12).join('\n') ? friendlyError(job.log.slice(-12).join('\n')) : last}`; }
         else job.done.push(stage);
+        if (job.status === 'error') logLine(ROOT, 'job-failed', `${job.episode} ${stage}: ${job.error}`);
         ok();
       });
     });
@@ -832,6 +834,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     json(res, 404, {error: 'Not found.'});
   } catch (e) {
     if (e instanceof HttpError) return json(res, e.code, {error: friendlyError(e.message)});
+    logLine(ROOT, 'api-500', `${m} ${url.pathname}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
     json(res, 500, {error: friendlyError(e instanceof Error ? e.message : String(e))});
   }
 }
@@ -849,6 +852,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith('/api/')) return void api(req, res, url);
   vite.middlewares(req, res);
 });
+process.on('uncaughtException', e => logLine(ROOT, 'uncaught', e.stack ?? String(e)));
+process.on('unhandledRejection', e => logLine(ROOT, 'unhandled', String(e instanceof Error ? e.stack : e)));
 ensureDefaultChannel();
 loadJobs(); pump();
 server.listen(PORT, '127.0.0.1', () => { console.log(`Mascot Engine Studio: http://localhost:${PORT}`); if (!process.env.STUDIO_TEST) void ensureOllama().catch(e => console.log(`Local AI: ${(e as Error).message}`)); });
