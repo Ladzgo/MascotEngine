@@ -97,6 +97,14 @@ export function loadEpisode(idOrPrefix: string): Episode {
 // ---- Unified timeline schema (decisions.json): written by the director and by the clipper, validated before every render.
 const sec = z.number().finite();
 const Hook = z.object({kind: z.enum(['punch_in', 'slow_open']), atSec: sec});
+/** Per-channel caption look: style, vertical position, size, how the spoken word is marked. Absent = director's pick and the defaults. */
+export const CaptionPrefs = z.object({
+  style: z.enum(['bar', 'pill', 'outline']).optional(),
+  position: z.enum(['bottom', 'middle', 'top']).default('bottom'),
+  size: z.number().min(32).max(120).optional(),
+  highlight: z.enum(['accent', 'underline', 'none']).default('accent'),
+});
+export type CaptionPrefs = z.infer<typeof CaptionPrefs>;
 export const SceneDecisionSchema = z.object({
   index: z.number().int().min(0), type: z.string(), layout: z.string(), charSide: z.enum(['left', 'right', 'center']), pose: z.string(), camera: z.string(), transition: z.string(),
   startSec: sec.min(0), durSec: sec.positive(), speechStart: sec, speechEnd: sec,
@@ -107,7 +115,7 @@ export const SceneDecisionSchema = z.object({
 export const DecisionsSchema = z.object({
   episodeId: z.string(), seed: z.number(), accent: z.string(),
   background: z.enum(['plain', 'grid', 'dots', 'vignette']), captionStyle: z.enum(['bar', 'pill', 'outline']), intro: z.enum(['ink_draw', 'pop', 'slide']),
-  music: z.object({mood: z.string(), track: z.string().nullable()}), totalSec: sec.positive(), hook: Hook.optional(),
+  music: z.object({mood: z.string(), track: z.string().nullable()}), totalSec: sec.positive(), hook: Hook.optional(), captions: CaptionPrefs.optional(),
   scenes: z.array(SceneDecisionSchema).min(1),
 }).superRefine((d, ctx) => {
   d.scenes.forEach((s, i) => {

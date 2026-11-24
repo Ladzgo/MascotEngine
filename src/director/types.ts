@@ -35,6 +35,8 @@ export type EpisodeDecisions = {
   totalSec: number;
   /** Optional (absent in old decisions.json). atSec is seconds from episode start. */
   hook?: Hook;
+  /** Optional: channel caption preferences (position, size, highlight). */
+  captions?: {style?: 'bar' | 'pill' | 'outline'; position: 'bottom' | 'middle' | 'top'; size?: number; highlight: 'accent' | 'underline' | 'none'};
   scenes: SceneDecision[];
 };
 

@@ -6,7 +6,7 @@ import type {Timings} from './pipeline/tts';
 import type {CharacterAssets} from './character/Mascot';
 import {BoilDefs} from './fx/boil';
 import {Paper} from './fx/paper';
-import {Captions, buildPhrases, type CaptionWord} from './fx/captions';
+import {Captions, buildPhrases, captionLayout, type CaptionWord} from './fx/captions';
 import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
 import {SourceCard} from './fx/overlays';
@@ -68,6 +68,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     </>
   );
 
+  const cap = captionLayout(decisions.captions, 'wide');
   const accent = accentHex(decisions.accent);
   const totalScenes = decisions.scenes.length;
   const endStart = L.ends[totalScenes - 1];
@@ -82,7 +83,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
             kind={d.transition} accent={accent} view={view} />
         </Sequence>
       ))}
-      <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} />
+      <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />
       {episode.disclaimer && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
           <EndCard episode={episode} accent={accent} />

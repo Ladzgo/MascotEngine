@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
+import {CaptionPrefs} from '../schema.js';
 
 export const DEFAULT_CHANNEL_ID = 'default';
 
@@ -25,6 +26,7 @@ export const Channel = z.object({
   accent: z.string().optional(),     // episode accent colour name (src/accents.ts); read by the drafter/director once wired
   sayVoice: z.string().optional(),   // macOS `say` voice for this channel (SAY_VOICE overrides)
   branding: BrandingConfig.optional(),
+  captions: CaptionPrefs.optional(),   // caption style/position/size/highlight; Shorts clamp it to the platform safe zone
   voiceStyle: z.string().optional(), // speaking-style note for the script prompt and for picking a TTS voice
   bannedTopics: z.array(z.string()).default([]),
   postingPerWeek: z.number().default(2),

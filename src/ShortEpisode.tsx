@@ -3,7 +3,7 @@ import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion'
 import type {EpisodeProps} from './Episode';
 import {BoilDefs} from './fx/boil';
 import {Paper} from './fx/paper';
-import {Captions, buildPhrases} from './fx/captions';
+import {Captions, buildPhrases, captionLayout} from './fx/captions';
 import {SceneView, type Place} from './scenes/SceneView';
 import {ACCENT_HEX} from './accents';
 import {CtaCard, Watermark, type Branding} from './Branding';
@@ -17,7 +17,6 @@ const VH = SHORT_H / K;
 // Vertical layout (virtual px): scene content on top, mascot below, captions in the lower safe zone.
 const PLACE: Place = {char: {cx: VW / 2, h: 760}, content: {x: 70, y: 150, w: VW - 140, h: 900}};
 const FLOOR = 1590;
-const CAPTION_BOTTOM = 380; // real px; keeps clear of Shorts UI
 
 export type ShortProps = EpisodeProps & {sceneIndexes: number[]; branding?: Branding | null};
 export const outroFrames = (b: Branding | null | undefined, fps: number) => (b && b.outroSec > 0 ? Math.round(b.outroSec * fps) : 0);
@@ -33,13 +32,14 @@ const ShortScene: React.FC<ShortProps & {sceneIndex: number}> = ({episode, timin
   const phrases = buildPhrases([words]);
   const accent = ACCENT_HEX[decisions.accent] ?? decisions.accent;
   const scene = episode.scenes[sceneIndex];
+  const cap = captionLayout(decisions.captions, 'short');
   return (
     <AbsoluteFill>
       <div style={{position: 'absolute', left: 0, top: 0, width: VW, height: VH, transform: `scale(${K})`, transformOrigin: '0 0'}}>
         <SceneView scene={scene} dec={d} frame={f} fps={fps} accent={decisions.accent === '' ? INK : accent} assets={assets} words={words}
           intro={decisions.intro} episodeTitle={episode.title} place={PLACE} floor={FLOOR} />
       </div>
-      <Captions phrases={phrases} t={f / fps} accent={accent} style={decisions.captionStyle} size={76} bottom={CAPTION_BOTTOM} maxWidth={SHORT_W - 140} />
+      <Captions phrases={phrases} t={f / fps} accent={accent} style={decisions.captionStyle} size={cap.size} anchor={cap.anchor} bottom={cap.offset} maxWidth={cap.maxWidth} highlight={decisions.captions?.highlight} />
     </AbsoluteFill>
   );
 };

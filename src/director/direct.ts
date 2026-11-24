@@ -193,7 +193,8 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
   const last3Accents = recent.slice(-3).map(e => e.accent);
   const accent = channelAccent(ep.channel) ?? pick(Object.keys(ACCENTS), a => (last3Accents.includes(a) ? 0.03 : 1) * noise(rand), rand);
   const background = pick([...BACKGROUNDS], b => freqPenalty(b, 'background', recent) * noise(rand), rand);
-  const captionStyle = pick([...CAPTIONS], c => freqPenalty(c, 'captionStyle', recent) * noise(rand), rand);
+  const capPrefs = (() => { try { return loadChannel(ep.channel).captions; } catch { return undefined; } })();
+  const captionStyle = capPrefs?.style ?? pick([...CAPTIONS], c => freqPenalty(c, 'captionStyle', recent) * noise(rand), rand);
   const intro = pick([...INTROS], c => freqPenalty(c, 'intro', recent) * noise(rand), rand);
   // emotion arc: the closing third counts 1.5x (the bed should land on how the video ends)
   const arc = (set: string[]) => ep.scenes.reduce((n, s, i) => n + (set.includes(s.emotion) ? (i >= ep.scenes.length * 2 / 3 ? 1.5 : 1) : 0), 0);
@@ -376,7 +377,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
 
   const out: EpisodeDecisions = {
     episodeId: ep.id, seed: ep.seed, accent, background, captionStyle, intro,
-    music: {mood, track: moodTrack(mood)}, totalSec: round(cursor), scenes: decided,
+    music: {mood, track: moodTrack(mood)}, totalSec: round(cursor), scenes: decided, ...(capPrefs ? {captions: capPrefs} : {}),
     ...(decided[0]?.hook ? {hook: decided[0].hook} : {}),
   };
   fs.writeFileSync(`${dir}build/decisions.json`, JSON.stringify(out, null, 2));
