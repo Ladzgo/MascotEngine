@@ -85,3 +85,7 @@ test('path traversal: ids with dots/slashes never reach the filesystem', async (
   }
   assert.equal((await fetch(`${BASE}/api/episodes`, {method: 'POST', headers: J, body: JSON.stringify({id: '../evil'})})).status, 400);
 });
+
+test('validation: non-object JSON bodies are 400, not 500', async () => {
+  for (const b of ['[]', 'null', '"x"', '12']) assert.equal((await fetch(`${BASE}/api/queue`, {method: 'POST', headers: J, body: b})).status, 400, b);
+});

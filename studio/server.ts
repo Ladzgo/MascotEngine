@@ -36,7 +36,7 @@ const readBody = (req: http.IncomingMessage) => new Promise<string>((ok, bad) =>
   req.on('end', () => { if (!over) ok(s); }); req.on('error', bad);
 });
 const body = async <T = Record<string, unknown>>(req: http.IncomingMessage): Promise<T> => {
-  try { return JSON.parse(await readBody(req)); } catch (e) { if (e instanceof HttpError) throw e; throw new HttpError(400, 'Request body is not valid JSON.'); }
+  try { const v = JSON.parse(await readBody(req)); if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object'); return v; } catch (e) { if (e instanceof HttpError) throw e; throw new HttpError(400, 'Request body is not valid JSON.'); }
 };
 const AUDIO_EXT: Record<string, string> = {wav: 'audio/wav', mp3: 'audio/mpeg', m4a: 'audio/mp4'};
 const MAX_AUDIO = 50 * 1024 * 1024;
@@ -150,6 +150,10 @@ function enqueue(id: string, b: {stages?: unknown; engine?: unknown}) {
   if (!fs.existsSync(`${d}episode.json`)) throw new HttpError(404, 'Episode not found.');
   if (!Array.isArray(b.stages) || !b.stages.length || !b.stages.every(x => typeof x === 'string' && x in STAGE_CMD)) throw new HttpError(400, 'stages must be a non-empty list of: voice, direct, preview, final, shorts.');
   const stages = b.stages as Stage[];
+  // rate limit: bounded queue, and no second identical run for the same episode while one is waiting
+  const active = [...jobs.values()].filter(j => j.status === 'queued' || j.status === 'running');
+  if (active.length >= 20) throw new HttpError(429, 'Too many runs are waiting (20). Wait for some to finish or remove them in the Queue.');
+  if (active.some(j => j.status === 'queued' && j.episode === id && j.stages.join() === stages.join())) throw new HttpError(409, 'The same run is already waiting for this episode.');
   const engine = String(b.engine ?? 'auto');
   if (!['auto', 'say', 'espeak-ng', 'piper', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be auto, say, espeak-ng, piper, eleven, local or silent.');
   if (stages.includes('voice') && engine === 'eleven' && (!process.env.ELEVENLABS_API_KEY || !process.env.ELEVENLABS_VOICE_ID)) throw new HttpError(422, 'ElevenLabs key or voice ID is missing. Add them in Settings.');
