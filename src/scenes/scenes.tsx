@@ -222,7 +222,7 @@ export const BeforeAfterScene: React.FC<SceneProps<Extract<Scene, {type: 'before
 // ------------------------------------------------------------ timeline
 export const TimelineScene: React.FC<SceneProps<Extract<Scene, {type: 'timeline'}>>> = ({scene, dec, frame, fps, accent, box}) => {
   const n = scene.events.length, t = frame / fps;
-  const lineY = box.h / 2, pad = 90, step = (box.w - 2 * pad) / (n - 1);
+  const lineY = box.h / 2, pad = 90, step = (box.w - 2 * pad) / (n - 1), lh = Math.min(250, lineY - 70); // label box height: stays inside the content box
   const draw = easeInOut((t - dec.elements[0] + 0.3) / Math.max(0.5, dec.elements[n - 1] - dec.elements[0] + 0.3));
   return (
     <div style={{position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h}}>
@@ -235,7 +235,7 @@ export const TimelineScene: React.FC<SceneProps<Extract<Scene, {type: 'timeline'
         return (
           <div key={k} style={{opacity: fade(at, frame, fps, 0.1)}}>
             <div style={{position: 'absolute', left: cx - 26, top: lineY - 26, width: 52, height: 52, borderRadius: '50%', background: accent, border: `8px solid ${INK}`, boxSizing: 'border-box', transform: `scale(${0.3 + 0.7 * p})`}} />
-            <div style={{position: 'absolute', left: cx - w / 2, width: w, textAlign: 'center', top: up ? lineY - 70 - 250 : lineY + 70, height: 250, display: 'flex', flexDirection: 'column', justifyContent: up ? 'flex-end' : 'flex-start', transform: `translateY(${(1 - easeOut((t - at) / 0.35)) * (up ? 40 : -40)}px)`}}>
+            <div style={{position: 'absolute', left: cx - w / 2, width: w, textAlign: 'center', top: up ? lineY - 70 - lh : lineY + 70, height: lh, display: 'flex', flexDirection: 'column', justifyContent: up ? 'flex-end' : 'flex-start', transform: `translateY(${(1 - easeOut((t - at) / 0.35)) * (up ? 40 : -40)}px)`}}>
               <div style={{fontFamily: DISPLAY, fontSize: Math.min(110, Math.floor(w / (Math.max(e.when.length, 1) * 0.62))), lineHeight: 1, color: accent}}>{e.when}</div>
               <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 46, lineHeight: 1.2, marginTop: 12, color: INK, overflowWrap: 'anywhere'}}>{e.what}</div>
             </div>
@@ -252,6 +252,10 @@ export const ListScene: React.FC<SceneProps<Extract<Scene, {type: 'list'}>>> = (
   const size = n > 4 ? 52 : n > 3 ? 60 : 68;
   const gap = n > 4 ? 22 : 30;
   const rowH = Math.min(190, (box.h - gap * (n - 1)) / n);
+  const dot = Math.min(96, Math.round(rowH - 30));
+  const longest = Math.max(...scene.items.map(x => x.length), 1);
+  // dense lists keep every item on one line: shrink the type to the available width (never below 34 px)
+  const fsize = rowH < 150 ? Math.max(34, Math.min(size, Math.floor((box.w - 76 - dot - 34 - 40) / (longest * 0.5)))) : size;
   return (
     <Frame box={box}>
       <div style={{display: 'flex', flexDirection: 'column', gap, alignItems: 'stretch', width: box.w}}>
@@ -265,9 +269,9 @@ export const ListScene: React.FC<SceneProps<Extract<Scene, {type: 'list'}>>> = (
               <div style={{position: 'absolute', inset: 0, borderRadius: 24, border: `5px dashed ${INK}`, opacity: 0.16 * (1 - shown)}} />
               <div style={{position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: 34, padding: '0 38px', borderRadius: 24,
                 border: `7px solid ${INK}`, background: '#fffdf6', opacity: shown, transform: `translateX(${(1 - easeOut((frame / fps - t) / 0.35)) * 90}px)`}}>
-                <div style={{width: 96, height: 96, flex: 'none', borderRadius: '50%', border: `8px solid ${INK}`, background: accent, color: onAccent(accent), fontFamily: DISPLAY, fontSize: 52,
+                <div style={{width: dot, height: dot, flex: 'none', borderRadius: '50%', border: `8px solid ${INK}`, boxSizing: 'border-box', background: accent, color: onAccent(accent), fontFamily: DISPLAY, fontSize: Math.round(dot * 0.54),
                   display: 'flex', alignItems: 'center', justifyContent: 'center', transform: `scale(${0.4 + 0.6 * p})`}}>{i + 1}</div>
-                <div style={{fontFamily: SANS, fontWeight: 700, fontSize: size, lineHeight: 1.15, color: INK, textAlign: 'left'}}>{item}</div>
+                <div style={{fontFamily: SANS, fontWeight: 700, fontSize: fsize, lineHeight: 1.15, color: INK, textAlign: 'left'}}>{item}</div>
               </div>
             </div>
           );

@@ -27,9 +27,10 @@ export function pickDoodles(text: string, max = 3): string[] {
 }
 
 /** Faint icons behind the content, placed away from the character. Pure decoration: behind everything, never behind captions. */
-export const Doodles: React.FC<{text: string; accent: string; frame: number; bounds: Rect | null; opacity?: number}> = ({text, accent, frame, bounds, opacity = 0.14}) => {
+export const Doodles: React.FC<{text: string; accent: string; frame: number; bounds: Rect | Rect[] | null; opacity?: number}> = ({text, accent, frame, bounds, opacity = 0.14}) => {
   const keys = pickDoodles(text);
-  const free = SLOTS.filter(([x, y]) => !bounds || x + SIZE < bounds.x0 || x > bounds.x1 || y + SIZE < bounds.y0 || y > bounds.y1);
+  const avoid = bounds ? (Array.isArray(bounds) ? bounds : [bounds]) : [];
+  const free = SLOTS.filter(([x, y]) => avoid.every(b => x + SIZE < b.x0 || x > b.x1 || y + SIZE < b.y0 || y > b.y1));
   return (
     <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', ...BOIL_STYLE}}>
       {keys.slice(0, free.length).map((k, n) => {

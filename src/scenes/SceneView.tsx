@@ -32,7 +32,7 @@ export function placement(layout: string, type: string): Place {
     case 'before_after:split': return {char: {cx: 960, h: 300}, content: c(100, 80, 1720, 820)};
     case 'before_after:split_char_center': return {char: {cx: 960, h: 500}, content: c(80, 80, 1760, 820)};
     case 'timeline:char_corner': return {char: {cx: 1680, h: 400}, content: c(90, 70, 1440, 830)};
-    case 'timeline:fullscreen': return {content: c(120, 70, 1680, 830)};
+    case 'timeline:fullscreen': return {char: {cx: 960, h: 250}, content: c(120, 60, 1680, 600)};
     case 'list:char_left': return {char: {cx: 340, h: 640}, content: c(620, 80, 1220, 820)};
     case 'list:char_right': return {char: {cx: 1580, h: 640}, content: c(100, 80, 1200, 820)};
     case 'list:center_list': return {char: {cx: 330, h: 600}, content: c(580, 70, 1260, 830)};
@@ -109,7 +109,7 @@ export const SceneView: React.FC<{
       // low-contrast backdrop: behind camera/boil/content, never behind captions (those are drawn above all scenes)
       <Img src={staticFile(scene.art)} style={{position: 'absolute', inset: 0, width: 1920, height: 1080, objectFit: 'cover', opacity: ART_OPACITY * clamp((frame + preroll) / 10)}} />
     )}
-    {!placeOverride && <Doodles text={`${scene.narration} ${scene.emphasis.join(' ')}`} accent={accent} frame={frame + preroll} bounds={place.char ? {x0: place.char.cx - place.char.h * 0.4, x1: place.char.cx + place.char.h * 0.4, y0: floor - place.char.h, y1: floor} : null} />}
+    {!placeOverride && <Doodles text={`${scene.narration} ${scene.emphasis.join(' ')}`} accent={accent} frame={frame + preroll} bounds={[...(place.char ? [{x0: place.char.cx - place.char.h * 0.4, x1: place.char.cx + place.char.h * 0.4, y0: floor - place.char.h, y1: floor}] : []), ...(['chart', 'timeline'].includes(scene.type) && place.content.w > 0 ? [{x0: place.content.x, x1: place.content.x + place.content.w, y0: place.content.y, y1: place.content.y + place.content.h}] : [])]} />}
     <div style={{position: 'absolute', inset: 0, ...cameraStyle(dec, frame, fps, placeOverride ? undefined : place, floor)}}>
       <div style={{position: 'absolute', inset: 0, ...BOIL_STYLE}}>
         <SceneContent scene={scene} dec={dec} frame={frame} fps={fps} accent={accent} box={place.content} intro={intro} episodeTitle={episodeTitle} keyword={keyword} />
