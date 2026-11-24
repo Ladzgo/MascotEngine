@@ -6,7 +6,7 @@ import {Paper} from './fx/paper';
 import {Captions, buildPhrases} from './fx/captions';
 import {SceneView, type Place} from './scenes/SceneView';
 import {ACCENT_HEX} from './accents';
-import {H, INK, W, loadFonts} from './theme';
+import {H, INK, W, clamp, easeInOut, easeOut, loadFonts} from './theme';
 
 export const SHORT_W = 1080;
 export const SHORT_H = 1920;
@@ -19,7 +19,8 @@ const FLOOR = 1590;
 const CAPTION_BOTTOM = 380; // real px; keeps clear of Shorts UI
 
 export type ShortProps = EpisodeProps & {sceneIndexes: number[]};
-const END_FADE = 9; // frames: fade to paper so the loop back to the hook reads as a cut, not a jump
+const END_FADE = 9; // frames: ease to paper at the end and from paper at the start, so the loop reads as one continuous beat
+const START_VEIL = 5;
 
 const ShortScene: React.FC<ShortProps & {sceneIndex: number}> = ({episode, timings, decisions, assets, sceneIndex}) => {
   const f = useCurrentFrame();
@@ -57,7 +58,7 @@ export const ShortVideo: React.FC<ShortProps> = props => {
       <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${SHORT_H / H})`, transformOrigin: '0 0'}}><Paper variant={props.decisions.background} /></div>
       {props.sceneIndexes.map((si, k) => { const from = at; at += lens[k]; return (
         <Sequence key={k} from={from} durationInFrames={lens[k]}><ShortScene {...props} sceneIndex={si} /></Sequence>); })}
-      <AbsoluteFill style={{background: '#f6f1e4', opacity: Math.max(0, (g - (durationInFrames - END_FADE)) / END_FADE), pointerEvents: 'none'}} />
+      <AbsoluteFill style={{background: '#f6f1e4', opacity: Math.max(easeInOut(clamp((g - (durationInFrames - END_FADE)) / END_FADE)), 1 - easeOut(clamp(g / START_VEIL))), pointerEvents: 'none'}} />
     </AbsoluteFill>
   );
 };
