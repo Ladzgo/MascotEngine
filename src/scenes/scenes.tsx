@@ -69,7 +69,7 @@ export const TalkScene: React.FC<SceneProps> = ({scene, dec, frame, fps, accent,
   return (
     <Frame box={box}>
       <div style={{position: 'relative', transform: `scale(${0.5 + 0.5 * p}) rotate(${(1 - p) * -4}deg)`, opacity: fade(t0, frame, fps, 0.1)}}>
-        <div style={{fontFamily: DISPLAY, fontSize: Math.min(130, Math.floor(box.w / (Math.max(keyword.length, 1) * 0.62))), lineHeight: 1.05, color: accent, textTransform: 'uppercase', maxWidth: box.w}}>{keyword}</div>
+        <div style={{fontFamily: DISPLAY, fontSize: Math.min(130, /\s/.test(keyword) ? Math.floor(Math.sqrt((box.w * box.h * 0.55) / (Math.max(keyword.length, 1) * 0.65))) : Math.floor(box.w / (Math.max(keyword.length, 1) * 0.62))), lineHeight: 1.05, color: accent, textTransform: 'uppercase', maxWidth: box.w}}>{keyword}</div>
         <div style={{position: 'relative', height: 30, margin: '10px auto 0', width: 640}}><Underline w={640} progress={easeInOut((frame / fps - t0 - 0.2) / 0.5)} color={INK} /></div>
       </div>
     </Frame>
@@ -281,6 +281,88 @@ export const ListScene: React.FC<SceneProps<Extract<Scene, {type: 'list'}>>> = (
   );
 };
 
+// ------------------------------------------------------------ table
+export const TableScene: React.FC<SceneProps<Extract<Scene, {type: 'table'}>>> = ({scene, dec, frame, fps, accent, box}) => {
+  const nc = scene.columns.length, nr = scene.rows.length, t = frame / fps;
+  const gap = 14, headH = 92, rowH = Math.min(150, (box.h - headH - gap * nr) / nr);
+  const longest = Math.max(...scene.rows.flat().map(c => c.length), ...scene.columns.map(c => c.length), 1);
+  const colW = (box.w - 2 * 20) / nc;
+  const fsize = Math.max(30, Math.min(58, Math.floor(colW / (longest * 0.52)))); // longest cell fits its column on one line
+  const cell: React.CSSProperties = {width: colW, boxSizing: 'border-box', padding: '0 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflowWrap: 'anywhere', lineHeight: 1.1};
+  return (
+    <div style={{position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, display: 'flex', flexDirection: 'column', gap, justifyContent: 'center'}}>
+      <div style={{display: 'flex', height: headH, borderRadius: 20, background: INK, color: '#fffdf6', opacity: fade(0.1, frame, fps, 0.2), padding: '0 20px'}}>
+        {scene.columns.map((c, i) => <div key={i} style={{...cell, fontFamily: DISPLAY, fontSize: Math.min(fsize, 54)}}>{c}</div>)}
+      </div>
+      {scene.rows.map((r, k) => {
+        const at = dec.elements[k] ?? 0, hl = scene.highlight === k;
+        return (
+          <div key={k} style={{display: 'flex', height: rowH, borderRadius: 20, border: `7px solid ${INK}`, boxSizing: 'border-box', padding: '0 13px', background: hl ? accent : '#fffdf6', color: hl ? onAccent(accent) : INK,
+            opacity: fade(at, frame, fps, 0.12), transform: `translateX(${(1 - easeOut((t - at) / 0.35)) * 70}px)`}}>
+            {r.map((c, i) => <div key={i} style={{...cell, fontFamily: i === 0 ? SANS : DISPLAY, fontWeight: 700, fontSize: i === 0 ? fsize * 0.9 : fsize}}>{c}</div>)}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ------------------------------------------------------------ checklist
+export const ChecklistScene: React.FC<SceneProps<Extract<Scene, {type: 'checklist'}>>> = ({scene, dec, frame, fps, accent, box}) => {
+  const n = scene.steps.length, t = frame / fps, gap = 22;
+  const rowH = Math.min(150, (box.h - gap * (n - 1)) / n), bx = Math.min(96, Math.round(rowH - 28));
+  const longest = Math.max(...scene.steps.map(x => x.length), 1);
+  const fsize = Math.max(34, Math.min(64, Math.floor((box.w - 76 - bx - 34) / (longest * 0.5))));
+  // the step currently being ticked is the last one whose time has come
+  const current = dec.elements.reduce((c, e, k) => (t >= e ? k : c), -1);
+  return (
+    <Frame box={box}>
+      <div style={{display: 'flex', flexDirection: 'column', gap, width: box.w}}>
+        {scene.steps.map((step, k) => {
+          const at = dec.elements[k] ?? 0, done = t >= at, tick = easeOut((t - at) / 0.35), isNow = k === current;
+          return (
+            <div key={k} style={{height: rowH, display: 'flex', alignItems: 'center', gap: 34, padding: '0 34px', borderRadius: 24, boxSizing: 'border-box', border: `7px solid ${INK}`,
+              background: isNow ? accent : '#fffdf6', color: isNow ? onAccent(accent) : INK, opacity: done ? 1 : 0.5, transform: `scale(${isNow ? 1 + 0.03 * backOut((t - at) / 0.4) : 1})`}}>
+              <svg width={bx} height={bx} viewBox="0 0 100 100" style={{flex: 'none', overflow: 'visible'}}>
+                <rect x={6} y={6} width={88} height={88} rx={16} fill="#fffdf6" stroke={INK} strokeWidth={9} />
+                <path d="M24 54 L44 74 L78 28" fill="none" stroke={INK} strokeWidth={13} strokeLinecap="round" strokeLinejoin="round" pathLength={100} strokeDasharray="100 100" strokeDashoffset={100 * (1 - (done ? tick : 0))} opacity={done ? 1 : 0} />
+              </svg>
+              <div style={{fontFamily: SANS, fontWeight: 700, fontSize: fsize, lineHeight: 1.15, textAlign: 'left'}}>{step}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Frame>
+  );
+};
+
+// ------------------------------------------------------------ stats (several counters side by side)
+export const StatsScene: React.FC<SceneProps<Extract<Scene, {type: 'stats'}>>> = ({scene, dec, frame, fps, accent, box}) => {
+  const n = scene.stats.length, t = frame / fps, gap = 36;
+  const cardW = (box.w - gap * (n - 1)) / n;
+  const texts = scene.stats.map(s => `${s.prefix}${fmt(s.value, s.decimals)}${s.suffix}`);
+  const size = Math.min(210, Math.floor((cardW - 60) / (Math.max(...texts.map(x => x.length)) * 0.66))); // widest final text fits its card
+  return (
+    <Frame box={box}>
+      <div style={{display: 'flex', gap, width: box.w, alignItems: 'stretch'}}>
+        {scene.stats.map((s, k) => {
+          const end = dec.elements[k] ?? 1.5, start = Math.max(0.3, end - 1.6);
+          const prog = easeOut((t - start) / (end - start)), landed = t >= end ? backOut((t - end) / 0.35) : 0;
+          const text = `${s.prefix}${fmt(t >= end ? s.value : t < start ? 0 : s.value * prog, s.decimals)}${s.suffix}`;
+          const hot = k === n - 1;
+          return (
+            <div key={k} style={{width: cardW, boxSizing: 'border-box', borderRadius: 28, border: `8px solid ${INK}`, padding: '36px 20px', textAlign: 'center', background: hot ? accent : '#fffdf6',
+              color: hot ? onAccent(accent) : INK, opacity: fade(start - 0.2, frame, fps, 0.2), transform: `translateY(${(1 - easeOut((t - start + 0.2) / 0.4)) * 50}px)`}}>
+              <div style={{fontFamily: DISPLAY, fontSize: size, whiteSpace: 'nowrap', lineHeight: 1, color: hot ? onAccent(accent) : accent, fontVariantNumeric: 'tabular-nums', transform: `scale(${1 + 0.1 * Math.sin(Math.PI * clamp(landed))})`}}>{text}</div>
+              <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 42, lineHeight: 1.2, marginTop: 24, overflowWrap: 'anywhere'}}>{s.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Frame>
+  );
+};
+
 export const SceneContent: React.FC<SceneProps> = props => {
   const s = props.scene;
   switch (s.type) {
@@ -291,6 +373,9 @@ export const SceneContent: React.FC<SceneProps> = props => {
     case 'compare': return <CompareScene {...(props as SceneProps<typeof s>)} />;
     case 'list': return <ListScene {...(props as SceneProps<typeof s>)} />;
     case 'before_after': return <BeforeAfterScene {...(props as SceneProps<typeof s>)} />;
+    case 'table': return <TableScene {...(props as SceneProps<typeof s>)} />;
+    case 'checklist': return <ChecklistScene {...(props as SceneProps<typeof s>)} />;
+    case 'stats': return <StatsScene {...(props as SceneProps<typeof s>)} />;
     case 'timeline': return <TimelineScene {...(props as SceneProps<typeof s>)} />;
   }
 };

@@ -7,6 +7,7 @@ import {BOIL_STYLE} from '../fx/boil';
 import {CAPTION_ZONE_TOP, clamp, easeInOut, easeOut} from '../theme';
 import {SceneContent, type Box} from './scenes';
 import {Doodles} from '../fx/doodles';
+import {pickKeyword} from './keyword';
 
 export type Place = {char?: {cx: number; h: number}; content: Box};
 const FLOOR = CAPTION_ZONE_TOP - 44; // character feet line (886): bob (+6) stays above y=902, clear of the caption bar
@@ -36,6 +37,12 @@ export function placement(layout: string, type: string): Place {
     case 'list:char_left': return {char: {cx: 340, h: 640}, content: c(620, 80, 1220, 820)};
     case 'list:char_right': return {char: {cx: 1580, h: 640}, content: c(100, 80, 1200, 820)};
     case 'list:center_list': return {char: {cx: 330, h: 600}, content: c(580, 70, 1260, 830)};
+    case 'table:char_corner': return {char: {cx: 1700, h: 400}, content: c(90, 70, 1440, 830)};
+    case 'table:fullscreen': return {char: {cx: 960, h: 250}, content: c(120, 60, 1680, 650)};
+    case 'checklist:char_left': return {char: {cx: 340, h: 640}, content: c(620, 80, 1220, 820)};
+    case 'checklist:char_right': return {char: {cx: 1580, h: 640}, content: c(100, 80, 1200, 820)};
+    case 'stats:center': return {char: {cx: 960, h: 330}, content: c(100, 90, 1720, 470)};
+    case 'stats:char_corner': return {char: {cx: 1700, h: 420}, content: c(90, 90, 1440, 560)};
     default: return {char: {cx: 960, h: 700}, content: c(160, 80, 1600, 800)};
   }
 }
@@ -99,10 +106,7 @@ export const SceneView: React.FC<{
   const flip = !!toward && !!poseDir && poseDir !== toward;
   const talking = words.some(w => t >= w.start && t <= w.end);
   // callout word: first emphasis word, else a number, else the longest content word (never a stopword tail like "or two")
-  const keyword = scene.emphasis[0] ?? (() => {
-    const ws = scene.narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(Boolean);
-    return ws.find(w => /\d/.test(w)) ?? [...ws].sort((a, b) => b.length - a.length)[0] ?? '';
-  })();
+  const keyword = pickKeyword(scene.narration, scene.emphasis);
   return (
     <>
     {scene.art && (

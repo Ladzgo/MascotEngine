@@ -23,6 +23,9 @@ const LAYOUTS: Record<string, string[]> = {
   before_after: ['split', 'split_char_center'],
   timeline: ['char_corner', 'fullscreen'],
   list: ['char_left', 'char_right', 'center_list'],
+  table: ['char_corner', 'fullscreen'],
+  checklist: ['char_left', 'char_right'],
+  stats: ['center', 'char_corner'],
 };
 
 const POSE_BY_EMOTION: Record<string, string[]> = {
@@ -113,7 +116,7 @@ export function channelAccent(channelId: string | undefined): string | null {
   try { const a = loadChannel(channelId ?? 'default').accent; return a && a in ACCENTS ? a : null; } catch { return null; }
 }
 function fitCamera(cam: string, s: Scene): number {
-  if (s.type === 'list' || s.type === 'chart' || s.type === 'timeline') return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
+  if (['list', 'chart', 'timeline', 'table', 'checklist', 'stats'].includes(s.type)) return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
   if (s.type === 'compare' || s.type === 'before_after') return cam === 'static' ? 1.4 : cam.startsWith('pan') ? 0.3 : 0.9;
   if (surprising(s)) return cam === 'slow_push' ? 1.8 : cam === 'static' ? 0.5 : 0.9;
   if (['worried', 'sad'].includes(s.emotion)) return cam === 'slow_push' ? 1.6 : 0.8;
@@ -124,7 +127,12 @@ function fitTransition(tr: string, s: Scene, prev?: Scene): number {
   if (tr === 'zoom_through' && s.type === 'big_number') return 1.8;
   if (tr === 'circle_reveal' && s.type === 'title') return 1.5;
   if (tr === 'paper_flip' && s.type === 'list') return 1.5;
-  if (tr === 'wipe_ink' && s.type === 'chart') return 1.5;
+  if (tr === 'wipe_ink' && (s.type === 'chart' || s.type === 'timeline')) return 1.5;
+  if (tr === 'paper_flip' && s.type === 'before_after') return 1.6;
+  if (tr === 'slide' && (s.type === 'table' || s.type === 'checklist')) return 1.5;
+  if (tr === 'zoom_through' && s.type === 'stats') return 1.5;
+  if (tr === 'circle_reveal' && s.type === 'compare') return 1.3;
+  if (tr !== 'cut' && prev && prev.type === s.type && ['chart', 'list', 'table', 'checklist'].includes(s.type)) return tr === 'slide' ? 0.6 : 1; // same-type neighbours: the cut already reads as the same family
   if (tr === 'cut' && prev?.type === 'talk' && s.type === 'talk') return 2;
   return 1;
 }
@@ -275,6 +283,17 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     } else if (s.type === 'timeline') {
       elements = s.events.map((e, k) => findWord(e.when, words) ?? findWord(e.what, words) ?? lead + 0.3 + k * itemGap(speechDur, s.events.length));
       tail = 0.3;
+    } else if (s.type === 'table') {
+      elements = s.rows.map((r, k) => findWord(r[0], words) ?? lead + 0.5 + k * itemGap(speechDur, s.rows.length));
+      tail = 0.3;
+    } else if (s.type === 'checklist') {
+      elements = s.steps.map((st, k) => findWord(st, words) ?? lead + 0.4 + k * itemGap(speechDur, s.steps.length));
+      tail = 0.3;
+    } else if (s.type === 'stats') {
+      // each counter lands (counting stops) on its label word, else spread across the speech; 1.6 s of counting before it
+      elements = s.stats.map((st, k) => Math.max(1.9, findWord(st.label, words) ?? lead + 1.6 + k * itemGap(speechDur, s.stats.length)));
+      elements = elements.map((e, k) => (k > 0 ? Math.max(e, elements[k - 1] + 0.5) : e));
+      tail = 0.5;
     } else if (s.type === 'chart') {
       elements = [lead + 0.5, Math.max(speechEnd, lead + 1.8)];
       tail = 0.35;
@@ -338,12 +357,13 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     const sfx: SfxCue[] = [];
     if (i > 0 && transition !== 'cut') sfx.push({t: 0, kind: 'whoosh', variant: variant('whoosh')});
     if (s.type === 'list') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
-    if (s.type === 'compare' || s.type === 'before_after' || s.type === 'timeline') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
+    if (['compare', 'before_after', 'timeline', 'table', 'checklist'].includes(s.type)) elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (s.type === 'title') sfx.push({t: 0.15, kind: 'pop', variant: variant('pop')});
     if (s.type === 'big_number') {
       for (let t = elements[0]; t < elements[1]; t += 0.11) sfx.push({t: round(t), kind: 'tick', variant: 0});
       sfx.push({t: elements[1], kind: 'ding', variant: variant('ding')});
     }
+    if (s.type === 'stats') elements.forEach(t => sfx.push({t, kind: 'ding', variant: variant('ding')}));
     if (s.type === 'chart') sfx.push({t: elements[0], kind: 'pop', variant: variant('pop')});
 
     decided.push({

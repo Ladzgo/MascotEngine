@@ -47,6 +47,17 @@ export const Scene = z.discriminatedUnion('type', [
   // timeline: 2-5 dated steps shown left to right; before_after: one thing then and now
   z.object({type: z.literal('timeline'), ...base, events: z.array(z.object({when: z.string().min(1).max(16), what: z.string().min(1).max(60)})).min(2).max(5)}),
   z.object({type: z.literal('before_after'), ...base, before: Side, after: Side}),
+  // table: 2-4 columns x 2-5 rows, row labels in the first column; checklist: 2-6 steps ticked in order; stats: 2-3 numbers counting up side by side
+  z.object({type: z.literal('table'), ...base,
+    columns: z.array(z.string().min(1).max(24)).min(2).max(4),
+    rows: z.array(z.array(z.string().max(28)).min(2).max(4)).min(2).max(5),
+    highlight: z.number().int().min(0).optional(), // row index drawn in the accent colour
+  }).refine(t => t.rows.every(r => r.length === t.columns.length), 'every row needs one cell per column')
+    .refine(t => t.highlight === undefined || t.highlight < t.rows.length, 'highlight row out of range'),
+  z.object({type: z.literal('checklist'), ...base, steps: z.array(z.string().min(1).max(60)).min(2).max(6)}),
+  z.object({type: z.literal('stats'), ...base, stats: z.array(z.object({
+    value: z.number(), prefix: z.string().max(4).default(''), suffix: z.string().max(6).default(''), decimals: z.number().int().min(0).max(3).default(0), label: z.string().min(1).max(40),
+  })).min(2).max(3)}),
 ]);
 export type Scene = z.infer<typeof Scene>;
 export type SceneType = Scene['type'];
