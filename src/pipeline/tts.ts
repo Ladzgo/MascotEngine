@@ -58,6 +58,13 @@ export class SilentTTS implements TTSAdapter {
   }
 }
 
+/** macOS say voice: SAY_VOICE env, else the channel preset, else Samantha. */
+export function pickSayVoice(ep: Episode, env: NodeJS.ProcessEnv = process.env): string {
+  let v: string | undefined;
+  try { v = loadChannel(ep.channel ?? 'default').sayVoice; } catch { /* unknown channel */ }
+  return env.SAY_VOICE || v || 'Samantha';
+}
+
 /** Channel voiceId wins over ELEVENLABS_VOICE_ID. */
 export function pickVoiceId(ep: Episode, env: NodeJS.ProcessEnv = process.env): string | undefined {
   let id: string | undefined;
@@ -142,7 +149,7 @@ export class LocalRecordingTTS implements TTSAdapter {
 export class SayTTS implements TTSAdapter {
   name = 'say';
   async synthesize(ep: Episode, outDir: string): Promise<Timings> {
-    const voice = process.env.SAY_VOICE || 'Samantha';
+    const voice = pickSayVoice(ep);
     if (spawnSync('sh', ['-c', 'command -v say'], {stdio: 'ignore'}).status !== 0) {
       throw new Error('The macOS `say` command was not found. The say engine only works on macOS; use --engine silent or eleven.');
     }

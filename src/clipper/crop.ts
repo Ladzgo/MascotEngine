@@ -18,13 +18,18 @@ export function skinMask(rgb: Uint8Array): Uint8Array {
  * colW weights columns (background suppression), skin weights moving pixels that look like skin (x1) vs not (x0.35).
  */
 export function centroidX(prev: Uint8Array, cur: Uint8Array, w: number, h: number, noise = 12, colW?: number[], skin?: Uint8Array): {x: number; conf: number} {
+  // pass 1: is there real moving skin? then non-skin motion (screens, tickers, foliage) is ignored, else it only counts x0.35
+  let skinE = 0, skinPx = 0;
+  if (skin) for (let i = 0; i < w * h; i++) { if (skin[i]) skinPx++; const d = Math.abs(cur[i] - prev[i]); if (skin[i] && d > noise) skinE += d * (colW?.[i % w] ?? 1); }
+  const person = skinPx >= 20; // a person-like blob is in frame: only their motion counts, otherwise the track holds
+  const other = skin ? (person ? 0.005 : 0.35) : 1;
   let sum = 0, wx = 0, raw = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const d = Math.abs(cur[y * w + x] - prev[y * w + x]);
-    if (d > noise) { raw += d; const k = d * (colW?.[x] ?? 1) * (skin ? (skin[y * w + x] ? 1 : 0.35) : 1); sum += k; wx += k * (x + 0.5); }
+    if (d > noise) { raw += d; const k = d * (colW?.[x] ?? 1) * (skin && !skin[y * w + x] ? other : 1); sum += k; wx += k * (x + 0.5); }
   }
   // motion that is mostly suppressed background carries no confidence (the track holds)
-  return {x: sum ? wx / sum / w : 0.5, conf: raw && sum / raw >= 0.15 ? Math.min(1, sum / (w * h * 8)) : 0};
+  return {x: sum ? wx / sum / w : 0.5, conf: raw && sum / raw >= 0.15 && !(person && skinE < 100) ? Math.min(1, sum / (w * h * 8)) : 0};
 }
 
 /** Column weights: columns that move in most frames (ticker, screen, fan, flashing light) are not the speaker. */
@@ -37,10 +42,11 @@ export function backgroundWeights(frames: Uint8Array[], w: number, h: number, no
     if (c >= 2) act[x]++;
   }
   // a window of columns (+-2) is "busy" if it moves in > 60% of frames; weight falls to 0.02 by 90%
-  return act.map((_, x) => {
+  const w0 = act.map((_, x) => {
     const f = Math.max(...act.slice(Math.max(0, x - 2), x + 3)) / n;
     return 1 - 0.98 * Math.min(1, Math.max(0, (f - 0.6) / 0.3));
   });
+  return w0.filter(v => v < 0.5).length > 0.6 * w ? act.map(() => 1) : w0; // everything moves (busy scene): nothing stands out, keep all columns
 }
 
 /** Raw track from consecutive frames; low-confidence frames hold the previous position (starts centered). */

@@ -84,3 +84,15 @@ test('no picture holds >4.5 s without a motion event; J-cut puts the next voice 
   }
   assert.ok(d.scenes.slice(1).every(sc => sc.speechStart < 0));
 });
+
+test('retention weights shorten/lengthen the still limit within 0.9-1.1; empty = neutral', async () => {
+  const {stillLimit} = await import('./direct.js');
+  assert.equal(stillLimit('talk', {}), 4.5);
+  assert.ok(Math.abs(stillLimit('talk', {talk: 0.9}) - 4.05) < 1e-9);
+  assert.ok(Math.abs(stillLimit('list', {list: 5}) - 4.95) < 1e-9); // clamped
+});
+
+test('channel accent preset: known accent wins, unknown or missing channel is ignored', async () => {
+  const {channelAccent} = await import('./direct.js');
+  assert.equal(channelAccent('no-such-channel-xyz'), null);
+});

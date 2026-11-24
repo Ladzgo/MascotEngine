@@ -74,6 +74,7 @@ export function channelContext(ch: Channel): string {
     `Audience: ${ch.audience}`,
     `Tone: ${ch.tone}`,
     `Language: ${ch.language}`,
+    ...(ch.voiceStyle ? [`Speaking style: ${ch.voiceStyle}`] : []),
     `Banned topics: ${ch.bannedTopics.length ? ch.bannedTopics.join(', ') : 'none'}`,
   ];
   if (ch.description) lines.push(`Description: ${ch.description}`);

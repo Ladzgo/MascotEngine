@@ -1,9 +1,12 @@
 try { process.loadEnvFile(); } catch { /* .env optional */ }
 import {exportSubtitles} from '../src/publish/subtitles.js';
+import {checkReadiness} from '../src/doctor/doctor.js';
+import {checkRequest, underRoots} from '../src/guard.js';
 import {friendlyError} from '../src/errors.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {createServer as createVite} from 'vite';
@@ -90,29 +93,8 @@ function emit(job: Job) {
   broadcastQueue();
 }
 
-// ---------- readiness: what is installed, what is missing and the fix (offline machines: see README) ----------
-const onPath = (b: string) => (process.env.PATH ?? '').split(path.delimiter).some(d => { try { fs.accessSync(path.join(d, b), fs.constants.X_OK); return true; } catch { return false; } });
-async function readiness() {
-  const root = path.resolve(new URL('../', import.meta.url).pathname);
-  const item = (id: string, label: string, ok: boolean, detail: string, fix: string) => ({id, label, ok, detail: ok ? detail : '', fix: ok ? '' : fix});
-  let models: string[] = [];
-  try { const r = await fetch(`${process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434'}/api/tags`, {signal: AbortSignal.timeout(1500)}); models = ((await r.json()) as {models?: {name: string}[]}).models?.map(x => x.name) ?? []; } catch { /* not running */ }
-  const picked = pickModel(models, process.env.OLLAMA_MODEL);
-  const whisperModel = process.env.WHISPER_MODEL && fs.existsSync(process.env.WHISPER_MODEL) ? process.env.WHISPER_MODEL : fs.existsSync(path.join(root, 'data/models/ggml-base.en.bin')) ? 'data/models/ggml-base.en.bin' : '';
-  const music = fs.existsSync(path.join(root, 'assets/music')) ? fs.readdirSync(path.join(root, 'assets/music')).filter(f => /\.(mp3|wav|m4a|ogg)$/i.test(f)) : [];
-  const voice = process.platform === 'darwin' && onPath('say') ? 'say' : onPath('piper') && process.env.PIPER_MODEL && fs.existsSync(process.env.PIPER_MODEL) ? 'piper' : onPath('espeak-ng') ? 'espeak-ng' : '';
-  const items = [
-    item('ffmpeg', 'ffmpeg', onPath('ffmpeg') && onPath('ffprobe'), 'ffmpeg + ffprobe found', 'Install ffmpeg (apt install ffmpeg / brew install ffmpeg).'),
-    item('whisper-bin', 'whisper.cpp', onPath('whisper-cli'), 'whisper-cli found', 'Build whisper.cpp and put whisper-cli on PATH (captions fall back to estimated timing).'),
-    item('whisper-model', 'Whisper model', !!whisperModel, whisperModel, 'Copy ggml-base.en.bin to data/models/ or set WHISPER_MODEL.'),
-    item('ollama', 'Ollama', models.length > 0, 'running', 'Install Ollama and run `ollama serve` (the Studio can also start it).'),
-    item('ollama-model', 'Ollama model', !!picked, picked ?? '', 'Run `ollama pull qwen2.5:7b` (on an offline machine, copy ~/.ollama/models from another machine).'),
-    item('music', 'Music bed', music.length > 0, music.join(', '), 'Put a licensed track in assets/music/ (an ambient pad ships with the repo).'),
-    item('voice', 'Voice engine', !!voice, voice, 'Linux: apt install espeak-ng, or set PIPER_BIN and PIPER_MODEL. macOS has say built in.'),
-  ];
-  return {ok: items.every(i => i.ok), items};
-}
-
+// ---------- readiness (src/doctor/doctor.ts) ----------
+const readiness = () => checkReadiness();
 
 // ---------- clipper (long video -> 9:16 clips; docs/CLIPPER.md) ----------
 const VIDEO_RE = /\.(mp4|mov|mkv|webm|m4v)$/i;
@@ -700,7 +682,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     }
     if (p[0] === 'make' && m === 'POST') { // one click: draft -> voice -> direct -> preview
       const b = await body<{topic?: unknown; angle?: unknown; channel?: unknown; stopAtPreview?: unknown}>(req);
-      const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ') : '';
+      const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ').replace(/^-+\s*/, '') : ''; // a leading dash would be read as a CLI option
       const angle = typeof b.angle === 'string' ? b.angle.trim().replace(/[\r\n]+/g, ' ') : '';
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
       const channel = typeof b.channel === 'string' && b.channel ? b.channel : 'default';
@@ -711,7 +693,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     }
     if (p[0] === 'draft' && m === 'POST') {
       const b = await body<{topic?: unknown; angle?: unknown; id?: unknown; channel?: unknown}>(req);
-      const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ') : '';
+      const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ').replace(/^-+\s*/, '') : ''; // a leading dash would be read as a CLI option
       const angle = typeof b.angle === 'string' ? b.angle.trim().replace(/[\r\n]+/g, ' ') : '';
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
       const channel = typeof b.channel === 'string' && b.channel ? b.channel : 'default';
@@ -730,7 +712,14 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       const name = clipSafe(url.searchParams.get('name'));
       if (!name || !VIDEO_RE.test(name)) throw new HttpError(400, 'Upload an mp4, mov, mkv, webm or m4v file.');
       fs.mkdirSync(`${ROOT}data/uploads`, {recursive: true});
-      await new Promise<void>((ok, bad) => { const w = fs.createWriteStream(`${ROOT}data/uploads/${name}`); req.pipe(w); w.on('finish', ok); w.on('error', bad); req.on('error', bad); });
+      const dest = `${ROOT}data/uploads/${name}`, part = `${dest}.part`;
+      if (fs.existsSync(dest) && url.searchParams.get('replace') !== '1') throw new HttpError(409, `${name} is already uploaded. Pick it from the list, or rename the file.`);
+      const MAX_VIDEO = 10 * 1024 ** 3;
+      await new Promise<void>((ok, bad) => {
+        const w = fs.createWriteStream(part); let n = 0, over = false;
+        req.on('data', (c: Buffer) => { n += c.length; if (n > MAX_VIDEO && !over) { over = true; req.unpipe(w); w.destroy(); req.resume(); fs.rmSync(part, {force: true}); bad(new HttpError(413, 'Video too large (max 10 GB).')); } });
+        req.pipe(w); w.on('finish', () => { if (!over) { fs.renameSync(part, dest); ok(); } }); w.on('error', e => { fs.rmSync(part, {force: true}); bad(e); }); req.on('error', e => { fs.rmSync(part, {force: true}); bad(e); });
+      });
       return json(res, 201, {name});
     }
     if (p[0] === 'clip' && m === 'POST') {
@@ -741,6 +730,8 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       const src = up ? `${ROOT}data/uploads/${up}` : typeof b.path === 'string' ? b.path.trim() : '';
       if (!src) throw new HttpError(400, 'Choose an uploaded video or enter the path of a video file on this computer.');
       if (!VIDEO_RE.test(src) || !fs.existsSync(src) || !fs.statSync(src).isFile()) throw new HttpError(400, `No video file found at ${src}.`);
+      const roots = [`${ROOT}data/uploads`, ...['Movies', 'Videos', 'Downloads', 'Desktop'].map(d => path.join(os.homedir(), d)), ...(process.env.CLIP_MEDIA_DIR ? process.env.CLIP_MEDIA_DIR.split(path.delimiter) : [])];
+      if (!underRoots(src, roots)) throw new HttpError(403, 'For safety the Clipper only reads videos from your Movies, Videos, Downloads or Desktop folder, the Studio uploads, or a folder listed in CLIP_MEDIA_DIR. Move the file there or upload it.');
       const num = (v: unknown, d: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(Number(v)) && v !== '' && v !== undefined ? Number(v) : d));
       const min = num(b.min, 20, 5, 120), max = Math.max(min + 5, num(b.max, 60, 10, 180)), count = Math.round(num(b.count, 5, 1, 10));
       const name = path.basename(src, path.extname(src));
@@ -800,6 +791,8 @@ const vite = await createVite({
   server: {middlewareMode: true}, appType: 'spa',
 });
 const server = http.createServer((req, res) => {
+  const bad = checkRequest({host: req.headers.host, origin: req.headers.origin, method: req.method, url: req.url, contentType: req.headers['content-type'], contentLength: req.headers['content-length']}, PORT);
+  if (bad) { res.writeHead(bad.code, {'Content-Type': 'text/plain'}); return void res.end(bad.msg); }
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   if (url.pathname.startsWith('/api/')) return void api(req, res, url);
   vite.middlewares(req, res);

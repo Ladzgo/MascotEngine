@@ -4,6 +4,8 @@ import type {Timings} from '../pipeline/tts.js';
 import type {EpisodeDecisions, History, HistoryEntry, SceneDecision, SfxCue} from './types.js';
 
 import {ACCENT_HEX as ACCENTS} from '../accents.js';
+import {loadChannel} from '../channel/channel.js';
+import {retentionWeights} from '../analytics/summary.js';
 export {ACCENTS};
 const BACKGROUNDS = ['plain', 'grid', 'dots', 'vignette'] as const;
 const CAPTIONS = ['bar', 'pill', 'outline'] as const;
@@ -101,6 +103,12 @@ const HOOK_EMOTIONS = ['shocked', 'excited'];
 const MIN_TAIL = 0.2;
 const JCUT = 0.3;
 const MAX_STILL = 4.5;
+/** Longest picture hold for a scene type: retention weights (0.9-1.1, empty until 3 curves) shorten it for types viewers leave on. */
+export const stillLimit = (type: string, w: Record<string, number>) => MAX_STILL * Math.min(1.1, Math.max(0.9, w[type] ?? 1));
+/** A channel's fixed accent colour (brand preset), if it names a known accent. */
+export function channelAccent(channelId: string | undefined): string | null {
+  try { const a = loadChannel(channelId ?? 'default').accent; return a && a in ACCENTS ? a : null; } catch { return null; }
+}
 function fitCamera(cam: string, s: Scene): number {
   if (s.type === 'list' || s.type === 'chart' || s.type === 'timeline') return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
   if (s.type === 'compare' || s.type === 'before_after') return cam === 'static' ? 1.4 : cam.startsWith('pan') ? 0.3 : 0.9;
@@ -161,8 +169,9 @@ function findWord(text: string, words: {w: string; start: number}[]): number | n
   return null;
 }
 
-export async function direct(idArg: string, opts: {final: boolean}) {
+export async function direct(idArg: string, opts: {final: boolean; weights?: Record<string, number>}) {
   const ep = loadEpisode(idArg);
+  const weights = opts.weights ?? retentionWeights();
   const dir = episodeDir(ep.id);
   const timings: Timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
   const history = loadHistory();
@@ -171,7 +180,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
 
   // --- episode level ---
   const last3Accents = recent.slice(-3).map(e => e.accent);
-  const accent = pick(Object.keys(ACCENTS), a => (last3Accents.includes(a) ? 0.03 : 1) * noise(rand), rand);
+  const accent = channelAccent(ep.channel) ?? pick(Object.keys(ACCENTS), a => (last3Accents.includes(a) ? 0.03 : 1) * noise(rand), rand);
   const background = pick([...BACKGROUNDS], b => freqPenalty(b, 'background', recent) * noise(rand), rand);
   const captionStyle = pick([...CAPTIONS], c => freqPenalty(c, 'captionStyle', recent) * noise(rand), rand);
   const intro = pick([...INTROS], c => freqPenalty(c, 'intro', recent) * noise(rand), rand);
@@ -304,7 +313,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
     for (let guard = 0; guard < 8; guard++) {
       const ev = [0, ...elements, ...punchIns.map(p => p.t), durSec].filter(x => x >= 0).sort((a, b) => a - b);
       let gapAt = -1;
-      for (let k = 1; k < ev.length; k++) if (ev[k] - ev[k - 1] > MAX_STILL) { gapAt = k; break; }
+      for (let k = 1; k < ev.length; k++) if (ev[k] - ev[k - 1] > stillLimit(s.type, weights)) { gapAt = k; break; }
       if (gapAt < 0) break;
       const mid = (ev[gapAt] + ev[gapAt - 1]) / 2;
       const starts = words.filter((w, k) => k > 0 && /[.!?]$/.test(words[k - 1].w)).map(w => w.start).filter(t => t > ev[gapAt - 1] + 1 && t < ev[gapAt] - 1);
