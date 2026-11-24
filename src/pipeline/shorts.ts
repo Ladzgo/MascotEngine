@@ -8,7 +8,7 @@ import type {Timings} from './tts.js';
 import {loadCharacterAssets} from './render.js';
 import {checkShort} from './shortsCheck.js';
 
-const WEIGHT: Record<string, number> = {big_number: 5, compare: 4, chart: 3, list: 2, title: 1, talk: 1};
+const WEIGHT: Record<string, number> = {big_number: 5, compare: 4, before_after: 4, timeline: 3, chart: 3, list: 2, title: 1, talk: 1};
 const MAX_SEC = 55;
 const ROOT = new URL('../../', import.meta.url).pathname;
 

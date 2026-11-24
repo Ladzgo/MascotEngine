@@ -44,6 +44,9 @@ export const Scene = z.discriminatedUnion('type', [
   }),
   z.object({type: z.literal('compare'), ...base, left: Side, right: Side}),
   z.object({type: z.literal('list'), ...base, items: z.array(z.string()).min(1).max(6)}),
+  // timeline: 2-5 dated steps shown left to right; before_after: one thing then and now
+  z.object({type: z.literal('timeline'), ...base, events: z.array(z.object({when: z.string().min(1).max(16), what: z.string().min(1).max(60)})).min(2).max(5)}),
+  z.object({type: z.literal('before_after'), ...base, before: Side, after: Side}),
 ]);
 export type Scene = z.infer<typeof Scene>;
 export type SceneType = Scene['type'];

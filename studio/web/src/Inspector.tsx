@@ -113,6 +113,27 @@ export function Inspector({cfg, hasVideo, doc, decisions, variety, audio, onAudi
                 </div>
               </fieldset>
             )}
+            {showV('visuals') && s.type === 'before_after' && s.before && s.after && (
+              <fieldset><legend>Before and after</legend>
+                <div className="two">
+                  <label className="field"><span>Before title</span><input value={s.before.title} onChange={e => set({before: {...s.before!, title: e.target.value}})} /></label>
+                  <label className="field"><span>Before value</span><input value={s.before.value} onChange={e => set({before: {...s.before!, value: e.target.value}})} /></label>
+                  <label className="field"><span>After title</span><input value={s.after.title} onChange={e => set({after: {...s.after!, title: e.target.value}})} /></label>
+                  <label className="field"><span>After value</span><input value={s.after.value} onChange={e => set({after: {...s.after!, value: e.target.value}})} /></label>
+                </div>
+              </fieldset>
+            )}
+            {showV('visuals') && s.type === 'timeline' && (
+              <label className="field"><span>Timeline (one step per line, "when | what", 2 to 5)</span>
+                <textarea rows={4} defaultValue={(s.events ?? []).map(e => `${e.when} | ${e.what}`).join('\n')} key={sel}
+                  onChange={e => { const ev = e.target.value.split('\n').map(l => l.split('|')).filter(p => p.length > 1 && p[0].trim() && p.slice(1).join('|').trim()).map(p => ({when: p[0].trim().slice(0, 16), what: p.slice(1).join('|').trim().slice(0, 60)})).slice(0, 5); if (ev.length >= 2) set({events: ev}); }} />
+              </label>
+            )}
+            {showV('visuals') && s.type === 'talk' && (
+              <label className="field"><span>Quote card (optional, max 140 characters)</span>
+                <input value={s.quote?.text ?? ''} maxLength={140} onChange={e => set({quote: e.target.value ? {text: e.target.value, by: s.quote?.by} : undefined})} />
+              </label>
+            )}
             {showV('visuals') && s.type === 'list' && (
               <label className="field"><span>List items (one per line, max 6)</span>
                 <textarea rows={4} value={(s.items ?? []).join('\n')} onChange={e => set({items: e.target.value.split('\n').filter(x => x.trim()).slice(0, 6)})} />

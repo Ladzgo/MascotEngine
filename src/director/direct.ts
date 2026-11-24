@@ -18,6 +18,8 @@ const LAYOUTS: Record<string, string[]> = {
   big_number: ['center', 'char_left', 'char_right'],
   chart: ['char_left', 'char_right', 'char_corner', 'fullscreen'],
   compare: ['split', 'split_char_center'],
+  before_after: ['split', 'split_char_center'],
+  timeline: ['char_corner', 'fullscreen'],
   list: ['char_left', 'char_right', 'center_list'],
 };
 
@@ -100,8 +102,8 @@ const MIN_TAIL = 0.2;
 const JCUT = 0.3;
 const MAX_STILL = 4.5;
 function fitCamera(cam: string, s: Scene): number {
-  if (s.type === 'list' || s.type === 'chart') return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
-  if (s.type === 'compare') return cam === 'static' ? 1.4 : cam.startsWith('pan') ? 0.3 : 0.9;
+  if (s.type === 'list' || s.type === 'chart' || s.type === 'timeline') return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
+  if (s.type === 'compare' || s.type === 'before_after') return cam === 'static' ? 1.4 : cam.startsWith('pan') ? 0.3 : 0.9;
   if (surprising(s)) return cam === 'slow_push' ? 1.8 : cam === 'static' ? 0.5 : 0.9;
   if (['worried', 'sad'].includes(s.emotion)) return cam === 'slow_push' ? 1.6 : 0.8;
   if (s.emotion === 'happy' || s.emotion === 'smug') return cam === 'slow_pull' || cam === 'drift' ? 1.4 : 1;
@@ -253,6 +255,14 @@ export async function direct(idArg: string, opts: {final: boolean}) {
       const r = findWord(s.right.title, words) ?? Math.max(l + 0.8, lead + speechDur * 0.65);
       elements = [l, r];
       tail = 0.3;
+    } else if (s.type === 'before_after') {
+      const l = findWord(s.before.title, words) ?? lead + speechDur * 0.3;
+      const r = findWord(s.after.title, words) ?? Math.max(l + 0.8, lead + speechDur * 0.65);
+      elements = [l, r];
+      tail = 0.3;
+    } else if (s.type === 'timeline') {
+      elements = s.events.map((e, k) => findWord(e.when, words) ?? findWord(e.what, words) ?? lead + 0.3 + (k / s.events.length) * speechDur * 0.85);
+      tail = 0.3;
     } else if (s.type === 'chart') {
       elements = [lead + 0.5, Math.max(speechEnd, lead + 1.8)];
       tail = 0.35;
@@ -314,7 +324,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
     const sfx: SfxCue[] = [];
     if (i > 0 && transition !== 'cut') sfx.push({t: 0, kind: 'whoosh', variant: variant('whoosh')});
     if (s.type === 'list') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
-    if (s.type === 'compare') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
+    if (s.type === 'compare' || s.type === 'before_after' || s.type === 'timeline') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (s.type === 'title') sfx.push({t: 0.15, kind: 'pop', variant: variant('pop')});
     if (s.type === 'big_number') {
       for (let t = elements[0]; t < elements[1]; t += 0.11) sfx.push({t: round(t), kind: 'tick', variant: 0});

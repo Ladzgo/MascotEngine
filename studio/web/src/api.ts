@@ -1,12 +1,12 @@
 import type React from 'react';
 export type Scene = {
-  type: 'title' | 'talk' | 'big_number' | 'chart' | 'compare' | 'list';
+  type: 'title' | 'talk' | 'big_number' | 'chart' | 'compare' | 'list' | 'timeline' | 'before_after';
   narration: string; emotion: string; emphasis: string[];
   layout?: string; camera?: string; transition?: string; pose?: string;
   value?: number; prefix?: string; suffix?: string; label?: string; decimals?: number;
   chart?: {kind: 'line' | 'bar'; labels: string[]; values: number[]; yLabel: string};
   left?: {title: string; value: string}; right?: {title: string; value: string};
-  items?: string[]; quote?: {text: string; by?: string};
+  items?: string[]; events?: {when: string; what: string}[]; before?: {title: string; value: string}; after?: {title: string; value: string}; quote?: {text: string; by?: string};
 };
 export type EpisodeDoc = {id: string; channel?: string; title: string; series: string; seed: number; scenes: Scene[]; sources: string[]; disclaimer: boolean};
 export type SceneDecision = {index: number; type: string; layout: string; pose: string; camera: string; transition: string; startSec: number; durSec: number};
@@ -92,11 +92,11 @@ export const TRANSITIONS = ['cut', 'slide', 'wipe_ink', 'circle_reveal', 'zoom_t
 export const LAYOUTS: Record<string, string[]> = {
   title: ['center', 'closeup'], talk: ['center', 'keyword_side', 'closeup', 'over_shoulder'],
   big_number: ['center', 'char_left', 'char_right'], chart: ['char_left', 'char_right', 'char_corner', 'fullscreen'],
-  compare: ['split', 'split_char_center'], list: ['char_left', 'char_right', 'center_list'],
+  compare: ['split', 'split_char_center'], before_after: ['split', 'split_char_center'], timeline: ['char_corner', 'fullscreen'], list: ['char_left', 'char_right', 'center_list'],
 };
 export const POSES = ['neutral', 'explain_left', 'explain_right', 'pointing_up', 'thinking', 'happy', 'excited', 'thumbs_up', 'smug', 'worried', 'shocked', 'sweating', 'sad', 'angry', 'confused', 'facepalm', 'counting_money', 'holding_sign', 'reading', 'writing'];
 export const EMOTIONS = ['neutral', 'smug', 'worried', 'shocked', 'happy', 'excited', 'thinking', 'explaining', 'angry', 'sad', 'confused', 'sweating'];
-export const SCENE_TYPES: Scene['type'][] = ['title', 'talk', 'big_number', 'chart', 'compare', 'list'];
+export const SCENE_TYPES: Scene['type'][] = ['title', 'talk', 'big_number', 'chart', 'compare', 'list', 'timeline', 'before_after'];
 export const nice = (s: string) => s.replace(/_/g, ' ');
 
 export function blankScene(type: Scene['type']): Scene {
@@ -105,6 +105,8 @@ export function blankScene(type: Scene['type']): Scene {
     case 'big_number': return {...base, type, value: 100, prefix: '$', suffix: '', label: 'What this number means', decimals: 0};
     case 'chart': return {...base, type, chart: {kind: 'line', labels: ['0', '1', '2'], values: [1, 2, 3], yLabel: 'value'}};
     case 'compare': return {...base, type, left: {title: 'Left', value: '1%'}, right: {title: 'Right', value: '2%'}};
+    case 'before_after': return {...base, type, before: {title: 'Before', value: '1%'}, after: {title: 'After', value: '2%'}};
+    case 'timeline': return {...base, type, events: [{when: '2000', what: 'First step'}, {when: '2010', what: 'Second step'}]};
     case 'list': return {...base, type, items: ['First point', 'Second point']};
     default: return {...base, type};
   }

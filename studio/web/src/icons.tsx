@@ -32,4 +32,4 @@ export const Copy = I(<><rect x="8.5" y="8.5" width="11" height="11" rx="2" /><p
 export const Pencil = I(<path d="M5 19l1-4L16.5 4.5a1.8 1.8 0 012.5 2.5L8.5 17.5 5 19zM14.5 6.5l3 3" />);
 export const Undo = I(<path d="M9 7L4.5 11.5 9 16M5 11.5h8.5a5 5 0 010 9H10" />);
 export const Send = I(<path d="M4 12l16-7-6 15-2.5-6.5L4 12z" />);
-export const typeIcon: Record<string, (p: P) => React.ReactElement> = {title: Title, talk: Talk, big_number: Number, chart: Chart, compare: Compare, list: List};
+export const typeIcon: Record<string, (p: P) => React.ReactElement> = {title: Title, talk: Talk, big_number: Number, chart: Chart, compare: Compare, list: List, timeline: List, before_after: Compare};

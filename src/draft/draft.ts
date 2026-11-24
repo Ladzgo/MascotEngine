@@ -42,6 +42,8 @@ Scene types (pick what fits the content):
 - chart {narration, emotion, chart:{kind:"line"|"bar", labels:[...], values:[...] same length, yLabel}}
 - compare {narration, emotion, left:{title,value}, right:{title,value}}
 - list {narration, emotion, items: 1-6 strings}
+- timeline {narration, emotion, events:[{when:"1971", what:"short step"}...] 2-5 steps in time order; use when the script walks through dates or stages}
+- before_after {narration, emotion, before:{title,value}, after:{title,value}; use for one thing then and now}
 emotion is one of: neutral, smug, worried, shocked, happy, excited, thinking, explaining, angry, sad, confused, sweating.
 Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact or claim. One clear angle. Every number shown (big_number, chart, or quoted in narration) must come from a real source whose URL is listed in "sources". Never invent URLs or data; if unsure, leave the number out. A big_number scene's "value" must be the exact number its own narration says out loud and must come from a source you list; if you do not know a real figure, write a talk scene instead (a big_number whose value the narration does not say is dropped). Never repeat a metaphor, simile, joke or phrase across scenes: each scene brings a fresh image or a plain fact. No guarantees, no advice phrasing. Narration is spoken text: spell out numbers naturally. This is a draft a human will rewrite.`;
 }
@@ -62,7 +64,7 @@ export function repairDraft(raw: any): any {
     const e = str(sc.emotion).toLowerCase().trim();
     sc.emotion = EMOTIONS.includes(e) ? e : EMO_ALIAS[e] ?? 'neutral';
     if (typeof sc.narration !== 'string' || !sc.narration.trim() || /^[.\s…]+$/.test(sc.narration)) sc.narration = str(sc.text ?? sc.script ?? sc.label ?? (Array.isArray(sc.items) ? sc.items.map(str).join('. ') + '.' : '...'));
-    if (!['title', 'talk', 'big_number', 'chart', 'compare', 'list'].includes(sc.type)) sc.type = 'talk';
+    if (!['title', 'talk', 'big_number', 'chart', 'compare', 'list', 'timeline', 'before_after'].includes(sc.type)) sc.type = 'talk';
     for (const k of ['left', 'right']) if (sc.type === 'compare') { const x = sc[k] && typeof sc[k] === 'object' ? sc[k] : {}; sc[k] = {title: str(x.title ?? x.label ?? x.name), value: str(x.value ?? x.number ?? x.amount)}; }
     if (sc.type === 'big_number') { if (typeof sc.value === 'string') sc.value = parseFloat(sc.value.replace(/[^0-9.\-]/g, '')); sc.label = str(sc.label); }
     if (sc.type === 'chart') { // rescue flat chart fields; a chart without real data becomes a talk scene (never invented)
@@ -73,6 +75,11 @@ export function repairDraft(raw: any): any {
       else { sc.type = 'talk'; delete sc.chart; }
     }
     if (sc.type === 'big_number' && !Number.isFinite(sc.value)) sc.type = 'talk';
+    if (sc.type === 'before_after') for (const [k, alt] of [['before', 'left'], ['after', 'right']]) { const x = sc[k] && typeof sc[k] === 'object' ? sc[k] : sc[alt] && typeof sc[alt] === 'object' ? sc[alt] : {}; sc[k] = {title: str(x.title ?? x.label ?? x.name), value: str(x.value ?? x.number ?? x.amount)}; }
+    if (sc.type === 'timeline') {
+      const ev = (Array.isArray(sc.events) ? sc.events : []).map((e: any) => ({when: str(e?.when ?? e?.year ?? e?.date).slice(0, 16), what: str(e?.what ?? e?.label ?? e?.title ?? e?.text).slice(0, 60)})).filter((e: any) => e.when && e.what).slice(0, 5);
+      if (ev.length >= 2) sc.events = ev; else { sc.type = 'talk'; delete sc.events; }
+    }
     if (sc.type === 'list' && Array.isArray(sc.items)) sc.items = sc.items.map(str).filter(Boolean).slice(0, 6);
     if (sc.emphasis !== undefined && !Array.isArray(sc.emphasis)) sc.emphasis = [str(sc.emphasis)];
     return sc;

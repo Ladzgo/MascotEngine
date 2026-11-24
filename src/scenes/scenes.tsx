@@ -178,23 +178,29 @@ export const ChartScene: React.FC<SceneProps<Extract<Scene, {type: 'chart'}>>> =
 };
 
 // ------------------------------------------------------------ compare
-export const CompareScene: React.FC<SceneProps<Extract<Scene, {type: 'compare'}>>> = ({scene, dec, frame, fps, accent, box}) => {
+export const CompareScene: React.FC<SceneProps<Extract<Scene, {type: 'compare'}>> & {tags?: [string, string]; mid?: string}> = ({scene, dec, frame, fps, accent, box, tags, mid = 'VS'}) => {
   const centre = dec.layout === 'split_char_center';
-  const gap = centre ? 520 : 200;
+  const narrow = box.w < 1500; // vertical Shorts: a 520 px gap made two thin cards in the corners
+  const gap = narrow ? 90 : centre ? 520 : 200;
   const ch = centre ? box.h - 200 : box.h - 340; // card height; split leaves room for the mascot below
   const cw = (box.w - gap) / 2;
   const card = (side: {title: string; value: string}, t: number, x: number, hot: boolean) => {
     const p = pop(t, frame, fps, 0.45);
     return (
+      <React.Fragment key={x}>
+      {/* ghost slot: the empty side stays framed until its card lands (a lone card in the corner looked unfinished) */}
+      <div style={{position: 'absolute', left: x + 6, top: 46, width: cw - 12, height: ch - 12, borderRadius: 26, border: `6px dashed ${INK}`, opacity: 0.16 * (1 - fade(t, frame, fps, 0.1)), boxSizing: 'border-box'}} />
       <div style={{position: 'absolute', left: x, top: 40, width: cw, height: ch, opacity: fade(t, frame, fps, 0.1), transform: `scale(${0.7 + 0.3 * p}) rotate(${(1 - p) * (hot ? 3 : -3)}deg)`}}>
         <svg width={cw} height={ch} style={{position: 'absolute', overflow: 'visible'}}>
           <rect x={6} y={6} width={cw - 12} height={ch - 12} rx={26} fill={hot ? accent : '#fffdf6'} fillOpacity={hot ? 0.9 : 1} stroke={INK} strokeWidth={8} />
         </svg>
         <div style={{position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '36px 56px', boxSizing: 'border-box', textAlign: 'center', overflow: 'hidden'}}>
+          {tags && <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 34, letterSpacing: 6, marginBottom: 18, opacity: 0.75, color: hot ? '#fffdf6' : INK}}>{hot ? tags[1] : tags[0]}</div>}
           <div style={{fontFamily: DISPLAY, fontSize: Math.min(side.value.length > 7 ? 120 : 170, Math.floor((cw - 112) / (Math.max(side.value.length, 1) * 0.62))), lineHeight: 1, whiteSpace: 'nowrap', color: hot ? '#fffdf6' : INK}}>{side.value}</div>
           <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 44, lineHeight: 1.2, marginTop: 26, maxWidth: cw - 112, overflowWrap: 'anywhere', color: hot ? '#fffdf6' : INK}}>{side.title}</div>
         </div>
       </div>
+      </React.Fragment>
     );
   };
   const vs = fade(dec.elements[1], frame, fps, 0.2);
@@ -202,7 +208,40 @@ export const CompareScene: React.FC<SceneProps<Extract<Scene, {type: 'compare'}>
     <div style={{position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h}}>
       {card(scene.left, dec.elements[0], 0, false)}
       {card(scene.right, dec.elements[1], cw + gap, true)}
-      <div style={{position: 'absolute', left: cw, width: gap, top: 40 + ch / 2 - 50, textAlign: 'center', fontFamily: DISPLAY, fontSize: 80, color: INK, opacity: vs * (dec.layout === 'split_char_center' ? 0 : 1)}}>VS</div>
+      <div style={{position: 'absolute', left: cw, width: gap, top: 40 + ch / 2 - 50, textAlign: 'center', fontFamily: DISPLAY, fontSize: 80, color: INK, opacity: vs * (dec.layout === 'split_char_center' || narrow ? 0 : 1)}}>{mid}</div>
+    </div>
+  );
+};
+
+// ------------------------------------------------------------ before / after
+export const BeforeAfterScene: React.FC<SceneProps<Extract<Scene, {type: 'before_after'}>>> = props => {
+  const {scene} = props;
+  return <CompareScene {...props} scene={{type: 'compare', narration: scene.narration, emotion: scene.emotion, emphasis: scene.emphasis, left: scene.before, right: scene.after}} tags={['BEFORE', 'AFTER']} mid="→" />;
+};
+
+// ------------------------------------------------------------ timeline
+export const TimelineScene: React.FC<SceneProps<Extract<Scene, {type: 'timeline'}>>> = ({scene, dec, frame, fps, accent, box}) => {
+  const n = scene.events.length, t = frame / fps;
+  const lineY = box.h / 2, pad = 90, step = (box.w - 2 * pad) / (n - 1);
+  const draw = easeInOut((t - dec.elements[0] + 0.3) / Math.max(0.5, dec.elements[n - 1] - dec.elements[0] + 0.3));
+  return (
+    <div style={{position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h}}>
+      <svg width={box.w} height={box.h} style={{position: 'absolute', overflow: 'visible'}}>
+        <line x1={pad - 40} y1={lineY} x2={pad - 40 + (box.w - 2 * pad + 80) * draw} y2={lineY} stroke={INK} strokeWidth={10} strokeLinecap="round" />
+      </svg>
+      {scene.events.map((e, k) => {
+        const at = dec.elements[k], p = pop(at, frame, fps, 0.4), up = k % 2 === 0, cx = pad + k * step;
+        const w = Math.min(430, step * 1.8);
+        return (
+          <div key={k} style={{opacity: fade(at, frame, fps, 0.1)}}>
+            <div style={{position: 'absolute', left: cx - 26, top: lineY - 26, width: 52, height: 52, borderRadius: '50%', background: accent, border: `8px solid ${INK}`, boxSizing: 'border-box', transform: `scale(${0.3 + 0.7 * p})`}} />
+            <div style={{position: 'absolute', left: cx - w / 2, width: w, textAlign: 'center', top: up ? lineY - 70 - 250 : lineY + 70, height: 250, display: 'flex', flexDirection: 'column', justifyContent: up ? 'flex-end' : 'flex-start', transform: `translateY(${(1 - easeOut((t - at) / 0.35)) * (up ? 40 : -40)}px)`}}>
+              <div style={{fontFamily: DISPLAY, fontSize: Math.min(110, Math.floor(w / (Math.max(e.when.length, 1) * 0.62))), lineHeight: 1, color: accent}}>{e.when}</div>
+              <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 40, lineHeight: 1.2, marginTop: 10, color: INK, overflowWrap: 'anywhere'}}>{e.what}</div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -247,6 +286,8 @@ export const SceneContent: React.FC<SceneProps> = props => {
     case 'chart': return <ChartScene {...(props as SceneProps<typeof s>)} />;
     case 'compare': return <CompareScene {...(props as SceneProps<typeof s>)} />;
     case 'list': return <ListScene {...(props as SceneProps<typeof s>)} />;
+    case 'before_after': return <BeforeAfterScene {...(props as SceneProps<typeof s>)} />;
+    case 'timeline': return <TimelineScene {...(props as SceneProps<typeof s>)} />;
   }
 };
 export {BOIL_STYLE};

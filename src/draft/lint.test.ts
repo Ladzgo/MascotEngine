@@ -34,3 +34,14 @@ test('repairDraft: chart without data becomes talk, flat chart fields are rescue
   assert.deepEqual(r.scenes.map((s: any) => s.type), ['talk', 'chart', 'talk']);
   assert.deepEqual(r.scenes[1].chart.values, [1, 2]);
 });
+
+test('repairDraft: timeline and before_after shapes', async () => {
+  const {repairDraft} = await import('./draft.js');
+  const {Episode} = await import('../schema.js');
+  const r = repairDraft({scenes: [
+    {type: 'timeline', narration: 'a', events: [{year: 1971, label: 'Gold standard ends'}, {when: '2008', what: 'Crisis'}]},
+    {type: 'timeline', narration: 'b', events: [{when: '1999', what: 'only one'}]},
+    {type: 'before_after', narration: 'c', left: {title: 'Then', value: '1%'}, right: {title: 'Now', value: '5%'}}]});
+  assert.deepEqual(r.scenes.map((s: any) => s.type), ['timeline', 'talk', 'before_after']);
+  assert.ok(Episode.safeParse({id: 'x-1', title: 't', scenes: r.scenes}).success);
+});

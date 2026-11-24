@@ -29,6 +29,10 @@ export function placement(layout: string, type: string): Place {
     case 'chart:fullscreen': return {content: c(120, 70, 1680, 830)};
     case 'compare:split': return {char: {cx: 960, h: 300}, content: c(100, 80, 1720, 820)};
     case 'compare:split_char_center': return {char: {cx: 960, h: 500}, content: c(80, 80, 1760, 820)};
+    case 'before_after:split': return {char: {cx: 960, h: 300}, content: c(100, 80, 1720, 820)};
+    case 'before_after:split_char_center': return {char: {cx: 960, h: 500}, content: c(80, 80, 1760, 820)};
+    case 'timeline:char_corner': return {char: {cx: 1680, h: 400}, content: c(90, 70, 1440, 830)};
+    case 'timeline:fullscreen': return {content: c(120, 70, 1680, 830)};
     case 'list:char_left': return {char: {cx: 340, h: 640}, content: c(620, 80, 1220, 820)};
     case 'list:char_right': return {char: {cx: 1580, h: 640}, content: c(100, 80, 1200, 820)};
     case 'list:center_list': return {char: {cx: 330, h: 600}, content: c(580, 70, 1260, 830)};
