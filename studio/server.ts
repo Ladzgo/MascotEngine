@@ -1,5 +1,6 @@
 try { process.loadEnvFile(); } catch { /* .env optional */ }
-import {exportSubtitles} from '../src/publish/subtitles.js';
+import {sceneWords, toVtt} from '../src/publish/subtitles.js';
+import {buildPhrases} from '../src/fx/captions.js';
 import {checkReadiness} from '../src/doctor/doctor.js';
 import {checkRequest, underRoots} from '../src/guard.js';
 import {friendlyError} from '../src/errors.js';
@@ -676,7 +677,13 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         if (code === 0 && out.some(l => l.startsWith('THUMB_OK'))) return json(res, 200, {ok: true, at: Date.now()});
         return json(res, 422, {error: cliMessage(out, code)});
       }
-      if (p[2] === 'media' && p[3]?.endsWith('.vtt')) { try { exportSubtitles(ROOT, id); } catch (e) { return json(res, 422, {error: `Subtitles need a voiced and directed episode: ${(e as Error).message}`}); } }
+      if (p[2] === 'media' && p[3]?.endsWith('.vtt')) { // built in memory: a GET writes nothing
+        try {
+          const dec = JSON.parse(fs.readFileSync(`${d}build/decisions.json`, 'utf8')), tim = JSON.parse(fs.readFileSync(`${d}build/timings.json`, 'utf8'));
+          res.writeHead(200, {'Content-Type': 'text/vtt; charset=utf-8', 'Content-Disposition': `attachment; filename="${id}.vtt"`});
+          return void res.end(toVtt(buildPhrases(sceneWords(dec, tim))));
+        } catch (e) { return json(res, 422, {error: `Subtitles need a voiced and directed episode: ${friendlyError((e as Error).message)}`}); }
+      }
       if (p[2] === 'media' && p[3]) return sendFile(req, res, `${d}build/${path.basename(p[3])}`);
       if (p[2] === 'shorts' && p[3]) return sendFile(req, res, `${d}build/shorts/${path.basename(p[3])}`);
     }
