@@ -7,6 +7,7 @@
 npm ci                        # once
 npm run doctor                # shows what is missing (ffmpeg, Chromium, Ollama model, voice...) with fixes
 npm run app                   # Studio at http://localhost:4177 -> Today -> "Make video"
+npm run support-bundle        # redacted log + doctor report for bug reports; guide (HU): docs/USER_GUIDE.md
 # or from the terminal: draft -> voice -> direct -> preview in one go
 npm run batch -- --topics topics.txt --qa
 ```
