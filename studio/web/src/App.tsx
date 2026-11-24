@@ -1,10 +1,6 @@
-import {Analytics} from './Analytics';
-import {Clipper} from './Clipper';
 import React, {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {api, type ChannelRow, type Settings as SettingsT, type Summary} from './api';
 import {Alert} from './icons';
-import {Channels} from './Channels';
-import {Ideas} from './Ideas';
 import {Library} from './Library';
 import {Overview} from './Overview';
 import {Palette} from './Palette';
@@ -13,6 +9,13 @@ import {Settings} from './Settings';
 import {ShortcutSheet, useGlobalShortcuts} from './Shortcuts';
 import {TopBar, useJobs} from './TopBar';
 import {PAGE_LABEL, STEP_LABEL, hasPage, nextStep, optionalPages, setRoute, useRoute, type RouteInput} from './router';
+
+// rarely visited pages load on demand (smaller first bundle)
+const lazyNamed = <T extends React.ComponentType<any>>(f: () => Promise<Record<string, unknown>>, n: string) => React.lazy(() => f().then(m => ({default: m[n] as T})));
+const Analytics = lazyNamed(() => import('./Analytics'), 'Analytics');
+const Clipper = lazyNamed(() => import('./Clipper'), 'Clipper');
+const Channels = lazyNamed<typeof import('./Channels').Channels>(() => import('./Channels'), 'Channels');
+const Ideas = lazyNamed<typeof import('./Ideas').Ideas>(() => import('./Ideas'), 'Ideas');
 
 type Loaded = React.ComponentType<Record<string, unknown>>;
 const lazyCache = new Map<string, React.LazyExoticComponent<Loaded>>();
@@ -109,7 +112,7 @@ export function App() {
       default: page = Workspace && route.ep
         ? <Boundary name="Episode"><Suspense fallback={<p className="muted pad" role="status">Loading…</p>}><Workspace key={route.ep} id={route.ep} step={route.step} scene={route.scene} onRoute={onRoute} /></Suspense></Boundary> : null;
     }
-    body = <main className="main" id="main" tabIndex={-1}>{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}{page}</main>;
+    body = <main className="main" id="main" tabIndex={-1}>{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<p className="muted pad" role="status">Loading…</p>}>{page}</Suspense></main>;
   }
 
   return (

@@ -10,6 +10,7 @@ if (!id || !sceneArg) { console.error('usage: still.ts <id> <scene#> [sec] [Epis
 const ep = loadEpisode(id), dir = episodeDir(ep.id), i = Number(sceneArg) - 1;
 const timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
 const decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8'));
+if (process.env.STILL_ACCENT) decisions.accent = process.env.STILL_ACCENT; // preview a scene in another accent colour
 const root = new URL('../', import.meta.url).pathname;
 const bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir: `${root}assets`});
 const inputProps: Record<string, unknown> = {episode: ep, timings, decisions, assets: loadCharacterAssets(), ...(compId === 'Short' ? {sceneIndexes: [i]} : {})};
