@@ -54,7 +54,7 @@ Shorts a kész epizódokból: `npm run shorts -- <id> --count 3`; a parancs val�
 ## 5. Publikálás
 
 1. `npm run publish-pack -- <id>`: címek, leírás, tagek, fejezetek (`build/publish.json`). AI nélkül is ad offline javaslatot; a `uploadNotes` mező a YouTube Studio lépéseit tartalmazza (AI-hang jelölés, kategória, kitűzött komment). A címek hangneme a csatorna presetjéhez igazodik (pénzügy: "the maths", tech: "How it works", történelem: "What really happened"); a `category` és a `pinnedComment` mező a kategóriát és a kitűzendő első komment szövegét adja.
-2. `npm run thumbnail -- <id> --variants 2`: két thumbnail (A/B), a parancs kiírja a 150 px-es olvashatóságot. Gyenge (WEAK) esetén írj rövidebb szöveget: `--text "3 szó"`.
+2. `npm run thumbnail -- <id> --variants 3`: három thumbnail (A: papír, B: akcentmező, C: kérdés-stílus), a csatorna akcentjével; a parancs kiírja a 150 px-es olvashatóságot, a legjobbat automatikusan `thumbnail.png`-nek másolja (pontszámok: `thumbnail.json`). Gyenge (WEAK) esetén írj rövidebb szöveget: `--text "3 szó"`.
 3. `npm run subs -- <id>`: `build/<id>.srt`, `.vtt` (szószintű) és `chapters.txt`.
 4. Ellenőrzőlista: `docs/PUBLISHING-CHECKLIST.md`. Pénzügyi tartalomnál a felelősségkizáró a leírásban és a végkártyán marad, hozamígéret nincs a címben.
 5. A feltöltés után a YouTube Studio CSV-it be lehet tölteni: `npm run analytics -- import export.csv [--id <epizód>]`, majd `npm run analytics -- summary` (melyik jelenettípus tartja a nézőt; 3 videó alatt csak tájékoztató).

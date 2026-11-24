@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {readability, thumbTexts} from './thumbnail.js';
+import {questionText, readability, thumbScore, thumbTexts} from './thumbnail.js';
 
 test('thumbTexts: 2-3 keywords, numbers first, filler dropped, distinct variants', () => {
   const t = thumbTexts('/nonexistent/', 'Why $500 a Month Can Make You a Millionaire', 2);
@@ -22,4 +22,11 @@ test('readability: dark text on paper passes at 150 px, low-contrast grey mush f
   assert.ok(readability(good).ok);
   assert.ok(!readability(bad).ok);
   fs.rmSync(dir, {recursive: true, force: true});
+});
+
+test('questionText and thumbScore (best variant = most legible, weak ones lose)', () => {
+  assert.equal(questionText('Why Your Savings Are Quietly Shrinking', 'Savings Shrinking'), 'Why Your Savings Are?');
+  assert.equal(questionText('Compound interest explained', 'Compound Interest Explained'), 'Compound Interest?');
+  assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: true}) > thumbScore({contrast: 8, ink: 0.1, ok: true}));
+  assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: false}) < thumbScore({contrast: 5, ink: 0.07, ok: true}));
 });
