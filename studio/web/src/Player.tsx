@@ -47,13 +47,13 @@ export function Player({data, v, onGenerate, busy, seek}: {data: EpisodeData; v:
           <div className="shorts">
             {data.shorts.map(f => (
               <figure key={f}>
-                <video controls preload="metadata" src={`/api/episodes/${id}/shorts/${f}?v=${v}`} />
+                <video controls preload="metadata" aria-label={`Short ${f}`} src={`/api/episodes/${id}/shorts/${f}?v=${v}`} />
                 <figcaption>{f.replace(`${id}-short-`, '').replace('.mp4', '').replace(/-/g, ' · ')}</figcaption>
               </figure>
             ))}
           </div>
         ) : st[active] ? (
-          <video ref={vid} key={`${active}${v}`} className="video" onKeyDown={e => { if (e.key === '[') step(-1); else if (e.key === ']') step(1); }} controls preload="metadata" src={`${src(`${id}-${active}.mp4`)}#t=0.1`} />
+          <video ref={vid} aria-label="Episode video" key={`${active}${v}`} className="video" onKeyDown={e => { if (e.key === '[') step(-1); else if (e.key === ']') step(1); }} controls preload="metadata" src={`${src(`${id}-${active}.mp4`)}#t=0.1`} />
         ) : (
           <div className="empty">
             <p className="display">Nothing rendered yet</p>
