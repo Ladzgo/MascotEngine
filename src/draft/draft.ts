@@ -159,7 +159,7 @@ const sceneData = (s: Episode['scenes'][number]) => JSON.stringify(s, (k, v) => 
  * Scene 1 (the hook) is never touched. Stops once the whole script reaches `targetWords`.
  */
 export async function expandThin(client: Client, ep: Episode, o: {model?: string; targetWords?: number; minWords?: number; log?: (m: string) => void} = {}): Promise<Episode> {
-  const target = o.targetWords ?? 340, thin = o.minWords ?? 32;
+  const target = o.targetWords ?? 340, thin = o.minWords ?? 42;
   const scenes = [...ep.scenes];
   const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
   for (let i = 1; i < scenes.length && count() < target; i++) {
@@ -167,13 +167,13 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
     if (s.narration.trim().split(/\s+/).length >= thin) continue;
     try {
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
-        system: 'You expand one line of narration in an explainer video script. Output ONLY JSON: {"narration": string}. 2 or 3 short spoken sentences, 28 to 45 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Keep every fact; do not add any new number, name or statistic. Never reuse a metaphor, simile or phrase from the other lines.',
+        system: 'You expand one line of narration in an explainer video script. Output ONLY JSON: {"narration": string}. 3 short spoken sentences, 38 to 55 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Keep every fact; do not add any new number, name or statistic. Never reuse a metaphor, simile or phrase from the other lines.',
         messages: [{role: 'user', content: `Video: ${ep.title}\nPrevious line: ${scenes[i - 1].narration}\nThis scene (${s.type}) shows: ${sceneData(s)}\nCurrent narration: ${s.narration}\nNext line: ${scenes[i + 1]?.narration ?? '(end)'}\nAlready used elsewhere (do not repeat these images or phrases): ${scenes.filter((_, j) => j !== i).map(x => x.narration).join(' ').slice(0, 900)}\nExpand the current narration so it flows between the previous and next lines.`}]});
       const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
       const cand = String((extractJson(text) as {narration?: unknown}).narration ?? '').trim();
       const words = cand.split(/\s+/).length;
       const known = new Set([...numsIn(s.narration), ...numsIn(sceneData(s)), ...numsIn(ep.title)]);
-      if (!cand || words <= s.narration.trim().split(/\s+/).length || words > 70 || numsIn(cand).some(n => !known.has(n))) { o.log?.(`expand: kept scene ${i + 1} as is`); continue; }
+      if (!cand || words <= s.narration.trim().split(/\s+/).length || words > 85 || numsIn(cand).some(n => !known.has(n))) { o.log?.(`expand: kept scene ${i + 1} as is`); continue; }
       const fixed = autoFixEpisode({...ep, scenes: [{...s, narration: 'x'}, {...s, narration: cand}] as Episode['scenes']}).scenes[1].narration; // slot 0 is a dummy: the fixer treats it as the hook
       const others = scenes.filter((_, j) => j !== i).map(x => x.narration);
       if (repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length) { o.log?.(`expand: scene ${i + 1} repeats a phrase, kept as is`); continue; }
@@ -191,7 +191,7 @@ export async function addScenes(client: Client, ep: Episode, o: {model?: string;
   const scenes = [...ep.scenes];
   const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
   const asks = ['a concrete everyday example (no new numbers)', 'the most common mistake people make', 'what a sensible person does about it (no advice phrasing)', 'why it feels different from what people expect'];
-  for (let k = 0; k < (o.max ?? 3) && count() < (o.minWords ?? 200) && scenes.length >= 3; k++) {
+  for (let k = 0; k < (o.max ?? 4) && count() < (o.minWords ?? 280) && scenes.length >= 3; k++) {
     try {
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
         system: 'You add one scene to an explainer video script. Output ONLY JSON: {"narration": string, "emotion": string}. 2 or 3 short spoken sentences, 28 to 40 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Do not add any number, name or statistic. Never reuse a metaphor or phrase from the existing lines.',

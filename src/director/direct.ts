@@ -213,7 +213,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
         if (l === 'closeup') sc *= 2;
         if (c === 'slow_push') sc *= 2;
       } else if (isHook && c === 'static') sc *= 0.6;
-      if (prev && prev.layout === l) sc *= 0.15;
+      if (prev && prev.layout === l) sc *= s.layout ? 0.15 : 0.001; // practically never the same layout twice (a single-layout type still falls back to it)
       if (prev && prev.camera === c && c !== 'static') sc *= 0.25;
       if (prev && prev.charSide !== 'center' && sideOf(l) === prev.charSide) sc *= 0.5;
       sc *= sceneFreqPenalty(l, 'layout', recent) * sceneFreqPenalty(c, 'camera', recent);
@@ -229,7 +229,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
     const transition = i === 0 ? 'cut' : pick(TRANSITIONS, t => {
       if (s.transition && t !== s.transition) return 0;
       let sc = fitTransition(t, s, prevScene) * noise(rand) * sceneFreqPenalty(t, 'transition', recent);
-      if (prev && prev.transition === t) sc *= 0.1;
+      if (prev && prev.transition === t) sc *= s.transition ? 0.1 : 0; // never the same transition twice in a row unless the author pinned it
       return sc;
     }, rand);
 
