@@ -113,8 +113,8 @@ function enqueue(id: string, b: {stages?: unknown; engine?: unknown}) {
   if (!fs.existsSync(`${d}episode.json`)) throw new HttpError(404, 'Episode not found.');
   if (!Array.isArray(b.stages) || !b.stages.length || !b.stages.every(x => typeof x === 'string' && x in STAGE_CMD)) throw new HttpError(400, 'stages must be a non-empty list of: voice, direct, preview, final, shorts.');
   const stages = b.stages as Stage[];
-  const engine = String(b.engine ?? 'say');
-  if (!['say', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be say, eleven, local or silent.');
+  const engine = String(b.engine ?? 'auto');
+  if (!['auto', 'say', 'espeak-ng', 'piper', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be auto, say, espeak-ng, piper, eleven, local or silent.');
   if (stages.includes('voice') && engine === 'eleven' && (!process.env.ELEVENLABS_API_KEY || !process.env.ELEVENLABS_VOICE_ID)) throw new HttpError(422, 'ElevenLabs key or voice ID is missing. Add them in Settings.');
   if (stages.includes('voice') && engine === 'local') {
     const miss = Array.from({length: sceneCount(d)}, (_, i) => i + 1).filter(n => !sceneAudio(d, n));
@@ -432,7 +432,7 @@ async function episodeDataApi(req: http.IncomingMessage, res: http.ServerRespons
     const n = Number(p[3]), count = sceneCount(d);
     if (!/^\d+$/.test(p[3]) || n < 1 || n > count) throw new HttpError(400, `Scene must be 1 to ${count}.`);
     const b = await body<{kind?: unknown; confirm?: unknown; engine?: unknown}>(req);
-    const engine = String(b.engine ?? readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'say');
+    const engine = String(b.engine ?? readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
     if (b.kind === 'preview') { const r = enqueue(id, {stages: ['direct', 'preview'], engine}); json(res, 202, r); return true; }
     if (b.kind !== 'voice') throw new HttpError(400, 'kind must be voice or preview.');
     const a = sceneAudio(d, n);
@@ -665,7 +665,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       const channel = typeof b.channel === 'string' && b.channel ? b.channel : 'default';
       needChannel(channel);
       const {id} = await draftEpisode(topic, angle, channel, undefined);
-      const engine = String(readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'say');
+      const engine = String(readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
       return json(res, 202, {id, jobId: enqueue(id, {stages: ['voice', 'direct', 'preview'], engine}).jobId});
     }
     if (p[0] === 'draft' && m === 'POST') {
@@ -703,7 +703,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return json(res, 200, {...llmSetupState(), reachable, models, chosen: pickModel(models, process.env.OLLAMA_MODEL?.trim() || undefined)});
     }
     if (p[0] === 'settings') {
-      if (m === 'GET') { const e = readEnv(); return json(res, 200, {elevenKeySet: !!(e.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY), voiceId: e.ELEVENLABS_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID ?? '', model: e.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2', engine: e.STUDIO_ENGINE ?? 'say', ffmpeg: await has('ffmpeg'), draftInstalled: draftInstalled(), ideasInstalled: scriptInstalled('ideas'), publishInstalled: scriptInstalled('publish-pack')}); }
+      if (m === 'GET') { const e = readEnv(); return json(res, 200, {elevenKeySet: !!(e.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY), voiceId: e.ELEVENLABS_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID ?? '', model: e.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2', engine: e.STUDIO_ENGINE ?? 'auto', ffmpeg: await has('ffmpeg'), draftInstalled: draftInstalled(), ideasInstalled: scriptInstalled('ideas'), publishInstalled: scriptInstalled('publish-pack')}); }
       if (m === 'PUT') {
         const b = await body<Record<string, unknown>>(req); const upd: Record<string, string> = {};
         if (typeof b.apiKey === 'string' && b.apiKey.trim()) upd.ELEVENLABS_API_KEY = b.apiKey.trim();

@@ -15,6 +15,7 @@ cp .env.example .env   # then fill the keys below
 ```
 `.env` keys:
 - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`: real voice (optional; the `silent` engine works without them)
+- Voice engines (`--engine`): `auto` (default: `say` on macOS; `piper` if `PIPER_BIN`/`piper` + `PIPER_MODEL=<voice>.onnx`, else `espeak-ng` on Linux; else silent), `say`, `espeak-ng`, `piper`, `eleven`, `local`, `silent`. All keyless engines use whisper-aligned word timing when available.
 - No key is needed: scripts/ideas/publish pack use free local Ollama (auto-started, model auto-picked or downloaded), voice defaults to the macOS `say` engine. `LLM_PROVIDER=anthropic|gemini` (+ key) is an optional override.
 
 ## Studio (one-click flow)

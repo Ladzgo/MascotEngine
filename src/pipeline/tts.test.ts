@@ -70,3 +70,20 @@ test('mapToNarration aligns hyphenated recognised words to spaced narration', as
   const m = mapToNarration('A get rich quick scheme', [{w: 'A', start: 0, end: 0.2}, {w: 'get-rich-quick', start: 0.2, end: 1.1}, {w: 'scheme', start: 1.1, end: 1.5}]);
   assert.deepEqual(m.map(w => [w.w, w.start]), [['A', 0], ['get', 0.2], ['rich', 0.5], ['quick', 0.8], ['scheme', 1.1]]);
 });
+
+import {spawnSync} from 'node:child_process';
+import {CliTTS, autoEngineName} from './tts.js';
+const espeak = spawnSync('sh', ['-c', 'command -v espeak-ng'], {stdio: 'ignore'}).status === 0;
+test('espeak-ng engine produces monotonic timings', {skip: !espeak}, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'esp-')) + '/';
+  const t = await new CliTTS('espeak-ng').synthesize(localEp(2), dir);
+  assert.equal(t.engine, 'espeak-ng');
+  assert.ok(t.scenes[1].start >= t.scenes[0].end);
+  assert.ok(t.scenes.every(s => s.words.length > 0 && fs.existsSync(s.audioFile!)));
+});
+test('auto engine resolves to a registered engine; CliTTS errors clearly without binary', async () => {
+  assert.equal(getEngine(autoEngineName()).name, autoEngineName());
+  const old = process.env.PATH; process.env.PATH = '/nonexistent';
+  try { await assert.rejects(new CliTTS('espeak-ng').synthesize(localEp(1), '/tmp/x/'), /espeak-ng not found/); }
+  finally { process.env.PATH = old; }
+});

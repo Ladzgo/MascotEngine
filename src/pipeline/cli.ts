@@ -34,7 +34,7 @@ async function main() {
     }
     case 'tts': {
       const ep = loadEpisode(id);
-      const engine = getEngine(String(flag('engine') ?? 'silent'));
+      const engine = getEngine(String(flag('engine') ?? 'auto'));
       const timings = await engine.synthesize(ep, episodeDir(ep.id));
       writeTimings(episodeDir(ep.id), timings);
       console.log(`${ep.id}: ${timings.scenes.length} scenes, ${timings.total.toFixed(1)}s (${engine.name})`);

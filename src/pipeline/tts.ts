@@ -169,12 +169,62 @@ export class SayTTS implements TTSAdapter {
   }
 }
 
+const hasBin = (b: string) => spawnSync('sh', ['-c', `command -v "${b}"`], {stdio: 'ignore'}).status === 0;
+export const piperBin = () => (process.env.PIPER_BIN && hasBin(process.env.PIPER_BIN) ? process.env.PIPER_BIN : hasBin('piper') ? 'piper' : null);
+export const piperAvailable = () => !!piperBin() && !!process.env.PIPER_MODEL && fs.existsSync(process.env.PIPER_MODEL);
+
+/** Keyless Linux voices: espeak-ng or piper -> wav -> mp3 (ffmpeg); whisper-aligned or proportional word timing. */
+export class CliTTS implements TTSAdapter {
+  constructor(public name: 'espeak-ng' | 'piper') {}
+  private speak(text: string, wav: string) {
+    if (this.name === 'piper') return spawnSync(piperBin()!, ['--model', process.env.PIPER_MODEL!, '--output_file', wav], {input: text, encoding: 'utf8', timeout: 120000});
+    return spawnSync('espeak-ng', ['-v', process.env.ESPEAK_VOICE || 'en-us', '-s', process.env.ESPEAK_SPEED || '155', '-w', wav, '--', text], {encoding: 'utf8', timeout: 120000});
+  }
+  async synthesize(ep: Episode, outDir: string): Promise<Timings> {
+    if (this.name === 'piper' ? !piperAvailable() : !hasBin('espeak-ng')) {
+      throw new Error(this.name === 'piper' ? 'piper not found: set PIPER_BIN (or put piper on PATH) and PIPER_MODEL to a .onnx voice.' : 'espeak-ng not found. Install it (apt install espeak-ng) or use --engine silent.');
+    }
+    fs.mkdirSync(`${outDir}audio`, {recursive: true});
+    const aligner = detectAligner();
+    let t = LEAD_IN;
+    const scenes: SceneTiming[] = [];
+    for (const [index, s] of ep.scenes.entries()) {
+      const file = `${outDir}audio/scene-${index + 1}.mp3`;
+      const wav = `${outDir}audio/scene-${index + 1}.wav`;
+      const r = this.speak(s.narration, wav);
+      if (r.error || r.status !== 0) throw new Error(`${this.name} failed on scene ${index + 1}: ${(r.stderr || r.error?.message || '').slice(0, 200)}`);
+      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', wav, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
+      fs.rmSync(wav, {force: true});
+      if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
+      const dur = probeDuration(file);
+      let rel: RelWord[] = [];
+      if (aligner) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, 'en')); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
+      if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
+      const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
+      const end = Math.max(t + dur + 0.3, t + MIN_SCENE);
+      scenes.push({index, start: round(t), end: round(end), audioFile: file, words});
+      t = end + SCENE_GAP;
+    }
+    return {engine: this.name, fps: FPS, total: round(t), scenes};
+  }
+}
+
+/** Default engine: say on macOS, piper/espeak-ng on Linux, else silent. */
+export function autoEngineName(): string {
+  if (process.platform === 'darwin' && hasBin('say')) return 'say';
+  if (piperAvailable()) return 'piper';
+  if (hasBin('espeak-ng')) return 'espeak-ng';
+  return hasBin('say') ? 'say' : 'silent';
+}
+
 export function getEngine(name: string): TTSAdapter {
   switch (name) {
+    case 'auto': return getEngine(autoEngineName());
     case 'silent': return new SilentTTS();
     case 'eleven': return new ElevenLabsTTS();
     case 'local': return new LocalRecordingTTS();
     case 'say': return new SayTTS();
+    case 'espeak-ng': case 'piper': return new CliTTS(name);
     default: throw new Error(`Unknown TTS engine: ${name}`);
   }
 }
