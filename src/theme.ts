@@ -24,6 +24,17 @@ export function loadFonts() {
 }
 
 export const clamp = (n: number, a = 0, b = 1) => Math.min(b, Math.max(a, n));
-export const easeOut = (t: number) => 1 - Math.pow(1 - clamp(t), 3);
-export const easeInOut = (t: number) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
-export const backOut = (t: number) => { t = clamp(t); const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+/** CSS-style cubic-bezier(x1,y1,x2,y2) easing: solves x(t)=u by bisection, returns y. */
+export const cubicBezier = (x1: number, y1: number, x2: number, y2: number) => (u: number) => {
+  u = clamp(u);
+  const bz = (a: number, b: number, t: number) => 3 * a * (1 - t) * (1 - t) * t + 3 * b * (1 - t) * t * t + t * t * t;
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (bz(x1, x2, m) < u) lo = m; else hi = m; }
+  return bz(y1, y2, (lo + hi) / 2);
+};
+/** Shared motion curves: everything that enters, moves or leaves uses these instead of linear progress. */
+export const easeOut = cubicBezier(0.16, 1, 0.3, 1);
+export const easeInOut = cubicBezier(0.65, 0, 0.35, 1);
+/** Damped spring settle (about 6% overshoot): replaces the old back-out overshoot. */
+export const spring = (t: number) => { t = clamp(t); return t >= 1 ? 1 : 1 - Math.exp(-7 * t) * Math.cos(9 * t); };
+export const backOut = spring;

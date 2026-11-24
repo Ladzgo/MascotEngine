@@ -9,6 +9,7 @@ import {Paper} from './fx/paper';
 import {Captions, buildPhrases, type CaptionWord} from './fx/captions';
 import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
+import {SourceCard} from './fx/overlays';
 import {DISPLAY, INK, SANS, loadFonts, easeOut} from './theme';
 
 export type EpisodeProps = {
@@ -44,9 +45,13 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     decisions.scenes.map((d, i): CaptionWord[] => sceneWordsRel[i].map(w => ({w: w.w, start: d.startSec + w.start, end: d.startSec + w.end}))),
   ), [decisions, sceneWordsRel]);
 
+  const host0 = (() => { try { return new URL(episode.sources[0]).hostname.replace(/^www\./, ''); } catch { return ''; } })();
   const view = (i: number, frame: number, preroll = 0) => (
+    <>
+    {host0 && ['big_number', 'chart'].includes(episode.scenes[i].type) && <SourceCard host={host0} t={(frame + preroll) / fps} accent={decisions.accent === '' ? INK : accentHex(decisions.accent)} />}
     <SceneView scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} preroll={preroll} fps={fps} accent={decisions.accent === '' ? INK : accentHex(decisions.accent)}
       assets={assets} words={sceneWordsRel[i]} intro={decisions.intro} episodeTitle={episode.title} />
+    </>
   );
 
   const accent = accentHex(decisions.accent);

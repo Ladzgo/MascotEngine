@@ -50,12 +50,12 @@ function layoutBounds(place: Place, floor: number) {
 
 export function cameraStyle(dec: SceneDecision, frame: number, fps: number, place?: Place, floor = FLOOR): React.CSSProperties {
   const dur = Math.max(1, dec.durSec * fps);
-  const p = clamp(frame / dur);
+  const p = easeInOut(frame / dur); // eased, so camera moves start and settle softly
   const t = frame / fps;
   let scale = 1, tx = 0, ty = 0;
   switch (dec.camera) {
-    case 'slow_push': scale = 1 + 0.07 * p; break;
-    case 'slow_pull': scale = 1.07 - 0.07 * p; break;
+    case 'slow_push': scale = 1 + 0.05 * p; break;
+    case 'slow_pull': scale = 1.05 - 0.05 * p; break;
     case 'pan_left': scale = 1.06; tx = -45 * (p - 0.5) * 2; break;
     case 'pan_right': scale = 1.06; tx = 45 * (p - 0.5) * 2; break;
     case 'drift': scale = 1.04; tx = Math.sin(t * 0.6) * 22; ty = Math.cos(t * 0.45) * 14; break;

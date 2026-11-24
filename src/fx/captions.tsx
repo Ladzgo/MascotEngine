@@ -1,6 +1,10 @@
 import React from 'react';
 import {DISPLAY, INK, PAPER, SANS, W} from '../theme';
 
+const FUNCTION_WORDS = new Set('a an the of to in on at for and or but is are was were be it its this that with as by from you your they them their we our so if than then there here do does did will would can could'.split(' '));
+/** Function words (to, the, a, of...) are never highlighted; only content words get the accent colour. */
+export const isFunctionWord = (w: string) => FUNCTION_WORDS.has(w.toLowerCase().replace(/[^a-z']/g, ''));
+
 export type CaptionWord = {w: string; start: number; end: number}; // absolute seconds
 export type Phrase = {start: number; end: number; words: CaptionWord[]};
 
@@ -28,10 +32,10 @@ export const Captions: React.FC<{phrases: Phrase[]; t: number; accent: string; s
   const phrase = phrases.filter(p => t >= p.start - 0.05 && t <= p.end + 0.35).pop();
   if (!phrase) return null;
   const inner = phrase.words.map((w, i) => {
-    const active = t >= w.start && t < w.end + 0.02;
+    const active = t >= w.start && t < w.end + 0.02 && !isFunctionWord(w.w);
     return <span key={i} style={{color: active ? accent : style === 'bar' ? PAPER : INK}}>{w.w}{i < phrase.words.length - 1 ? ' ' : ''}</span>;
   });
-  const base: React.CSSProperties = {fontFamily: style === 'outline' ? DISPLAY : SANS, fontWeight: 700, fontSize: size, lineHeight: 1.15, textAlign: 'center', maxWidth};
+  const base: React.CSSProperties = {fontFamily: style === 'outline' ? DISPLAY : SANS, fontWeight: 700, fontSize: size, lineHeight: 1.15, textAlign: 'center', maxWidth, textShadow: style === 'bar' ? '0 2px 0 rgba(0,0,0,0.35)' : undefined};
   return (
     <div style={{position: 'absolute', left: 0, right: 0, bottom, display: 'flex', justifyContent: 'center'}}>
       {style === 'bar' && <div style={{...base, background: 'rgba(27,27,31,0.88)', padding: '14px 44px', borderRadius: 14}}>{inner}</div>}
