@@ -89,3 +89,12 @@ test('fallback tags: no junk, phrases, limits', () => {
   for (const bad of ['your', 'quietly', 'why', 'are']) assert.ok(!tags.some(t => t.split(' ').includes(bad)), bad);
   assert.ok(tags.includes('money myths') && tags.includes('savings shrinking') && tags.includes('bls'));
 });
+
+import {fixPack, validatePack, fallbackMeta} from './publish.js';
+test('validatePack flags YouTube rule violations; fixPack repairs the fixable ones', () => {
+  const bad: any = {titles: ['x'.repeat(101), 'ok <b>'], description: 'a <b> ' + 'word '.repeat(1100), tags: ['fine', 'y'.repeat(31)], chapters: [{startSec: 5, title: 'a'}, {startSec: 8, title: ''}]};
+  const msgs = validatePack(bad);
+  for (const m of ['max 100', 'contains < or >', 'max 5000', 'over 30', '0:00', 'at least 3', 'shorter than']) assert.ok(msgs.some(x => x.includes(m)), m);
+  const fixed = fixPack({...bad, thumbnailText: [], source: 'fallback'});
+  assert.ok(!validatePack({...fixed, chapters: []}).some(x => /max 100|< or >|max 5000|over 30/.test(x)));
+});

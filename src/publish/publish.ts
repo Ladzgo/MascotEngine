@@ -11,6 +11,7 @@ export type Chapter = {startSec: number; title: string};
 export type Pack = {
   titles: string[]; description: string; tags: string[]; chapters: Chapter[];
   thumbnailText: string[]; source: 'ai' | 'fallback';
+  uploadNotes?: string[]; // manual YouTube Studio steps (AI disclosure etc.)
 };
 export type SceneTiming = {index: number; startSec: number};
 
@@ -93,7 +94,7 @@ export function fallbackThumbs(ep: Episode): string[] {
   const bn = ep.scenes.find(s => s.type === 'big_number');
   if (bn && bn.type === 'big_number') {
     const n = `${bn.prefix}${bn.value.toLocaleString('en-US', {maximumFractionDigits: bn.decimals})}${bn.suffix}`;
-    const label = words(bn.label).filter(w => !STOP.has(w.toLowerCase())).slice(0, 2).join(' ');
+    const label = words(bn.label).filter(w => !STOP.has(w.toLowerCase()) && !/[\d$%]/.test(w)).slice(0, 2).join(' ');
     out.push(cap(`${n} ${label}`.trim()));
   }
   const emph = ep.scenes.flatMap(s => s.emphasis).find(e => words(e).length >= 1 && words(e).length <= 4);
@@ -117,8 +118,9 @@ export function fallbackTags(ep: Episode): string[] {
   ep.scenes.flatMap(s => s.emphasis).forEach(runs);
   const bn = ep.scenes.find(s => s.type === 'big_number');
   if (bn && bn.type === 'big_number') runs(bn.label);
-  const hosts = ep.sources.map(u => { try { return new URL(u).hostname.replace(/^www\./, '').split('.')[0]; } catch { return ''; } }).filter(h => h.length > 2);
-  const single = words(ep.title).filter(isKeyword).map(w => w.toLowerCase());
+  const hosts = ep.sources.map(u => { try { return new URL(u).hostname.replace(/^www\./, '').split('.')[0]; } catch { return ''; } }).filter(h => h.length > 2 && h.length <= 6); // short agency names (bls, fred), not 'investor'
+  const freq = (w: string) => (ep.scenes.map(x => x.narration).join(' ').toLowerCase().match(new RegExp(`\\b${w}\\b`, 'g')) ?? []).length;
+  const single = words(ep.title).filter(isKeyword).map(w => w.toLowerCase()).filter((w, i) => i === 0 || (w.length >= 5 && freq(w) >= 2)); // one-word tags only if the video really repeats them
   const topic = single[0];
   const cand = [ep.series.replace(/-/g, ' '), 'personal finance', ...phrases,
     ...(topic ? [`${topic} explained`] : []), ...single, 'money basics', ...hosts];
@@ -131,13 +133,52 @@ export function fallbackTags(ep: Episode): string[] {
   return out;
 }
 
-export function fallbackMeta(ep: Episode): Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> {
-  const t = ep.title.trim();
-  const titles = [t, `${t}: the maths`, `${t} (explained)`, `The truth about ${t.replace(/[.?!]+$/, '')}`, `${t} in plain English`].map(x => clip(x, 100));
-  const tags = fallbackTags(ep);
-  const thumbnailText = fallbackThumbs(ep);
-  return {titles, tags, thumbnailText};
+export function fallbackMeta(ep: Episode, totalSec = 0): Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> {
+  const t = ep.title.trim().replace(/[.?!]+$/, '');
+  const short = shortTitle(ep.title);
+  const bn = ep.scenes.find(s => s.type === 'big_number');
+  const num = bn && bn.type === 'big_number' ? `${bn.prefix}${bn.value.toLocaleString('en-US', {maximumFractionDigits: bn.decimals})}${bn.suffix}` : '';
+  const mins = Math.max(1, Math.round(totalSec / 60));
+  const cand = [ep.title.trim(),
+    ...(num && bn?.type === 'big_number' && !/\d/.test(bn.label) ? [`${num} ${bn.label.replace(/\s+/g, ' ').trim().toLowerCase()}: the maths step by step`] : []),
+    ...(totalSec >= 90 ? [`${short || t} explained in ${mins} minute${mins > 1 ? 's' : ''}`] : []),
+    `${short || t}: what the numbers say`, `${t} in plain English`, `${t}: the maths`, `${t}: the numbers, explained`];
+  const titles = [...new Set(cand.map(x => clip(upFirst(x), 100)))].slice(0, 5);
+  return {titles, tags: fallbackTags(ep), thumbnailText: fallbackThumbs(ep)};
 }
+
+/** YouTube limits: title <= 100 (<= 70 reads fully on mobile), description <= 5000 bytes, no < >, tags <= 500 chars total and <= 30 each, chapters 0:00 / >= 3 / >= 10 s. */
+export function validatePack(p: Pick<Pack, 'titles' | 'description' | 'tags' | 'chapters'>): string[] {
+  const out: string[] = [];
+  p.titles.forEach((t, i) => { if (t.length > 100) out.push(`title ${i + 1} is ${t.length} chars (max 100)`); else if (t.length > 70) out.push(`title ${i + 1} is ${t.length} chars (cut off after ~70 on mobile)`); if (/[<>]/.test(t)) out.push(`title ${i + 1} contains < or >`); });
+  if (Buffer.byteLength(p.description) > 5000) out.push(`description is ${Buffer.byteLength(p.description)} bytes (max 5000)`);
+  if (/[<>]/.test(p.description)) out.push('description contains < or > (YouTube rejects them)');
+  if (p.tags.join(',').length > 500) out.push('tags exceed 500 characters');
+  p.tags.filter(t => t.length > 30).forEach(t => out.push(`tag "${t}" is over 30 chars`));
+  const ch = p.chapters;
+  if (ch.length) {
+    if (ch[0].startSec !== 0) out.push('first chapter must start at 0:00');
+    if (ch.length < 3) out.push('need at least 3 chapters');
+    ch.forEach((c, i) => { if (i && c.startSec - ch[i - 1].startSec < MIN_CHAPTER_SEC) out.push(`chapter ${i} is shorter than ${MIN_CHAPTER_SEC}s`); if (!c.title.trim()) out.push(`chapter ${i + 1} has no title`); });
+  }
+  return out;
+}
+
+/** Make a pack safe to paste: strip angle brackets, drop over-long tags, trim description at a line break. */
+export function fixPack(p: Pack): Pack {
+  const strip = (x: string) => x.replace(/[<>]/g, '');
+  let description = strip(p.description);
+  while (Buffer.byteLength(description) > 5000) description = description.slice(0, description.lastIndexOf('\n\n')).trimEnd();
+  const tags: string[] = [];
+  for (const t of p.tags.filter(x => x.length <= 30)) if ([...tags, t].join(',').length <= 500) tags.push(t);
+  return {...p, titles: p.titles.map(t => clip(strip(t), 100)), description, tags};
+}
+
+export const UPLOAD_NOTES = [
+  'YouTube Studio > Details > "Altered content": answer Yes if the voice or any scene could be mistaken for a real person or real event. This channel uses a synthetic (AI/text-to-speech) narrator and cartoon visuals; Google lets purely animated or obviously unrealistic content answer No, but when unsure answer Yes. The description already says the narration is AI-generated.',
+  'Keep the disclosure line in the description; do not remove it before publishing.',
+  'Financial content: the educational disclaimer is in the description and the end card; do not add return guarantees to the title or thumbnail.',
+];
 
 const BANNED = [/guarantee/i, /risk[- ]free/i, /can'?t lose/i, /get rich/i, /you should (buy|sell|invest)/i, /won'?t believe/i, /shocking/i, /secret/i, /nobody tells/i, /millionaire in/i];
 
@@ -188,13 +229,15 @@ export async function buildPack(o: {
   const chapters = buildChapters(o.ep.scenes, o.timings, o.totalSec, o.ep.title);
   if (!chapters.length) warn('Warning: video too short for YouTube chapters (need 3 chapters of 10s+); chapters omitted.');
   const description = buildDescription(o.ep, chapters);
-  let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep);
+  let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep, o.totalSec);
   let source: Pack['source'] = 'fallback';
   if (o.client) {
     try { meta = await aiMeta(o.client, o.ep, o.model); source = 'ai'; }
     catch (e) { warn(`AI metadata failed, using fallback: ${(e as Error).message}`); }
   } else warn(`${NO_PROVIDER} Using offline fallback titles.`);
-  return {...meta, description, chapters, source};
+  const pack = fixPack({...meta, description, chapters, source, uploadNotes: UPLOAD_NOTES});
+  validatePack(pack).forEach(m => warn(`Publish pack: ${m}`));
+  return pack;
 }
 
 export function loadEpisodeFile(root: string, id: string): {ep: Episode; dir: string} {
