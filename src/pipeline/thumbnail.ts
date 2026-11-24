@@ -7,6 +7,7 @@ import {episodeDir, loadEpisode} from '../schema.js';
 import {loadCharacterAssets} from './render.js';
 import {loadChannel} from '../channel/channel.js';
 import {chromiumTuning} from './renderOpts.js';
+import {MIN_THUMB_SIZE, thumbSize} from '../Thumbnail.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const FILLER = new Set('a an the of to in on at for and or but is are was were be it its this that with as by from you your they them their we our so if than then there here do does did will would can could how why what who when which just really very about into over'.split(' '));
@@ -80,6 +81,8 @@ export async function makeThumbnail(id: string, text?: string, variants = 1): Pr
     const comp = await selectComposition({serveUrl, id: 'Thumbnail', inputProps: props});
     const out = `${dir}build/thumbnail-${variant}.png`;
     await renderStill({composition: comp, serveUrl, output: out, inputProps: props, frame: 0, chromiumOptions: chromiumTuning()});
+    const px = thumbSize(variant, props.text);
+    if (px < MIN_THUMB_SIZE) console.log(`thumbnail ${variant.toUpperCase()}: headline is only ${px}px (long word); use a shorter hook for small-screen legibility`);
     const rd = readability(out, variant);
     results.push({variant, file: out, text: props.text, ...rd, score: +thumbScore(rd).toFixed(3)});
     console.log(`thumbnail ${variant.toUpperCase()} "${props.text}": contrast ${rd.contrast}:1, ink ${(rd.ink * 100).toFixed(0)}% at 150px ${rd.ok ? 'ok' : 'WEAK'} score ${thumbScore(rd).toFixed(2)}`);

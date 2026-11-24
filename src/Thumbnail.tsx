@@ -10,6 +10,11 @@ export type ThumbProps = {text: string; accent: string; pose: string; assets: Ch
 // Archivo Black is ~0.74 em per capital: shrink until the longest word fits `budget` px (never over the mascot)
 const fit = (words: string[], max: number, budget: number) => Math.min(max, Math.floor(budget / (Math.max(...words.map(w => w.length), 3) * 0.74)));
 
+const words4 = (text: string) => text.toUpperCase().split(/\s+/).filter(Boolean).slice(0, 4);
+/** Headline font size in px for a variant; below ~100 px the text is hard to read at 150 px wide. */
+export const thumbSize = (variant: 'a' | 'b' | 'c', text: string) => fit(words4(text), variant === 'c' ? 190 : 220, variant === 'c' ? 700 : 730);
+export const MIN_THUMB_SIZE = 100;
+
 /**
  * YouTube thumbnail (1280x720), both variants built for 150 px legibility: 2-3 word hook, one accent word,
  * heavy ink outline, no text over the mascot.
@@ -18,7 +23,7 @@ const fit = (words: string[], max: number, budget: number) => Math.min(max, Math
 export const Thumbnail: React.FC<ThumbProps> = ({text, accent, pose, assets, variant = 'a'}) => {
   loadFonts();
   const hex = ACCENT_HEX[accent] ?? ACCENT_HEX.violet;
-  const words = text.toUpperCase().split(/\s+/).filter(Boolean).slice(0, 4);
+  const words = words4(text);
   const last = words.length - 1;
   if (variant === 'c') { // question style: ink field, giant accent question mark behind the mascot, white question text
     const size = fit(words, 190, 700);
@@ -61,7 +66,7 @@ export const Thumbnail: React.FC<ThumbProps> = ({text, accent, pose, assets, var
       </div>
       <div style={{position: 'absolute', left: 52, top: 0, bottom: 0, width: 740, display: 'flex', flexDirection: 'column', justifyContent: 'center', transform: 'rotate(-2deg)'}}>
         {words.map((w, i) => (
-          <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 0.98, letterSpacing: -2, color: i === last ? hex : INK, WebkitTextStroke: `${Math.round(size * (i === last ? 0.07 : 0.01))}px ${INK}`, paintOrder: 'stroke fill', textShadow: i === last ? `0 7px 0 ${INK}` : undefined}}>{w}</span>
+          <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 0.98, letterSpacing: -2, color: i === last ? hex : INK, WebkitTextStroke: `${Math.round(size * (i === last ? 0.07 : 0.03))}px ${INK}`, paintOrder: 'stroke fill', textShadow: i === last ? `0 7px 0 ${INK}` : undefined}}>{w}</span>
         ))}
       </div>
     </AbsoluteFill>

@@ -30,3 +30,26 @@ test('questionText and thumbScore (best variant = most legible, weak ones lose)'
   assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: true}) > thumbScore({contrast: 8, ink: 0.1, ok: true}));
   assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: false}) < thumbScore({contrast: 15, ink: 0.2, ok: true}) - 0.4);
 });
+
+test('golden: all three variants stay legible at 150 px for short, long and accented hooks', async () => {
+  const {bundle} = await import('@remotion/bundler');
+  const {renderStill, selectComposition} = await import('@remotion/renderer');
+  const {loadCharacterAssets} = await import('./render.js');
+  const {chromiumTuning} = await import('./renderOpts.js');
+  const {thumbSize, MIN_THUMB_SIZE} = await import('../Thumbnail.js');
+  const root = new URL('../../', import.meta.url).pathname;
+  const serveUrl = await bundle({entryPoint: `${root}src/index.ts`, publicDir: `${root}assets`});
+  const assets = loadCharacterAssets(), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thg-'));
+  try {
+    for (const text of ['$500 A MONTH', 'COMPOUND INTEREST?', 'VÉSZALAP MIÉRT?']) {
+      for (const variant of ['a', 'b', 'c'] as const) {
+        assert.ok(thumbSize(variant, text) >= MIN_THUMB_SIZE, `${text} ${variant} size`);
+        const props = {text, accent: 'violet', pose: 'shocked', assets, variant}, out = path.join(dir, `${variant}.png`);
+        const comp = await selectComposition({serveUrl, id: 'Thumbnail', inputProps: props});
+        await renderStill({composition: comp, serveUrl, output: out, inputProps: props, frame: 0, chromiumOptions: chromiumTuning()});
+        const r = readability(out, variant);
+        assert.ok(r.ok && thumbScore(r) >= 0.35, `${text} ${variant} ${JSON.stringify(r)}`);
+      }
+    }
+  } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+});
