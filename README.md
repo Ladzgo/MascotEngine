@@ -53,3 +53,13 @@ In `episodes/<id>/build/`: `<id>-preview.mp4`, `<id>-final.mp4`, `<id>.srt`, `ti
 
 ## Mascot art
 Until real PNGs exist in `assets/character/` the engine uses a placeholder mascot. See `docs/MASCOT-ART.md`.
+
+## Linux install (offline work machine)
+Prepare everything on a machine with internet, then copy it over (the repo is on GitHub: `git clone https://github.com/Ladzgo/MascotEngine`).
+1. Node 20+ and `npm ci` (copy `node_modules` too if the target has no registry access). Remotion needs a Chromium: run `npx remotion browser ensure` online once and copy `node_modules/.remotion` (or install `chromium`).
+2. `apt install ffmpeg espeak-ng` (download the `.deb` files and their dependencies beforehand: `apt-get install --download-only`).
+3. Ollama: install the Linux binary, then `ollama pull qwen2.5:7b` online and copy `~/.ollama/models` to the same path on the target.
+4. whisper.cpp: build `whisper-cli`, put it on `PATH`, and copy `ggml-base.en.bin` to `data/models/` (or set `WHISPER_MODEL`). Optional but gives word-accurate captions.
+5. Better voice (optional): piper binary + an `.onnx` voice, then `PIPER_BIN` and `PIPER_MODEL` in `.env`. Without it espeak-ng is used.
+6. Music: drop licensed tracks into `assets/music/` (an ambient pad is included).
+7. Check: `npm run app`, then `GET /api/readiness` (Studio server) lists every missing piece with its fix. Over SSH use `ssh -L 4177:localhost:4177 host` and open http://localhost:4177.

@@ -88,6 +88,29 @@ function emit(job: Job) {
   broadcastQueue();
 }
 
+// ---------- readiness: what is installed, what is missing and the fix (offline machines: see README) ----------
+const onPath = (b: string) => (process.env.PATH ?? '').split(path.delimiter).some(d => { try { fs.accessSync(path.join(d, b), fs.constants.X_OK); return true; } catch { return false; } });
+async function readiness() {
+  const root = path.resolve(new URL('../', import.meta.url).pathname);
+  const item = (id: string, label: string, ok: boolean, detail: string, fix: string) => ({id, label, ok, detail: ok ? detail : '', fix: ok ? '' : fix});
+  let models: string[] = [];
+  try { const r = await fetch(`${process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434'}/api/tags`, {signal: AbortSignal.timeout(1500)}); models = ((await r.json()) as {models?: {name: string}[]}).models?.map(x => x.name) ?? []; } catch { /* not running */ }
+  const picked = pickModel(models, process.env.OLLAMA_MODEL);
+  const whisperModel = process.env.WHISPER_MODEL && fs.existsSync(process.env.WHISPER_MODEL) ? process.env.WHISPER_MODEL : fs.existsSync(path.join(root, 'data/models/ggml-base.en.bin')) ? 'data/models/ggml-base.en.bin' : '';
+  const music = fs.existsSync(path.join(root, 'assets/music')) ? fs.readdirSync(path.join(root, 'assets/music')).filter(f => /\.(mp3|wav|m4a|ogg)$/i.test(f)) : [];
+  const voice = process.platform === 'darwin' && onPath('say') ? 'say' : onPath('piper') && process.env.PIPER_MODEL && fs.existsSync(process.env.PIPER_MODEL) ? 'piper' : onPath('espeak-ng') ? 'espeak-ng' : '';
+  const items = [
+    item('ffmpeg', 'ffmpeg', onPath('ffmpeg') && onPath('ffprobe'), 'ffmpeg + ffprobe found', 'Install ffmpeg (apt install ffmpeg / brew install ffmpeg).'),
+    item('whisper-bin', 'whisper.cpp', onPath('whisper-cli'), 'whisper-cli found', 'Build whisper.cpp and put whisper-cli on PATH (captions fall back to estimated timing).'),
+    item('whisper-model', 'Whisper model', !!whisperModel, whisperModel, 'Copy ggml-base.en.bin to data/models/ or set WHISPER_MODEL.'),
+    item('ollama', 'Ollama', models.length > 0, 'running', 'Install Ollama and run `ollama serve` (the Studio can also start it).'),
+    item('ollama-model', 'Ollama model', !!picked, picked ?? '', 'Run `ollama pull qwen2.5:7b` (on an offline machine, copy ~/.ollama/models from another machine).'),
+    item('music', 'Music bed', music.length > 0, music.join(', '), 'Put a licensed track in assets/music/ (an ambient pad ships with the repo).'),
+    item('voice', 'Voice engine', !!voice, voice, 'Linux: apt install espeak-ng, or set PIPER_BIN and PIPER_MODEL. macOS has say built in.'),
+  ];
+  return {ok: items.every(i => i.ok), items};
+}
+
 // ---------- queue (one job runs, the rest wait) ----------
 const queueClients = new Set<http.ServerResponse>();
 const jobBrief = (j: Job) => ({jobId: j.id, episode: j.episode, stages: j.stages, status: j.status, current: j.current, done: j.done, progress: j.progress, error: j.error, engine: j.engine, createdAt: j.createdAt});
@@ -679,6 +702,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     }
     if (await globalDataApi(req, res, url, p, m)) return;
     if (p[0] === 'channels') return await channelApi(req, res, url, p, m);
+    if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
     if (p[0] === 'overview' && m === 'GET') return json(res, 200, {channels: overview()});
     if (p[0] === 'jobs' && p[1]) {
       const job = jobs.get(p[1]);
