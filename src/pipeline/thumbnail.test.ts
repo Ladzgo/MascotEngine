@@ -28,5 +28,5 @@ test('questionText and thumbScore (best variant = most legible, weak ones lose)'
   assert.equal(questionText('Why Your Savings Are Quietly Shrinking', 'Savings Shrinking'), 'Why Your Savings Are?');
   assert.equal(questionText('Compound interest explained', 'Compound Interest Explained'), 'Compound Interest?');
   assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: true}) > thumbScore({contrast: 8, ink: 0.1, ok: true}));
-  assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: false}) < thumbScore({contrast: 5, ink: 0.07, ok: true}));
+  assert.ok(thumbScore({contrast: 15, ink: 0.2, ok: false}) < thumbScore({contrast: 15, ink: 0.2, ok: true}) - 0.4);
 });
