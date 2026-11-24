@@ -1,0 +1,18 @@
+# Episode QA (`npm run qa -- <id> [--file video.mp4]`)
+
+Runs on `episodes/<id>/build/<id>-final.mp4` (else `-preview.mp4`), needs `decisions.json` + `timings.json`. Writes `build/qa.json`, prints PASS/FAIL per check, exit 0 = all pass, 1 = failing checks, 2 = error. Free, local (ffmpeg only). Thresholds live in `LIMITS` in `scripts/qa/qa.ts`.
+
+| Check | Threshold | Why |
+|---|---|---|
+| render is current | video mtime >= decisions/timings | a stale render makes every other result meaningless |
+| duration | 45 s .. 20 min | below 45 s it is a Short, above 20 min the pipeline was not built for it |
+| audio stream | present | |
+| loudness (ffmpeg loudnorm, integrated) | -16 .. -12.5 LUFS | mix target -14; YouTube normalises down, not up |
+| true peak | <= -1.0 dBTP | codec headroom |
+| loudness range | <= 14 LU | no jumps between music and voice |
+| longest pause (voice.wav, silencedetect -38 dB, 0.35 s, leading/trailing ignored) | <= 1.5 s | pacing rule from Item 27/31 (avg gap ~0.4 s) |
+| pause share | <= 25% of duration | |
+| caption coverage | >= 90% of speech seconds inside a phrase window | data check against `buildPhrases` |
+| frames at 10/30/50/70/90% (centred on the nearest spoken word) | not blank (std dev >= 4), side margin strips (2% each) edge density <= 12%, caption zone (y 86-99%) edge density >= 2% | catches empty scenes, content cut by the frame edge, missing captions |
+
+Known limit: the frame checks are heuristics (gradient density), not OCR; a transition wipe sampled mid-frame can trip the margin check, re-run or look at the frame. Silent (`--engine silent`) episodes have no speech, so pause and caption checks are not meaningful.
