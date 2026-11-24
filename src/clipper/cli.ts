@@ -5,12 +5,13 @@ import {spawnSync} from 'node:child_process';
 import {findCandidates} from './segment.js';
 import {cropPath, cropWidth, sampleTrack} from './crop.js';
 import {renderClip} from './render.js';
+import {cleanupCaptions, renderCaptionVideos} from './captions.js';
 import {snapClip} from './snap.js';
 import {TimelineSchema, WordSchema, type Timeline} from './timeline.js';
 
 function arg(name: string, def: string) { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : def; }
 
-function main() {
+async function main() {
   const file = process.argv.slice(2).find(a => !a.startsWith('--') && !/^\d+(\.\d+)?$/.test(a));
   if (!file || !fs.existsSync(file)) throw new Error('usage: npm run clip -- <file> [--min 20 --max 60 --count 5] [--words words.json] [--no-render]');
   const min = +arg('min', '20'), max = +arg('max', '60'), count = +arg('count', '5');
@@ -39,11 +40,14 @@ function main() {
     crop: {w: cw, h: H, path: cropPath(sampleTrack(file, c.start, c.end, W, H), W, cw)},
   }))};
   if (!cands.length) console.warn('no clip candidates found (try wider --min/--max)');
+  const render = !process.argv.includes('--no-render');
+  const caps = render && !process.argv.includes('--no-captions') ? await renderCaptionVideos(tl.clips, dir) : new Map<string, string | null>();
   for (const c of tl.clips) {
-    if (!process.argv.includes('--no-render')) { c.file = path.join(dir, `${c.id}.mp4`); renderClip(file, c, c.file); }
+    if (render) { c.file = path.join(dir, `${c.id}.mp4`); renderClip(file, c, c.file, caps.get(c.id) ?? null); }
     console.log(`${c.id} ${c.start.toFixed(1)}-${c.end.toFixed(1)}s score ${c.score} [${c.reasons.join(', ')}]`);
   }
+  cleanupCaptions(caps);
   fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(TimelineSchema.parse(tl), null, 2));
   console.log(`timeline: ${path.join(dir, 'timeline.json')}`);
 }
-try { main(); } catch (e) { console.error((e as Error).message); process.exit(1); }
+main().catch(e => { console.error((e as Error).message); process.exit(1); });

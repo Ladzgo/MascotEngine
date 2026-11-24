@@ -6,6 +6,8 @@ import {H, W} from './theme';
 import {THUMB_H, THUMB_W, Thumbnail, type ThumbProps} from './Thumbnail';
 import {SHORT_H, SHORT_W, ShortVideo, shortFrames, type ShortProps} from './ShortEpisode';
 
+import {CLIP_CAP_H, CLIP_CAP_W, ClipCaptions, type ClipCaptionProps} from './ClipCaptions';
+
 const FPS = 30;
 
 export const Root: React.FC = () => (
@@ -39,5 +41,8 @@ export const Root: React.FC = () => (
     }}
   />
   <Composition id="Thumbnail" component={Thumbnail} width={THUMB_W} height={THUMB_H} fps={FPS} durationInFrames={1} defaultProps={undefined as unknown as ThumbProps} />
+  <Composition id="ClipCaptions" component={ClipCaptions} width={CLIP_CAP_W} height={CLIP_CAP_H} fps={FPS} durationInFrames={FPS}
+    defaultProps={undefined as unknown as ClipCaptionProps}
+    calculateMetadata={({props}) => ({durationInFrames: Math.max(1, Math.ceil((props as ClipCaptionProps).durationSec * FPS))})} />
   </>
 );

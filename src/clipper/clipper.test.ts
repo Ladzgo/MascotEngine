@@ -128,3 +128,13 @@ test('crop path: jumping track is rate-limited, jitter inside the deadband holds
   const q = cropPath(jitter, srcW, cw);
   assert.ok(Math.max(...q.map(r => r.x)) - Math.min(...q.map(r => r.x)) <= 2, 'deadband holds');
 });
+
+import {captionChunks} from '../ClipCaptions.js';
+test('captionChunks: <=3 words, contiguous, visible while spoken', () => {
+  const ws = Array.from({length: 10}, (_, i) => ({w: i === 4 ? 'infrastructure' : 'word' + i, start: i * 0.4, end: i * 0.4 + 0.3}));
+  const ch = captionChunks(ws);
+  assert.equal(ch.flatMap(c => c.words).length, 10);
+  assert.ok(ch.every(c => c.words.length <= 3 && c.to > c.from));
+  for (const w of ws) assert.ok(ch.some(c => w.start + 0.1 >= c.from && w.start + 0.1 < c.to), `word at ${w.start} uncovered`);
+  for (let i = 1; i < ch.length; i++) assert.ok(ch[i].from >= ch[i - 1].to - 1e-9, 'no overlap');
+});
