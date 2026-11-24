@@ -29,7 +29,7 @@ async function main() {
     }
     case 'thumbnail': {
       const {makeThumbnail} = await import('./thumbnail.js');
-      console.log(`THUMB_OK ${await makeThumbnail(id, typeof flag('text') === 'string' ? String(flag('text')) : undefined)}`);
+      console.log(`THUMB_OK ${await makeThumbnail(id, typeof flag('text') === 'string' ? String(flag('text')) : undefined, +(flag('variants') ?? 1) || 1)}`);
       break;
     }
     case 'tts': {
