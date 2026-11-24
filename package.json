@@ -22,7 +22,8 @@
     "channel": "tsx src/channel/cli.ts",
     "art": "tsx src/art/cli.ts",
     "clip": "tsx src/clipper/cli.ts",
-    "qa": "tsx scripts/qa/qa.ts"
+    "qa": "tsx scripts/qa/qa.ts",
+    "batch": "tsx src/batch/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",
