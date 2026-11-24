@@ -54,11 +54,11 @@ export async function checkReadiness(p: Probe = realProbe(path.resolve(new URL('
   const items = [
     item('node', 'Node.js 20+', true, +p.nodeVersion.split('.')[0] >= 20, `v${p.nodeVersion}`, 'Install Node 20 or newer.'),
     item('node-modules', 'npm packages', true, fs.existsSync(path.join(p.root, 'node_modules/remotion')), 'node_modules present', 'Run `npm ci` (offline: unpack the bundle, see docs/OFFLINE.md).'),
-    item('ffmpeg', 'ffmpeg + ffprobe', true, ff, 'ffmpeg + ffprobe found', 'Install ffmpeg (apt install ffmpeg / brew install ffmpeg).'),
+    item('ffmpeg', 'ffmpeg + ffprobe', true, ff, 'ffmpeg + ffprobe found', 'Install ffmpeg: `brew install ffmpeg` (macOS) or `apt install ffmpeg`.'),
     item('x264', 'ffmpeg libx264 + aac', true, ff && p.ffmpegHas('libx264') && p.ffmpegHas('aac'), 'libx264 and aac available', 'Use an ffmpeg build with libx264 (the apt package has it).'),
     item('prores', 'ffmpeg ProRes (Clipper captions)', false, ff && p.ffmpegHas('prores_ks'), 'prores_ks available', 'Use a full ffmpeg build (apt ffmpeg has prores_ks); only the Clipper captions need it.'),
     item('chromium', 'Chromium for Remotion', true, !!chromium, chromium, 'Run `npx remotion browser ensure` online once and copy node_modules/.remotion, or install chromium and set REMOTION_BROWSER_EXECUTABLE.'),
-    item('whisper-bin', 'whisper.cpp (whisper-cli)', false, p.onPath('whisper-cli'), 'whisper-cli found', 'Build whisper.cpp and put whisper-cli on PATH (captions fall back to estimated timing; the Clipper needs it).'),
+    item('whisper-bin', 'whisper.cpp (whisper-cli)', false, p.onPath('whisper-cli'), 'whisper-cli found', 'Run `brew install whisper-cpp`, or build whisper.cpp and put whisper-cli on PATH (captions fall back to estimated timing; the Clipper needs it).'),
     item('whisper-model', 'Whisper model', false, !!whisperModel, whisperModel, 'Copy ggml-base.en.bin to data/models/ or set WHISPER_MODEL.'),
     item('ollama', 'Ollama running', false, models.length > 0, 'running', 'Install Ollama and run `ollama serve` (the Studio can also start it).'),
     item('ollama-model', 'Ollama model', false, !!picked, picked ?? '', 'Run `ollama pull qwen2.5:7b` (offline: copy ~/.ollama/models from another machine, see docs/OFFLINE.md).'),

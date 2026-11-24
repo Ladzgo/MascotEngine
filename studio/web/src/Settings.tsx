@@ -20,7 +20,7 @@ export function ReadinessPanel({onlyMissing = false}: {onlyMissing?: boolean}) {
   return (
     <div className={onlyMissing ? 'panel ready-warn' : 'ready'} aria-label="Machine readiness">
       <h2 className="label">{onlyMissing ? 'Missing on this machine' : 'This machine'}</h2>
-      <ul>{items.map(i => <li key={i.id} className={i.ok ? 'ok' : 'bad'}>{i.ok ? <Check size={14} /> : <Alert size={14} />}<b>{i.label}</b><span>{i.ok ? i.detail || 'ready' : i.fix}</span></li>)}</ul>
+      <ul>{items.map(i => <li key={i.id} className={i.ok ? 'ok' : 'bad'}>{i.ok ? <Check size={14} /> : <Alert size={14} />}<b>{i.label}</b><span>{i.ok ? i.detail || 'ready' : i.fix}</span>{!i.ok && <button type="button" className="btn sm" aria-label={`Copy fix for ${i.label}`} onClick={() => void navigator.clipboard?.writeText(i.fix.match(/`([^`]+)`/)?.[1] ?? i.fix)}>Copy</button>}</li>)}</ul>
       {onlyMissing && <p><a className="link" href="#/settings">Open Settings</a></p>}
     </div>
   );
