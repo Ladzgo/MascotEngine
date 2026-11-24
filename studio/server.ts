@@ -15,6 +15,7 @@ import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {createServer as createVite} from 'vite';
+import {deletePreset, listPresets, savePreset} from '../src/channel/userPresets.js';
 import react from '@vitejs/plugin-react';
 import {Episode} from '../src/schema.js';
 import {ensureOllama, llmSetupState, ollamaReachable, pickModel} from '../src/llm/llm.js';
@@ -242,7 +243,7 @@ const needAi = (script: string) => {
 };
 
 // ---------- channels ----------
-type Channel = {id: string; name: string; description: string; niche: string; audience: string; tone: string; language: string; voiceId?: string; bannedTopics: string[]; postingPerWeek: number; createdAt: string};
+type Channel = {id: string; name: string; description: string; niche: string; audience: string; tone: string; language: string; voiceId?: string; bannedTopics: string[]; postingPerWeek: number; createdAt: string; accent?: string; sayVoice?: string; voiceStyle?: string; branding?: {handle?: string; cta?: string; outroSec: number; watermark: boolean}};
 const chDir = (id: unknown) => { if (typeof id !== 'string' || !ID_RE.test(id)) throw new HttpError(400, 'Invalid channel id. Use lowercase letters, numbers and dashes only.'); return `${CHANNELS}${id}/`; };
 function ensureDefaultChannel() {
   const dir = `${CHANNELS}default/`;
@@ -259,6 +260,17 @@ const str = (v: unknown, max: number, field: string, required = false) => {
   if (t.length > max) throw new HttpError(422, `${field} is too long (max ${max} characters).`);
   return t;
 };
+/** Optional profile fields the Studio form edits (accent, say voice, style, branding); invalid branding numbers fall back to defaults. */
+function extras(b: Record<string, unknown>): Partial<Channel> {
+  const o: Partial<Channel> = {}, a = str(b.accent, 40, 'Accent'), sv = str(b.sayVoice, 60, 'Say voice'), vs = str(b.voiceStyle, 300, 'Voice style');
+  if (a) o.accent = a; if (sv) o.sayVoice = sv; if (vs) o.voiceStyle = vs;
+  const br = b.branding;
+  if (br && typeof br === 'object') {
+    const x = br as Record<string, unknown>, handle = str(x.handle, 40, 'Handle'), cta = str(x.cta, 60, 'Call to action'), sec = Number(x.outroSec ?? 2);
+    o.branding = {...(handle ? {handle} : {}), ...(cta ? {cta} : {}), outroSec: Number.isFinite(sec) ? Math.min(6, Math.max(0, sec)) : 2, watermark: x.watermark !== false};
+  }
+  return o;
+}
 function checkChannel(b: Record<string, unknown>, id: string, createdAt: string): Channel {
   const banned = Array.isArray(b.bannedTopics) ? b.bannedTopics : typeof b.bannedTopics === 'string' ? b.bannedTopics.split(/[,\n]/) : [];
   if (!banned.every(x => typeof x === 'string')) throw new HttpError(422, 'bannedTopics must be a list of text.');
@@ -268,13 +280,13 @@ function checkChannel(b: Record<string, unknown>, id: string, createdAt: string)
   return {
     id, name: str(b.name, 80, 'Name', true), description: str(b.description, 2000, 'Description'), niche: str(b.niche, 200, 'Niche'),
     audience: str(b.audience, 400, 'Audience'), tone: str(b.tone, 400, 'Tone'), language: str(b.language, 60, 'Language') || 'English',
-    ...(voiceId ? {voiceId} : {}), bannedTopics: (banned as string[]).map(x => x.trim()).filter(Boolean).slice(0, 50), postingPerWeek: ppw, createdAt,
+    ...(voiceId ? {voiceId} : {}), bannedTopics: (banned as string[]).map(x => x.trim()).filter(Boolean).slice(0, 50), postingPerWeek: ppw, createdAt, ...extras(b),
   };
 }
 function readChannel(id: string): Channel | null {
   const c = readJson<Partial<Channel>>(`${chDir(id)}channel.json`);
   if (!c || typeof c !== 'object') return null;
-  return {id, name: typeof c.name === 'string' && c.name ? c.name : id, description: c.description ?? '', niche: c.niche ?? '', audience: c.audience ?? '', tone: c.tone ?? '', language: c.language ?? 'English', ...(c.voiceId ? {voiceId: c.voiceId} : {}), bannedTopics: Array.isArray(c.bannedTopics) ? c.bannedTopics.filter(x => typeof x === 'string') : [], postingPerWeek: typeof c.postingPerWeek === 'number' ? c.postingPerWeek : 1, createdAt: c.createdAt ?? ''};
+  return {id, name: typeof c.name === 'string' && c.name ? c.name : id, description: c.description ?? '', niche: c.niche ?? '', audience: c.audience ?? '', tone: c.tone ?? '', language: c.language ?? 'English', ...(c.voiceId ? {voiceId: c.voiceId} : {}), bannedTopics: Array.isArray(c.bannedTopics) ? c.bannedTopics.filter(x => typeof x === 'string') : [], postingPerWeek: typeof c.postingPerWeek === 'number' ? c.postingPerWeek : 1, createdAt: c.createdAt ?? '', ...extras(c as Record<string, unknown>)};
 }
 const listChannels = () => { ensureDefaultChannel(); return (fs.existsSync(CHANNELS) ? fs.readdirSync(CHANNELS) : []).filter(d => ID_RE.test(d)).map(readChannel).filter((c): c is Channel => !!c); };
 const episodesOf = (channel: string) => (fs.existsSync(EPISODES) ? fs.readdirSync(EPISODES) : []).filter(d => fs.existsSync(`${EPISODES}${d}/episode.json`)).map(episodeSummary).filter(e => e.channel === channel);
@@ -750,6 +762,14 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return json(res, 200, await draftEpisode(topic, angle, channel, typeof b.id === 'string' && b.id ? b.id : undefined));
     }
     if (await globalDataApi(req, res, url, p, m)) return;
+    if (p[0] === 'presets') {
+      if (m === 'GET' && p.length === 1) return json(res, 200, listPresets());
+      if (m === 'POST' && p.length === 1) { // save a channel's profile as a user preset
+        const b = await body(req), c = needChannel(String(b.channel ?? ''));
+        try { return json(res, 201, {id: savePreset(String(b.id ?? ''), c)}); } catch (e) { throw new HttpError(422, (e as Error).message); }
+      }
+      if (m === 'DELETE' && p.length === 2) { try { deletePreset(p[1]); } catch (e) { throw new HttpError(422, (e as Error).message); } return json(res, 200, {ok: true}); }
+    }
     if (p[0] === 'channels') return await channelApi(req, res, url, p, m);
     if (p[0] === 'clips' && m === 'GET') {
       if (!p[1]) return json(res, 200, {job: clipJob, sources: fs.existsSync(`${ROOT}data/uploads`) ? fs.readdirSync(`${ROOT}data/uploads`).filter(f => VIDEO_RE.test(f)) : [], items: listClips()});

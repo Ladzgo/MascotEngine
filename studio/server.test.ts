@@ -89,3 +89,16 @@ test('path traversal: ids with dots/slashes never reach the filesystem', async (
 test('validation: non-object JSON bodies are 400, not 500', async () => {
   for (const b of ['[]', 'null', '"x"', '12']) assert.equal((await fetch(`${BASE}/api/queue`, {method: 'POST', headers: J, body: b})).status, 400, b);
 });
+
+test('channels keep profile fields (accent, voice, branding); presets list built-ins', async () => {
+  const id = 'zz-test-chan';
+  try {
+    const mk = await fetch(`${BASE}/api/channels`, {method: 'POST', headers: J, body: JSON.stringify({id, name: 'ZZ', accent: 'green', sayVoice: 'Tünde', branding: {cta: 'Hi', handle: '@zz'}})});
+    assert.equal(mk.status, 201);
+    const put = await fetch(`${BASE}/api/channels/${id}`, {method: 'PUT', headers: J, body: JSON.stringify({...(await mk.json() as object), niche: 'cats'})});
+    const c = await put.json() as {accent: string; sayVoice: string; niche: string; branding: {cta: string; outroSec: number}};
+    assert.deepEqual([c.accent, c.sayVoice, c.niche, c.branding.cta, c.branding.outroSec], ['green', 'Tünde', 'cats', 'Hi', 2]);
+    const presets = await (await fetch(`${BASE}/api/presets`)).json() as {id: string; builtin: boolean}[];
+    assert.ok(presets.some(p => p.id === 'finance' && p.builtin));
+  } finally { await fetch(`${BASE}/api/channels/${id}`, {method: 'DELETE', headers: J}); }
+});
