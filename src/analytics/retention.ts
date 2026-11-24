@@ -16,11 +16,12 @@ export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [], cell = '', q = false;
   const t = text.replace(/^﻿/, '');
+  const first = t.split(/\r?\n/, 1)[0], sep = first.split(';').length > first.split(',').length ? ';' : ','; // hu/de Excel locales export ';'
   for (let i = 0; i < t.length; i++) {
     const c = t[i];
     if (q) { if (c === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
     else if (c === '"') q = true;
-    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === sep) { row.push(cell); cell = ''; }
     else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cell); if (row.some(x => x.trim())) rows.push(row); row = []; cell = ''; }
     else cell += c;
   }
@@ -28,7 +29,7 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
-const num = (s: string | undefined) => { const n = parseFloat((s ?? '').replace(/[%,\s]/g, '')); return Number.isFinite(n) ? n : undefined; };
+const num = (s: string | undefined) => { const n = parseFloat((s ?? '').replace(/^(\d+),(\d{1,2})%?$/, '$1.$2').replace(/[%,\s]/g, '')); return Number.isFinite(n) ? n : undefined; };
 const col = (head: string[], ...needles: RegExp[]) => head.findIndex(h => needles.some(n => n.test(h.trim().toLowerCase())));
 /** "1:23" or "0:01:23" or seconds -> seconds. */
 export const hms = (s: string | undefined): number | undefined => {
@@ -44,7 +45,7 @@ export function parseStudioCsv(text: string): Parsed {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new Error('CSV is empty.');
   const head = rows[0].map(h => h.trim().toLowerCase());
-  const pos = col(head, /video position/, /^time$/), ret = col(head, /audience retention/, /absolute audience retention/, /audience watching/);
+  const pos = col(head, /video position/, /videópozíció/, /^time$/), ret = col(head, /audience retention/, /közönség megtartása/, /absolute audience retention/, /audience watching/);
   if (pos >= 0 && ret >= 0) {
     const pts = rows.slice(1).map(r => ({x: num(r[pos]), y: num(r[ret])})).filter((p): p is {x: number; y: number} => p.x !== undefined && p.y !== undefined);
     if (pts.length < 5) throw new Error('Retention CSV has too few rows.');
@@ -57,7 +58,8 @@ export function parseStudioCsv(text: string): Parsed {
     // some exports give 0..1 instead of percent
     return {kind: 'curve', curve: Math.max(...curve) <= 1.5 ? curve.map(v => v * 100) : curve};
   }
-  const t = col(head, /^video title$/, /^content$/, /^title$/), v = col(head, /^views$/), pct = col(head, /average percentage viewed/), dur = col(head, /average view duration/), ctr = col(head, /click-through rate/);
+  const t = [/^video title$/, /^videó címe$/, /^title$/, /^content$/, /^tartalom$/].map(n => col(head, n)).find(i => i >= 0) ?? -1, // title beats the video-id 'Content' column
+     v = col(head, /^views$/, /^megtekintések$/), pct = col(head, /average percentage viewed/, /átlagos megtekintett százalék/), dur = col(head, /average view duration/, /átlagos megtekintési időtartam/), ctr = col(head, /click-through rate/, /átkattintási arány/);
   if (t < 0 || (v < 0 && pct < 0)) throw new Error('Unrecognised CSV: expected a "Table data" export (Content/Video title + Views) or an "Audience retention" export (Video position + retention).');
   const videos = rows.slice(1).filter(r => r[t]?.trim() && !/^total$/i.test(r[t].trim())).map(r => ({title: r[t].trim(), views: v >= 0 ? num(r[v]) : undefined, avgPctViewed: pct >= 0 ? num(r[pct]) : undefined, avgViewSec: dur >= 0 ? hms(r[dur]) : undefined, ctr: ctr >= 0 ? num(r[ctr]) : undefined}));
   return {kind: 'table', videos};

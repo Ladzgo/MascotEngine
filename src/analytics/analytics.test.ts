@@ -10,8 +10,14 @@ test('parseCsv handles BOM, quotes, commas, CRLF', () => {
 test('table export: per-video stats, total row dropped, durations parsed', () => {
   const p = parseStudioCsv('Content,Video title,Views,Average view duration,Average percentage viewed (%),Impressions click-through rate (%)\nTotal,,100,0:30,40,5\nabc,Why Cash Melts,"1,200",1:05,52.5,6.1\n');
   assert.equal(p.kind, 'table');
-  if (p.kind === 'table') { assert.equal(p.videos.length, 1); assert.deepEqual([p.videos[0].views, p.videos[0].avgViewSec, p.videos[0].avgPctViewed, p.videos[0].ctr], [1200, 65, 52.5, 6.1]); }
+  if (p.kind === 'table') { assert.equal(p.videos.length, 1); assert.equal(p.videos[0].title, 'Why Cash Melts'); assert.deepEqual([p.videos[0].views, p.videos[0].avgViewSec, p.videos[0].avgPctViewed, p.videos[0].ctr], [1200, 65, 52.5, 6.1]); }
   assert.equal(hms('1:02:03'), 3723);
+});
+
+test('semicolon + Hungarian headers + decimal comma', () => {
+  const p = parseStudioCsv('Tartalom;Videó címe;Megtekintések;Átlagos megtekintési időtartam;Átlagos megtekintett százalék\nTotal;;100;0:30;40\nabc;Miért olvad a készpénz;1200;1:05;52,5\n');
+  assert.equal(p.kind, 'table');
+  if (p.kind === 'table') assert.deepEqual([p.videos[0].title, p.videos[0].views, p.videos[0].avgViewSec, p.videos[0].avgPctViewed], ['Miért olvad a készpénz', 1200, 65, 52.5]);
 });
 
 test('curve export (percent positions) resamples to 101 points; merge needs an episode id', () => {
