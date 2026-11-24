@@ -91,7 +91,7 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
                 <span className="lib-t"><b className={e.title.trim().toLowerCase() === 'untitled' ? 'untitled' : ''}>{e.title}</b><span className="small muted">{e.id}{ch === 'all' ? ` · ${chName(e.channel)}` : ''}</span></span>
                 <span className="lib-stages" aria-label="Progress">{STAGES.map(([k, l]) => <i key={k} className={e.stages[k] ? 'on' : ''}><span className="sr">{l} {e.stages[k] ? 'done' : 'not done'}</span></i>)}</span>
                 <span className="small num lib-n">{e.scenes} {e.scenes === 1 ? "scene" : "scenes"}{e.totalSec ? ` · ${mmss(e.totalSec)}` : ''}</span>
-                <span className={`status ${st}`}>{e.stale.final || e.stale.preview ? t('Out of date') : st === 'draft' ? `${t('Next')}: ${t(STEP_LABEL[nextStep(e)])}` : t(st[0].toUpperCase() + st.slice(1))}</span>
+                <span className={`status ${e.stale.final || e.stale.preview ? 'stale' : st}`}>{e.stale.final || e.stale.preview ? t('Out of date') : st === 'draft' ? `${t('Next')}: ${t(STEP_LABEL[nextStep(e)])}` : t(st[0].toUpperCase() + st.slice(1))}</span>
               </a></li>
             );
           })}
