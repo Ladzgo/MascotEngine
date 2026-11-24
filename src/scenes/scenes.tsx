@@ -1,3 +1,4 @@
+import {inflectionIndex} from '../fx/inflection';
 import React from 'react';
 import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
@@ -117,6 +118,7 @@ export const ChartScene: React.FC<SceneProps<Extract<Scene, {type: 'chart'}>>> =
   const xOf = (i: number) => (chart.kind === 'bar' ? padL + ((i + 0.5) / n) * pw : padL + (i / (n - 1)) * pw);
   const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1].map(f => bottom + f * (top - bottom));
   const pts = chart.values.map((v, i) => `${i ? 'L' : 'M'}${xOf(i)} ${yOf(v)}`).join(' ');
+  const k = chart.kind === 'line' ? inflectionIndex(chart.values) : -1;
   const barW = Math.min(180, (pw / n) * 0.55);
   const fmtTick = (v: number) => (v === 0 ? '0' : top >= 1e6 ? `${fmt(v / 1e6, 1)}M` : top >= 1e4 ? `${fmt(v / 1e3)}k` : fmt(v));
   return (
@@ -140,6 +142,16 @@ export const ChartScene: React.FC<SceneProps<Extract<Scene, {type: 'chart'}>>> =
               const s = backOut((p - shownAt) / 0.12 + (i === 0 ? 1 : 0));
               return p >= shownAt - 0.001 ? <circle key={i} cx={xOf(i)} cy={yOf(v)} r={16 * clamp(s, 0, 1.2)} fill="#fffdf6" stroke={INK} strokeWidth={7} /> : null;
             })}
+            {k >= 0 && p >= k / (n - 1) + 0.04 && (() => {
+              const e = easeOut((p - k / (n - 1) - 0.04) / 0.1);
+              const cx = xOf(k), cy = yOf(chart.values[k]);
+              return (
+                <g opacity={e}>
+                  <circle cx={cx} cy={cy} r={20 + 22 * e} fill="none" stroke={INK} strokeWidth={6} strokeDasharray="10 8" />
+                  <text x={cx} y={cy + 96} textAnchor="middle" fontFamily={SANS} fontWeight={700} fontSize={36} fill={INK}>{chart.labels[k]}: {fmt(chart.values[k])}</text>
+                </g>
+              );
+            })()}
             {p > 0.98 && (
               <text x={xOf(n - 1)} y={yOf(chart.values[n - 1]) - 34} textAnchor="end" fontFamily={DISPLAY} fontSize={54} fill={INK}>{fmt(chart.values[n - 1])}</text>
             )}

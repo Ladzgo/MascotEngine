@@ -12,3 +12,9 @@ test('captions never highlight function words', async () => {
   const {isFunctionWord} = await import('./captions.js');
   assert.ok(isFunctionWord('to') && isFunctionWord('The,') && !isFunctionWord('inflation'));
 });
+
+test('inflectionIndex finds the kink in the data, none for a straight line', async () => {
+  const {inflectionIndex} = await import('./inflection.js');
+  assert.equal(inflectionIndex([1, 2, 3, 4, 12, 20]), 3);
+  assert.equal(inflectionIndex([1, 2, 3, 4, 5]), -1);
+});
