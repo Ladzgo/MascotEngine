@@ -66,6 +66,10 @@ const noise = (rand: () => number) => 0.75 + rand() * 0.5;
 const surprising = (s: Scene) =>
   s.type === 'big_number' || ['shocked', 'excited', 'angry'].includes(s.emotion);
 
+const musicDir = new URL('../../assets/music/', import.meta.url).pathname;
+/** Bed file for a mood (calm = the original pad), null when that file is not installed. */
+const moodTrack = (mood: string) => { const f = mood === 'calm' ? 'ambient-pad.mp3' : `ambient-${mood}.mp3`; return fs.existsSync(musicDir + f) ? f : null; };
+
 function fitLayout(layout: string, s: Scene): number {
   if (s.type === 'big_number' && s.emotion === 'shocked' && layout === 'center') return 1.6;
   if (s.type === 'talk' && s.quote) return layout === 'keyword_side' ? 8 : 0.05; // quote card lives in the keyword_side content box
@@ -169,10 +173,13 @@ export async function direct(idArg: string, opts: {final: boolean}) {
   const background = pick([...BACKGROUNDS], b => freqPenalty(b, 'background', recent) * noise(rand), rand);
   const captionStyle = pick([...CAPTIONS], c => freqPenalty(c, 'captionStyle', recent) * noise(rand), rand);
   const intro = pick([...INTROS], c => freqPenalty(c, 'intro', recent) * noise(rand), rand);
-  const tense = ep.scenes.filter(s => ['worried', 'angry', 'shocked', 'sweating'].includes(s.emotion)).length;
-  const upbeat = ep.scenes.filter(s => ['happy', 'excited', 'smug'].includes(s.emotion)).length;
+  // emotion arc: the closing third counts 1.5x (the bed should land on how the video ends)
+  const arc = (set: string[]) => ep.scenes.reduce((n, s, i) => n + (set.includes(s.emotion) ? (i >= ep.scenes.length * 2 / 3 ? 1.5 : 1) : 0), 0);
+  const tense = arc(['worried', 'angry', 'shocked', 'sweating', 'sad']);
+  const upbeat = arc(['happy', 'excited', 'smug']);
+  const curious = arc(['thinking', 'confused', 'explaining']);
   const mood = pick([...MOODS], m => {
-    const fit = m === 'tense' ? 1 + tense : m === 'upbeat' ? 1 + upbeat : 1.5;
+    const fit = m === 'tense' ? 1 + tense : m === 'upbeat' ? 1 + upbeat : m === 'curious' ? 1 + curious * 0.6 : 1.5;
     return fit * freqPenalty(m, 'music', recent) * noise(rand);
   }, rand);
 
@@ -182,7 +189,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
   const treat: {type: string; layout: string; camera: string}[] = [];
   const decided: SceneDecision[] = [];
   let cursor = 0;
-  let sfxVariantLast: Record<string, number> = {};
+  let sfxVariantLast: Record<string, number[]> = {};
   let prevPose = '';
 
   ep.scenes.forEach((s, i) => {
@@ -298,9 +305,10 @@ export async function direct(idArg: string, opts: {final: boolean}) {
 
     // sfx with variant selection (never the same variant twice in a row per kind)
     const variant = (kind: string) => {
-      let v = Math.floor(rand() * 3);
-      if (v === sfxVariantLast[kind]) v = (v + 1) % 3;
-      sfxVariantLast[kind] = v;
+      const last = sfxVariantLast[kind] ?? [];
+      const free = [0, 1, 2].filter(x => !last.includes(x)); // never one of the last two variants of this kind (3 variants: leaves 1)
+      const v = free[Math.floor(rand() * free.length)] ?? 0;
+      sfxVariantLast[kind] = [...last, v].slice(-2);
       return v;
     };
     const sfx: SfxCue[] = [];
@@ -324,7 +332,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
 
   const out: EpisodeDecisions = {
     episodeId: ep.id, seed: ep.seed, accent, background, captionStyle, intro,
-    music: {mood, track: null}, totalSec: round(cursor), scenes: decided,
+    music: {mood, track: moodTrack(mood)}, totalSec: round(cursor), scenes: decided,
     ...(decided[0]?.hook ? {hook: decided[0].hook} : {}),
   };
   fs.writeFileSync(`${dir}build/decisions.json`, JSON.stringify(out, null, 2));

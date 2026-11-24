@@ -25,3 +25,4 @@
 | File | Author | License |
 |---|---|---|
 | assets/music/ambient-pad.mp3 | Generated locally with ffmpeg sine synthesis (this repo) | Own work, no third-party rights |
+| assets/music/ambient-tense.mp3, ambient-upbeat.mp3, ambient-curious.mp3 | Generated locally with ffmpeg sine synthesis (scripts/gen-music.sh) | Own work, no third-party rights |

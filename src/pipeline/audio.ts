@@ -97,7 +97,8 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   writeWav(voiceWav, voice);
 
   const musicDir = process.env.YT_MUSIC_DIR ? process.env.YT_MUSIC_DIR.replace(/\/?$/, '/') : new URL('../../assets/music/', import.meta.url).pathname;
-  const track = fs.existsSync(musicDir) ? fs.readdirSync(musicDir).find(f => /\.(mp3|wav|m4a|ogg)$/i.test(f)) : undefined;
+  const beds = fs.existsSync(musicDir) ? fs.readdirSync(musicDir).filter(f => /\.(mp3|wav|m4a|ogg)$/i.test(f)) : [];
+  const track = dec.music?.track && beds.includes(dec.music.track) ? dec.music.track : beds[0]; // director's mood bed, else any bed
   const args = ['-y', '-loglevel', 'error', '-i', voiceWav, '-i', sfxWav];
   // voice is the sidechain key for both the SFX duck and the (optional) music duck
   const sfxDuck = 'sidechaincompress=threshold=0.03:ratio=4:attack=5:release=200';
