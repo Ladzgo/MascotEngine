@@ -33,11 +33,24 @@ npm run tts -- ep003-topic --engine silent  # or: elevenlabs (default engine is 
 npm run direct -- ep003-topic [--final]     # director decisions (--final writes history)
 npm run render -- ep003-topic [--final]     # preview 720p, or final 1080p
 npm run shorts -- ep003-topic --count 3     # Shorts cut-downs
+npm run thumbnail -- ep003-topic --variants 2   # A/B thumbnails + 150 px readability check
+npm run publish-pack -- ep003-topic         # titles, description, tags, chapters, upload notes (offline fallback without AI)
+npm run subs -- ep003-topic                 # .srt, word-level .vtt, chapters.txt
+npm run qa -- ep003-topic                   # loudness, pauses, captions, frame checks (docs/QA.md)
+npm run batch -- --topics topics.txt        # many episodes unattended (or --scout 5); writes batch-report.json
+npm run clip -- video.mp4                   # long video -> 9:16 clips (docs/CLIPPER.md)
+npm run analytics -- import studio.csv      # YouTube Studio CSV -> data/retention.json; `-- summary`
+npm run doctor                              # what is missing on this machine, with fixes
+npm run bundle                              # offline package for the Linux machine (docs/OFFLINE.md)
+npm run e2e                                 # smoke test: topic -> preview -> qa -> subs
+npm run channel -- create my-tech --preset tech   # presets: finance, tech, history
 npm run studio                              # Remotion Studio (frame-level preview)
 npm run assets:check                        # validate assets/character art
 npm run typecheck
 npm test
 ```
+
+Guides: `docs/GUIDE.md` (Hungarian user guide), `docs/OFFLINE.md` (offline Linux install), `docs/QA.md`, `docs/CLIPPER.md`, `docs/SECURITY.md`.
 
 ## Folder layout
 - `src/` pipeline (`pipeline/`), director, drafter (`draft/`), scenes, mascot, schema
