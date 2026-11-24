@@ -15,6 +15,8 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
   useEffect(() => { if (q === route.q) return; const t = setTimeout(() => setRoute({q}, true), 250); return () => clearTimeout(t); }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
   const scoped = eps.filter(e => (ch === 'all' || e.channel === ch) && !e.archived);
   const rows = useMemo(() => scoped.filter(e => (!status || statusOf(e) === status) && (!q.trim() || `${e.title} ${e.id}`.toLowerCase().includes(q.trim().toLowerCase()))), [scoped, status, q]);
+  const [shown, setShown] = useState(100);
+  useEffect(() => { setShown(100); }, [q, status, ch]);
   const chName = (id: string) => chans.find(c => c.id === id)?.name ?? id;
   const list = useRef<HTMLUListElement>(null);
   const [focusI, setFocusI] = useState(0);
@@ -79,7 +81,7 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
         </div>
       ) : (
         <ul className="lib" ref={list} onKeyDown={onKey}>
-          {rows.map((e, i) => {
+          {rows.slice(0, shown).map((e, i) => {
             const st = statusOf(e);
             return (
               <li key={e.id} style={pick ? {display: 'flex', alignItems: 'center', gap: 10} : undefined}>
@@ -94,6 +96,7 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
           })}
         </ul>
       )}
+      {rows.length > shown && <p><button type="button" className="btn" onClick={() => setShown(n => n + 100)}>Show more ({rows.length - shown} left)</button></p>}
     </div>
   );
 }
