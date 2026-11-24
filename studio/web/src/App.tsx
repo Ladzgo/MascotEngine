@@ -9,6 +9,7 @@ import {Settings} from './Settings';
 import {ShortcutSheet, useGlobalShortcuts} from './Shortcuts';
 import {TopBar, useJobs} from './TopBar';
 import {PAGE_LABEL, STEP_LABEL, hasPage, nextStep, optionalPages, setRoute, useRoute, type RouteInput} from './router';
+import {t, useLang} from './i18n';
 
 // rarely visited pages load on demand (smaller first bundle)
 const lazyNamed = <T extends React.ComponentType<any>>(f: () => Promise<Record<string, unknown>>, n: string) => React.lazy(() => f().then(m => ({default: m[n] as T})));
@@ -43,6 +44,7 @@ function Soon({name, hint}: {name: string; hint: string}) {
 
 export function App() {
   const route = useRoute();
+  const lang = useLang();
   const [eps, setEps] = useState<Summary[]>([]);
   const [epsLoaded, setEpsLoaded] = useState(false);
   const [chans, setChans] = useState<ChannelRow[]>([]);
@@ -70,7 +72,7 @@ export function App() {
   }, [route, epsLoaded, eps, chans]);
 
   const ep = route.ep ? eps.find(e => e.id === route.ep) : undefined;
-  const pageName = route.page === 'ep' ? `${ep?.title ?? route.ep}${route.step ? ` · ${STEP_LABEL[route.step]}` : ''}` : PAGE_LABEL[route.page];
+  const pageName = route.page === 'ep' ? `${ep?.title ?? route.ep}${route.step ? ` · ${t(STEP_LABEL[route.step])}` : ''}` : t(PAGE_LABEL[route.page]);
   useEffect(() => {
     const mark = jobs.running ? '● ' : jobs.finished ? (jobs.finished.status === 'done' ? '✓ ' : '! ') : '';
     document.title = `${mark}${pageName} · Mascot Engine Studio`;
@@ -116,7 +118,7 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" key={lang}>
       <a className="skip" href="#main" onClick={e => { e.preventDefault(); document.getElementById('main')?.focus(); }}>Skip to content</a>
       <Rail route={route} />
       <TopBar route={route} chans={chans} epTitle={ep?.title} epChannel={ep?.channel} jobs={jobs} onPalette={openPalette} />

@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {api, type ChannelRow, type Idea, type SearchResult, type Summary} from './api';
 import {PAGE_LABEL, setRoute, useActions, type Action, type Page} from './router';
 import {useModal} from './Shortcuts';
+import {t} from './i18n';
 
 type Item = {id: string; group: string; label: string; sub?: string; hint?: string; run: () => void};
 type IdeaRow = Idea & {channel: string};
@@ -44,7 +45,7 @@ export function Palette({open, onClose, eps, chans, ch, onHelp}: {open: boolean;
     const chanItems: Item[] = [{id: 'ch:all', group: 'Channels', label: 'All channels', sub: 'Switch scope', run: () => setRoute({ch: 'all'})}, ...chans.map(c => ({id: `ch:${c.id}`, group: 'Channels', label: c.name, sub: `Switch scope · ${c.episodes} episodes`, run: () => setRoute({ch: c.id})}))];
     const sceneItems: Item[] = (found?.scenes ?? []).map(s => ({id: `sc:${s.ep}:${s.n}`, group: 'Scenes', label: s.text, sub: `${s.ep}, scene ${s.n}`, run: () => setRoute({page: 'ep', ep: s.ep, scene: s.n})}));
     const acts: Action[] = [
-      ...GO.map(g => ({id: `go:${g}`, label: `Go to ${PAGE_LABEL[g]}`, hint: g === 'queue' || g === 'calendar' ? undefined : `g ${g === 'settings' ? 's' : g[0]}`, run: () => setRoute({page: g})})),
+      ...GO.map(g => ({id: `go:${g}`, label: `Go to ${t(PAGE_LABEL[g])}`, hint: g === 'queue' || g === 'calendar' ? undefined : `g ${g === 'settings' ? 's' : g[0]}`, run: () => setRoute({page: g})})),
       {id: 'new-channel', label: 'New channel', run: () => setRoute({page: 'channels', isNew: true})},
       {id: 'new-episode', label: 'New episode', run: () => setRoute({page: 'today'})},
       {id: 'shortcuts', label: 'Show keyboard shortcuts', hint: '?', run: onHelp},

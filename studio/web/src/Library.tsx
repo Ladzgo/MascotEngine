@@ -3,6 +3,7 @@ import {api, mmss, type ChannelRow, type Summary} from './api';
 import {dataApi} from './api-data';
 import {Film, Plus} from './icons';
 import {hashFor, nextStep, setRoute, STEP_LABEL, type Route} from './router';
+import {t} from './i18n';
 
 const STATUSES: [string, string][] = [['', 'All'], ['draft', 'Draft'], ['rendered', 'Rendered'], ['scheduled', 'Scheduled'], ['published', 'Published']];
 export const statusOf = (e: Summary): string => e.status?.state === 'published' ? 'published' : e.status?.state === 'scheduled' ? 'scheduled' : e.stages.final ? 'rendered' : 'draft';
@@ -13,12 +14,12 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
   const [q, setQ] = useState(route.q);
   useEffect(() => { setQ(route.q); }, [route.q]);
   useEffect(() => { if (q === route.q) return; const t = setTimeout(() => setRoute({q}, true), 250); return () => clearTimeout(t); }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chName = (id: string) => chans.find(c => c.id === id)?.name ?? id;
   const scoped = eps.filter(e => (ch === 'all' || e.channel === ch) && !e.archived);
-  const rows = useMemo(() => scoped.filter(e => (!status || statusOf(e) === status) && (!q.trim() || `${e.title} ${e.id}`.toLowerCase().includes(q.trim().toLowerCase()))), [scoped, status, q]);
+  const rows = useMemo(() => scoped.filter(e => (!status || statusOf(e) === status) && (!q.trim() || `${e.title} ${e.id} ${chName(e.channel)}`.toLowerCase().includes(q.trim().toLowerCase()))), [scoped, status, q, chans]);
   const [shown, setShown] = useState(100);
   useEffect(() => { setShown(100); }, [q, status, ch]);
-  const chName = (id: string) => chans.find(c => c.id === id)?.name ?? id;
-  const list = useRef<HTMLUListElement>(null);
+    const list = useRef<HTMLUListElement>(null);
   const [focusI, setFocusI] = useState(0);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
@@ -54,30 +55,30 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
   const count = (s: string) => scoped.filter(e => !s || statusOf(e) === s).length;
   return (
     <div className="page">
-      <div className="page-head"><div><h1 className="display" tabIndex={-1}>Library</h1><p className="muted">Every episode{ch === 'all' ? ' in every channel' : ` in ${chName(ch)}`}. Press Enter on a row to open it.</p></div>
-        <button type="button" className="btn" aria-pressed={!!pick} onClick={() => { setPick(p => (p ? null : new Set())); setMsg(null); }}>{pick ? 'Done selecting' : 'Select'}</button>
-        <label className="btn" aria-disabled={busy}>Import ZIP<input type="file" accept=".zip,application/zip" className="sr" disabled={busy} onChange={e => { void importZip(e.target.files?.[0]); e.target.value = ''; }} /></label>
-        <a className="btn primary" href={`${hashFor({page: 'today', ch})}`} onClick={() => setTimeout(() => document.getElementById('new')?.scrollIntoView(), 50)}><Plus size={16} />New episode</a></div>
+      <div className="page-head"><div><h1 className="display" tabIndex={-1}>{t('Library')}</h1><p className="muted">Every episode{ch === 'all' ? ' in every channel' : ` in ${chName(ch)}`}. Press Enter on a row to open it.</p></div>
+        <button type="button" className="btn" aria-pressed={!!pick} onClick={() => { setPick(p => (p ? null : new Set())); setMsg(null); }}>{pick ? t('Done selecting') : t('Select')}</button>
+        <label className="btn" aria-disabled={busy}>{t('Import ZIP')}<input type="file" accept=".zip,application/zip" className="sr" disabled={busy} onChange={e => { void importZip(e.target.files?.[0]); e.target.value = ''; }} /></label>
+        <a className="btn primary" href={`${hashFor({page: 'today', ch})}`} onClick={() => setTimeout(() => document.getElementById('new')?.scrollIntoView(), 50)}><Plus size={16} />{t('New episode')}</a></div>
       <div className="lib-tools">
-        <label className="field lib-q"><span className="sr">Search episodes</span><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Search title or id" /></label>
+        <label className="field lib-q"><span className="sr">Search episodes</span><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search title, id or channel')} /></label>
         <div className="seg" role="radiogroup" aria-label="Status">
-          {STATUSES.filter(([k]) => !['scheduled', 'published'].includes(k) || count(k) > 0 || status === k).map(([k, l]) => <button key={k} role="radio" aria-checked={status === k} onClick={() => setRoute({status: k}, true)}>{l} <span className="num">{count(k)}</span></button>)}
+          {STATUSES.filter(([k]) => !['scheduled', 'published'].includes(k) || count(k) > 0 || status === k).map(([k, l]) => <button key={k} role="radio" aria-checked={status === k} onClick={() => setRoute({status: k}, true)}>{t(l)} <span className="num">{count(k)}</span></button>)}
         </div>
       </div>
       {pick && (
         <div className="row" role="toolbar" aria-label="Batch actions">
           <span className="small" role="status">{pick.size} selected</span>
-          <button type="button" className="btn sm" onClick={() => setPick(new Set(rows.map(r => r.id)))}>Select all shown</button>
-          <button type="button" className="btn sm" disabled={!pick.size || busy} onClick={() => void batch('preview')}>Queue previews</button>
-          <button type="button" className="btn sm" disabled={!pick.size || busy} onClick={() => void batch('archive')}>Archive</button>
-          <button type="button" className="btn sm" disabled={!pick.size} onClick={() => [...pick].forEach((id, i) => setTimeout(() => { const a = document.createElement('a'); a.href = `/api/episodes/${id}/export`; a.download = `${id}.zip`; a.click(); }, i * 400))}>Export ZIP</button>
+          <button type="button" className="btn sm" onClick={() => setPick(new Set(rows.map(r => r.id)))}>{t('Select all shown')}</button>
+          <button type="button" className="btn sm" disabled={!pick.size || busy} onClick={() => void batch('preview')}>{t('Queue previews')}</button>
+          <button type="button" className="btn sm" disabled={!pick.size || busy} onClick={() => void batch('archive')}>{t('Archive')}</button>
+          <button type="button" className="btn sm" disabled={!pick.size} onClick={() => [...pick].forEach((id, i) => setTimeout(() => { const a = document.createElement('a'); a.href = `/api/episodes/${id}/export`; a.download = `${id}.zip`; a.click(); }, i * 400))}>{t('Export ZIP')}</button>
         </div>
       )}
       {msg && <p className="small" role="status">{msg}</p>}
       {!loaded ? <p className="muted">Loading…</p> : !rows.length ? (
-        <div className="panel empty-box"><Film size={28} /><h2 className="display">{scoped.length ? 'No episodes match' : 'No episodes yet'}</h2>
-          <p>{scoped.length ? 'Clear the search or pick another status.' : 'Draft one from a topic and it will show up here.'}</p>
-          {scoped.length ? <button className="btn" onClick={() => { setQ(''); setRoute({q: '', status: ''}, true); }}>Clear filters</button> : <a className="btn primary" href={hashFor({page: 'today', ch})}>Start an episode</a>}
+        <div className="panel empty-box"><Film size={28} /><h2 className="display">{t(scoped.length ? 'No episodes match' : 'No episodes yet')}</h2>
+          <p>{t(scoped.length ? 'Clear the search or pick another status.' : 'Draft one from a topic and it will show up here.')}</p>
+          {scoped.length ? <button className="btn" onClick={() => { setQ(''); setRoute({q: '', status: ''}, true); }}>{t('Clear filters')}</button> : <a className="btn primary" href={hashFor({page: 'today', ch})}>Start an episode</a>}
         </div>
       ) : (
         <ul className="lib" ref={list} onKeyDown={onKey}>
@@ -90,7 +91,7 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
                 <span className="lib-t"><b className={e.title.trim().toLowerCase() === 'untitled' ? 'untitled' : ''}>{e.title}</b><span className="small muted">{e.id}{ch === 'all' ? ` · ${chName(e.channel)}` : ''}</span></span>
                 <span className="lib-stages" aria-label="Progress">{STAGES.map(([k, l]) => <i key={k} className={e.stages[k] ? 'on' : ''}><span className="sr">{l} {e.stages[k] ? 'done' : 'not done'}</span></i>)}</span>
                 <span className="small num lib-n">{e.scenes} {e.scenes === 1 ? "scene" : "scenes"}{e.totalSec ? ` · ${mmss(e.totalSec)}` : ''}</span>
-                <span className={`status ${st}`}>{e.stale.final || e.stale.preview ? 'Out of date' : st === 'draft' ? `Next: ${STEP_LABEL[nextStep(e)]}` : st[0].toUpperCase() + st.slice(1)}</span>
+                <span className={`status ${st}`}>{e.stale.final || e.stale.preview ? t('Out of date') : st === 'draft' ? `${t('Next')}: ${t(STEP_LABEL[nextStep(e)])}` : t(st[0].toUpperCase() + st.slice(1))}</span>
               </a></li>
             );
           })}

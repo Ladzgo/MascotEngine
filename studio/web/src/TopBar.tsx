@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {api, type ChannelRow, type JobState, type QueueItem} from './api';
 import {PAGE_LABEL, STEP_LABEL, hashFor, setRoute, type Route} from './router';
+import {t} from './i18n';
 
 // ---- jobs ----
 export type Jobs = {running: JobState | null; queue: QueueItem[]; hasQueue: boolean; finished: {episode: string; status: string} | null; clear: () => void};
@@ -95,8 +96,8 @@ export function TopBar({route, chans, epTitle, epChannel, jobs, onPalette}: {rou
   const chId = route.page === 'ep' && epChannel ? epChannel : route.ch;
   const chName = chId === 'all' ? 'All channels' : chans.find(c => c.id === chId)?.name ?? chId;
   const crumbs: {label: string; href?: string}[] = [{label: chName, href: hashFor({page: 'today', ch: chId})}];
-  if (route.page === 'ep') { crumbs.push({label: epTitle ?? route.ep ?? 'Episode', href: route.step ? hashFor({page: 'ep', ep: route.ep, ch: route.chRaw}) : undefined}); if (route.step) crumbs.push({label: STEP_LABEL[route.step]}); }
-  else crumbs.push({label: PAGE_LABEL[route.page]});
+  if (route.page === 'ep') { crumbs.push({label: epTitle ?? route.ep ?? 'Episode', href: route.step ? hashFor({page: 'ep', ep: route.ep, ch: route.chRaw}) : undefined}); if (route.step) crumbs.push({label: t(STEP_LABEL[route.step])}); }
+  else crumbs.push({label: t(PAGE_LABEL[route.page])});
   return (
     <header className="top">
       <nav className="crumbs" aria-label="Breadcrumb">

@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {api, type LlmStatus, type Readiness, type Settings as S} from './api';
 import {Check, Alert} from './icons';
+import {t} from './i18n';
 
 export type Check = {key: string; label: string; ok: boolean; fix: string};
 /** What is missing before Generate / Draft can work. Voice checks only apply to the ElevenLabs engine. */
@@ -19,8 +20,8 @@ export function ReadinessPanel({onlyMissing = false}: {onlyMissing?: boolean}) {
   const items = onlyMissing ? r.items.filter(i => !i.ok) : r.items;
   return (
     <div className={onlyMissing ? 'panel ready-warn' : 'ready'} aria-label="Machine readiness">
-      <h2 className="label">{onlyMissing ? 'Missing on this machine' : 'This machine'}</h2>
-      <ul>{items.map(i => <li key={i.id} className={i.ok ? 'ok' : 'bad'}>{i.ok ? <Check size={14} /> : <Alert size={14} />}<b>{i.label}</b><span>{i.ok ? i.detail || 'ready' : i.fix}</span>{!i.ok && <button type="button" className="btn sm" aria-label={`Copy fix for ${i.label}`} onClick={() => void navigator.clipboard?.writeText(i.fix.match(/`([^`]+)`/)?.[1] ?? i.fix)}>Copy</button>}</li>)}</ul>
+      <h2 className="label">{onlyMissing ? t('Missing on this machine') : t('This machine')}</h2>
+      <ul>{items.map(i => <li key={i.id} className={i.ok ? 'ok' : 'bad'}>{i.ok ? <Check size={14} /> : <Alert size={14} />}<b>{i.label}</b><span>{i.ok ? i.detail || 'ready' : i.fix}</span>{!i.ok && <button type="button" className="btn sm" aria-label={`Copy fix for ${i.label}`} onClick={() => void navigator.clipboard?.writeText(i.fix.match(/`([^`]+)`/)?.[1] ?? i.fix)}>{t('Copy')}</button>}</li>)}</ul>
       {onlyMissing && <p><a className="link" href="#/settings">Open Settings</a></p>}
     </div>
   );
@@ -39,7 +40,7 @@ export function Settings({onSaved}: {onSaved: () => void}) {
   };
   return (
     <form className="settings panel" onSubmit={save}>
-      <h1 className="display" tabIndex={-1}>Settings</h1>
+      <h1 className="display" tabIndex={-1}>{t('Settings')}</h1>
       <p className="muted">Stored in the project's <code>.env</code> file. The API key never leaves this computer and is never shown again.</p>
       {readiness(s, engine).some(c => !c.ok) && <div className="ready" aria-label="Readiness">
         <h2 className="label">Readiness</h2>
@@ -47,12 +48,12 @@ export function Settings({onSaved}: {onSaved: () => void}) {
       </div>}
       <ReadinessPanel />
       <AiPanel />
-      <label className="field"><span>Voice engine</span>
+      <label className="field"><span>{t('Voice engine')}</span>
         <select value={engine} onChange={e => setEngine(e.target.value)}>
-          <option value="say">Free voice (built into your Mac)</option>
+          <option value="say">{t('Free voice (built into your Mac)')}</option>
           <option value="eleven">ElevenLabs (paid, optional)</option>
-          <option value="local">My own recordings (local)</option>
-          <option value="silent">Silent (estimated timing, for quick previews)</option>
+          <option value="local">{t('My own recordings (local)')}</option>
+          <option value="silent">{t('Silent (estimated timing, for quick previews)')}</option>
         </select>
         {engine === 'local' && <small className="hint">Needs one audio file per scene (wav, mp3 or m4a). Word timing is approximate unless whisper is installed.</small>}
       </label>
@@ -62,7 +63,7 @@ export function Settings({onSaved}: {onSaved: () => void}) {
       <label className="field"><span>Voice ID</span><input value={voiceId} onChange={e => setVoice(e.target.value)} placeholder="From the ElevenLabs voice library" /></label>
       <label className="field"><span>Model</span><input value={model} onChange={e => setModel(e.target.value)} /></label>
       <div className="row">
-        <button className="btn primary" type="submit">Save settings</button>
+        <button className="btn primary" type="submit">{t('Save settings')}</button>
         <span className={`pill ${s.ffmpeg ? 'ok' : 'bad'}`}>{s.ffmpeg ? <Check size={14} /> : <Alert size={14} />}ffmpeg {s.ffmpeg ? 'found' : 'not found. Install it to render audio'}</span>
       </div>
       {msg && <p className={msg.ok ? 'ok-text' : 'err-text'} role="status">{msg.text}</p>}
