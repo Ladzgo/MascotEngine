@@ -1,7 +1,9 @@
 import type {Episode} from '../schema.js';
 import {scrubSlop} from './critic.js';
+import {HU_BANNED, huWordValue} from './lang.js';
 
 const BANNED = [
+  ...HU_BANNED,
   /guarantee/i, /risk[- ]free/i, /can'?t lose/i, /get rich quick/i, /you should (buy|sell|invest)/i,
   /financial advice/i, /sure thing/i, /will (double|triple) your/i, /act now/i,
 ];
@@ -83,8 +85,15 @@ const lookup = (w: string): number | undefined => (ONES.indexOf(w) >= 0 ? ONES.i
 /** Every number a listener would hear in a narration: digits ("86,542", "2.5 million") and spelled-out ("one percent", "five hundred thousand"). */
 export function spokenNumbers(text: string): number[] {
   const out: number[] = [];
-  const t = text.toLowerCase().replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/[$%€£]/g, ' ');
-  for (const m of t.matchAll(/(\d+(?:\.\d+)?)(?:\s*(thousand|million|billion|trillion|k)\b)?/g)) out.push(Number(m[1]) * (m[2] ? (m[2] === 'k' ? 1e3 : SCALE[m[2]]) : 1));
+  const t = text.toLowerCase().replace(/(\d)[ \u00a0](?=\d{3}(?!\d))/g, '$1').replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/(\d),(?=\d{1,2}(?!\d))/g, '$1.').replace(/[$%€£]/g, ' ');
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)(?:\s*(thousand|million|billion|trillion|k|ezer|millió|milliárd)(?![\p{L}]))?/gu)) out.push(Number(m[1]) * (m[2] ? (m[2] === 'k' ? 1e3 : SCALE[m[2]] ?? ({ezer: 1e3, millió: 1e6, milliárd: 1e9} as Record<string, number>)[m[2]]) : 1));
+  let prev: number | null = null;
+  for (const w of t.split(/[^\p{L}]+/u)) {
+    const v = w.length > 1 ? huWordValue(w) : null;
+    if (v !== null && prev !== null && ['ezer', 'millió', 'milliárd'].includes(w) && prev < 1000) { out.pop(); out.push(prev * v); prev = null; continue; } // "két millió"
+    if (v !== null) out.push(v); // widens grounding only (an English 'hat' counts as 6, harmless)
+    prev = v;
+  }
   const toks = t.replace(/(?<=[a-z])-(?=[a-z])/g, ' ').replace(/[^a-z\s]+/g, ' | ').split(/\s+/).filter(Boolean); // '|' = punctuation or digits break a number phrase
   let total = 0, cur = 0, any = false;
   const flush = () => { if (any) out.push(total + cur); total = 0; cur = 0; any = false; };

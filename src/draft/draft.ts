@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {Episode} from '../schema.js';
+import {HU_SHAPE_EXAMPLE, LANG_RULES, isHu} from './lang.js';
 import {autoFixEpisode, lintEpisode, repeatedPhrases} from './lint.js';
 import {extractJson, type Client} from '../llm/llm.js';
 
@@ -17,20 +18,25 @@ export function loadVoice(voicePath: string, warn: (m: string) => void = console
   return FALLBACK_VOICE;
 }
 
-export function buildSystem(voice: string, channelCtx?: string): string {
-  return `You write draft scripts for an explainer YouTube channel.${channelCtx ? `\n\nChannel profile:\n${channelCtx}` : ''}
+const EN_SHAPE_EXAMPLE = `{"title":"Renting Is Not Throwing Money Away","scenes":[
+ {"type":"title","emotion":"smug","narration":"Renting is not burning money. Owning has bills too."},
+ {"type":"talk","emotion":"explaining","narration":"Rent buys you a place to live and zero surprise repair bills."},
+ {"type":"big_number","emotion":"shocked","value":1,"prefix":"","suffix":"%","label":"typical yearly upkeep cost of a home, as a share of its price","decimals":0,"narration":"Owners spend about one percent of the home's price every year just on upkeep."},
+ {"type":"compare","emotion":"thinking","left":{"title":"Rent","value":"predictable"},"right":{"title":"Own","value":"surprises"},"narration":"One bill is predictable. The other arrives with a leaking roof."},
+ {"type":"list","emotion":"explaining","items":["Count the full cost","Compare to rent","Keep an emergency fund"],"narration":"So count everything before you decide."}]}`;
+
+export const langNote = (lang?: string) => (isHu(lang) ? ' Write the narration in natural spoken Hungarian (numbers: 1 234 567, decimal comma).' : '');
+
+export function buildSystem(voice: string, channelCtx?: string, lang?: string): string {
+  const hu = isHu(lang);
+  return `You write draft scripts for an explainer YouTube channel.${channelCtx ? `\n\nChannel profile:\n${channelCtx}` : ''}${hu ? `\n\n${LANG_RULES.hu}` : ''}
 
 Follow this voice guide verbatim:
 
 ${voice}
 
 Shape example (a DIFFERENT topic, only to show structure and pacing; never reuse its words or numbers):
-{"title":"Renting Is Not Throwing Money Away","scenes":[
- {"type":"title","emotion":"smug","narration":"Renting is not burning money. Owning has bills too."},
- {"type":"talk","emotion":"explaining","narration":"Rent buys you a place to live and zero surprise repair bills."},
- {"type":"big_number","emotion":"shocked","value":1,"prefix":"","suffix":"%","label":"typical yearly upkeep cost of a home, as a share of its price","decimals":0,"narration":"Owners spend about one percent of the home's price every year just on upkeep."},
- {"type":"compare","emotion":"thinking","left":{"title":"Rent","value":"predictable"},"right":{"title":"Own","value":"surprises"},"narration":"One bill is predictable. The other arrives with a leaking roof."},
- {"type":"list","emotion":"explaining","items":["Count the full cost","Compare to rent","Keep an emergency fund"],"narration":"So count everything before you decide."}]}
+${hu ? HU_SHAPE_EXAMPLE : EN_SHAPE_EXAMPLE}
 
 Output ONLY one JSON object (no prose, no code fences) matching this episode schema:
 {"id": string, "title": string, "series": "money-myths", "seed": 0, "disclaimer": true, "sources": [url...],
@@ -101,9 +107,9 @@ function validate(text: string, id: string, channel?: string, stats?: DraftStats
 }
 
 export async function draftEpisode(o: {
-  client: Client; topic: string; id: string; angle?: string; voice: string; model?: string; channel?: string; channelContext?: string; stats?: DraftStats;
+  client: Client; topic: string; id: string; angle?: string; voice: string; model?: string; channel?: string; channelContext?: string; stats?: DraftStats; lang?: string;
 }): Promise<Episode> {
-  const system = buildSystem(o.voice, o.channelContext);
+  const system = buildSystem(o.voice, o.channelContext, o.lang);
   const messages: Msg[] = [{role: 'user', content: buildUser(o.topic, o.id, o.angle)}];
   let last: string[] = [];
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -136,11 +142,11 @@ export function writeDraft(root: string, ep: Episode): string {
 }
 
 /** Second, narrow pass: ask for a sharper opening line only. Accepted only if it passes the same hard rules; otherwise the draft is kept as is. */
-export async function punchUpHook(client: Client, ep: Episode, model?: string): Promise<Episode> {
+export async function punchUpHook(client: Client, ep: Episode, model?: string, lang?: string): Promise<Episode> {
   const first = ep.scenes[0];
   if (!first) return ep;
   try {
-    const res = await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'You sharpen the opening line of an explainer video. Output ONLY JSON: {"hook": string}. The hook is at most 14 words, concrete, surprising, plain spoken, no hype, no advice, no questions that start with "Did you know".',
+    const res = await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: langNote(lang).trim() + ' You sharpen the opening line of an explainer video. Output ONLY JSON: {"hook": string}. The hook is at most 14 words, concrete, surprising, plain spoken, no hype, no advice, no questions that start with "Did you know".',
       messages: [{role: 'user', content: `Title: ${ep.title}\nCurrent hook: ${first.narration}\nWhat the video says: ${ep.scenes.slice(1, 4).map(s => s.narration).join(' ')}\nWrite a stronger hook about the same claim.`}]});
     const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
     const hook = String((extractJson(text) as {hook?: unknown}).hook ?? '').trim();
@@ -158,7 +164,7 @@ const sceneData = (s: Episode['scenes'][number]) => JSON.stringify(s, (k, v) => 
  * A rewrite is kept only if it is longer, not absurdly long, passes the banned-wording fixer, and adds no number that was not already in the scene.
  * Scene 1 (the hook) is never touched. Stops once the whole script reaches `targetWords`.
  */
-export async function expandThin(client: Client, ep: Episode, o: {model?: string; targetWords?: number; minWords?: number; log?: (m: string) => void} = {}): Promise<Episode> {
+export async function expandThin(client: Client, ep: Episode, o: {model?: string; targetWords?: number; minWords?: number; log?: (m: string) => void; lang?: string} = {}): Promise<Episode> {
   const target = o.targetWords ?? 340, thin = o.minWords ?? 42;
   const scenes = [...ep.scenes];
   const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
@@ -167,7 +173,7 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
     if (s.narration.trim().split(/\s+/).length >= thin) continue;
     try {
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
-        system: 'You expand one line of narration in an explainer video script. Output ONLY JSON: {"narration": string}. 3 short spoken sentences, 38 to 55 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Keep every fact; do not add any new number, name or statistic. Never reuse a metaphor, simile or phrase from the other lines.',
+        system: langNote(o.lang).trim() + ' You expand one line of narration in an explainer video script. Output ONLY JSON: {"narration": string}. 3 short spoken sentences, 38 to 55 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Keep every fact; do not add any new number, name or statistic. Never reuse a metaphor, simile or phrase from the other lines.',
         messages: [{role: 'user', content: `Video: ${ep.title}\nPrevious line: ${scenes[i - 1].narration}\nThis scene (${s.type}) shows: ${sceneData(s)}\nCurrent narration: ${s.narration}\nNext line: ${scenes[i + 1]?.narration ?? '(end)'}\nAlready used elsewhere (do not repeat these images or phrases): ${scenes.filter((_, j) => j !== i).map(x => x.narration).join(' ').slice(0, 900)}\nExpand the current narration so it flows between the previous and next lines.`}]});
       const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
       const cand = String((extractJson(text) as {narration?: unknown}).narration ?? '').trim();
@@ -187,14 +193,14 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
  * Last resort for very short drafts: ask (one narrow call each) for extra talk scenes that explain the topic further.
  * Kept only if 25+ words, no new numbers, no banned wording and no repeated phrase; inserted before the closing scene.
  */
-export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void} = {}): Promise<Episode> {
+export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void; lang?: string} = {}): Promise<Episode> {
   const scenes = [...ep.scenes];
   const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
   const asks = ['a concrete everyday example (no new numbers)', 'the most common mistake people make', 'what a sensible person does about it (no advice phrasing)', 'why it feels different from what people expect'];
   for (let k = 0; k < (o.max ?? 4) && count() < (o.minWords ?? 280) && scenes.length >= 3; k++) {
     try {
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
-        system: 'You add one scene to an explainer video script. Output ONLY JSON: {"narration": string, "emotion": string}. 2 or 3 short spoken sentences, 28 to 40 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Do not add any number, name or statistic. Never reuse a metaphor or phrase from the existing lines.',
+        system: langNote(o.lang).trim() + ' You add one scene to an explainer video script. Output ONLY JSON: {"narration": string, "emotion": string}. 2 or 3 short spoken sentences, 28 to 40 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Do not add any number, name or statistic. Never reuse a metaphor or phrase from the existing lines.',
         messages: [{role: 'user', content: `Video: ${ep.title}\nExisting lines: ${scenes.map(x => x.narration).join(' ').slice(0, 1800)}\nWrite one new scene about: ${asks[k % asks.length]}.`}]});
       const j = extractJson(res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('')) as {narration?: unknown; emotion?: unknown};
       const cand = String(j.narration ?? '').trim();

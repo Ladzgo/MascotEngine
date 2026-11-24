@@ -3,7 +3,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
-import {criticNotes, criticPass} from './critic.js';
+import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {sourceFlags} from './lint.js';
 import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
@@ -21,23 +21,24 @@ if (!topic || !id) die('Usage: npm run draft -- "<topic>" --id <episode-id> [--c
 if (!/^[a-z0-9-]+$/.test(id)) die('Episode id must match [a-z0-9-]+');
 
 const channelId = values.channel ?? DEFAULT_CHANNEL_ID;
-let ctx: string;
-try { ctx = channelContext(loadChannel(channelId)); } catch (e) { die((e as Error).message); }
+let ctx: string, lang = 'en';
+try { const chan = loadChannel(channelId); ctx = channelContext(chan); lang = chan.language; } catch (e) { die((e as Error).message); }
 const voice = loadVoice(path.join(root, 'docs/VOICE.md'));
 if (values.dry) {
-  console.log(buildSystem(voice, ctx) + '\n\n---\n' + buildUser(topic, id, values.angle));
+  console.log(buildSystem(voice, ctx, lang) + '\n\n---\n' + buildUser(topic, id, values.angle));
   process.exit(0);
 }
 const dir = path.join(root, 'episodes', id);
 if (fs.existsSync(path.join(dir, 'episode.json'))) die(`Episode ${id} already exists; refusing to overwrite.`);
 
 const client = await requireClient(die);
+if (/^hu/i.test(lang) && !/gemma3|14b|27b|32b|70b/i.test(process.env.DRAFT_MODEL ?? process.env.OLLAMA_MODEL ?? '')) console.log('DRAFT_WARN Hungarian from small local models (7B and below) is often ungrammatical. For real use set OLLAMA_MODEL to gemma3:12b or larger (ollama pull gemma3:12b), or a hosted model.');
 try {
-  const ep0 = await draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, model: process.env.DRAFT_MODEL ?? MODEL});
-  const ep1 = values['no-expand'] ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
-  const ep1b = values['no-expand'] ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
-  const ep2 = values['no-punchup'] ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL);
-  const ep = await criticPass(client, ep2, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  const ep0 = await draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model: process.env.DRAFT_MODEL ?? MODEL});
+  const ep1 = values['no-expand'] ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  const ep1b = values['no-expand'] ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  const ep2 = values['no-punchup'] ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL, lang);
+  const ep = ensurePayoff(await criticPass(client, ep2, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)}), lang);
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);

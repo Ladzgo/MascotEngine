@@ -1,5 +1,6 @@
 import type {Episode} from '../schema.js';
 import {extractJson, type Client} from '../llm/llm.js';
+import {CLOSERS, HU_NUMBERISH, HU_PAYOFF, HU_SLOP, HU_TENSION, isHu} from './lang.js';
 
 type Sc = Episode['scenes'][number];
 
@@ -24,14 +25,16 @@ const SLOP: [RegExp, string][] = [
   [/\bnot just (?:a|an) \w+,? but (?:a|an) \w+\b/gi, 'more than that'],
 ];
 
-export const slopHits = (t: string): string[] => SLOP.flatMap(([re]) => (t.match(new RegExp(re.source, re.flags)) ?? []).map(m => m.trim().toLowerCase()));
+const ALL_SLOP = [...SLOP, ...HU_SLOP];
+export const slopHits = (t: string): string[] => ALL_SLOP.flatMap(([re]) => (t.match(new RegExp(re.source, re.flags)) ?? []).map(m => m.trim().toLowerCase()));
 const digits = (t: string) => (t.match(/\d[\d,.]*/g) ?? []).join('|');
+const upFirst = (t: string) => t.replace(/(^|[.!?]\s+)(\p{Ll})/gu, (_, a, b) => a + b.toUpperCase());
 
 /** Deterministic scrub of stock phrases in one narration; digits are verified unchanged or the original is returned. */
 export function scrubSlop(t: string): string {
   let out = t;
-  for (const [re, rep] of SLOP) out = out.replace(re, rep);
-  out = out.replace(/\s{2,}/g, ' ').replace(/(^|[.!?]\s+)([a-z])/g, (_, a, b) => a + b.toUpperCase()).trim();
+  for (const [re, rep] of ALL_SLOP) out = out.replace(re, rep);
+  out = upFirst(out.replace(/\s{2,}/g, ' ')).trim();
   return out && digits(out) === digits(t) ? out : t;
 }
 
@@ -39,15 +42,26 @@ const TENSION = /\b(but|however|yet|trap|mistake|problem|risk|costly|cost|hurts?
 const NUMBERISH = /\d|\b(percent|dollars?|thousand|million|billion|hundred|double|twice|half)\b/i;
 const PAYOFF = /\b(so|remember|takeaway|bottom line|next time|keep|start|try|check|that'?s)\b/i;
 
+const hasPayoff = (sc: Sc) => PAYOFF.test(sc.narration) || HU_PAYOFF.test(sc.narration) || sc.type === 'list';
+
+/** Deterministic payoff: when the last scene lands no takeaway, append one neutral closing sentence (no advice wording, no numbers). */
+export function ensurePayoff(ep: Episode, lang?: string): Episode {
+  const last = ep.scenes.at(-1);
+  if (!last || ep.scenes.length < 4 || hasPayoff(last)) return ep;
+  const scenes = [...ep.scenes];
+  scenes[scenes.length - 1] = {...last, narration: `${last.narration.trim().replace(/[.!?]?$/, '.')} ${isHu(lang) ? CLOSERS.hu : CLOSERS.en}`} as Sc;
+  return {...ep, scenes: scenes as Episode['scenes']};
+}
+
 /** Advisory arc check: Hook -> Tension -> Evidence -> Payoff. Returns human-readable gaps (empty = fine). */
 export function arcGaps(ep: Episode): string[] {
   const s = ep.scenes, gaps: string[] = [];
   if (s.length < 4) return ['Too few scenes for a hook, tension, evidence and payoff arc.'];
   if (s[0].narration.trim().split(/\s+/).length > 15) gaps.push('Hook is longer than 15 words.');
   const mid = s.slice(1, -1);
-  if (!mid.some(x => TENSION.test(x.narration) || ['worried', 'shocked', 'angry', 'sad', 'confused', 'sweating'].includes(x.emotion))) gaps.push('No tension scene (a problem, myth or "but").');
-  if (!mid.some(x => x.type === 'big_number' || x.type === 'chart' || x.type === 'compare' || NUMBERISH.test(x.narration))) gaps.push('No evidence scene (a number, chart or comparison).');
-  if (!PAYOFF.test(s.at(-1)!.narration) && s.at(-1)!.type !== 'list') gaps.push('The last scene does not land a takeaway.');
+  if (!mid.some(x => (TENSION.test(x.narration) || HU_TENSION.test(x.narration)) || ['worried', 'shocked', 'angry', 'sad', 'confused', 'sweating'].includes(x.emotion))) gaps.push('No tension scene (a problem, myth or "but").');
+  if (!mid.some(x => x.type === 'big_number' || x.type === 'chart' || x.type === 'compare' || (NUMBERISH.test(x.narration) || HU_NUMBERISH.test(x.narration)))) gaps.push('No evidence scene (a number, chart or comparison).');
+  if (!hasPayoff(s.at(-1)!) ) gaps.push('The last scene does not land a takeaway.');
   return gaps;
 }
 
@@ -70,7 +84,7 @@ export async function criticPass(client: Client, ep: Episode, o: {model?: string
     if (i === 0 || !slopHits(s.narration).length) continue;
     try {
       const res = await client.messages.create({model: o.model ?? 'claude-sonnet-5-5', max_tokens: 300,
-        system: 'You remove generic AI-sounding phrasing from one line of a video script. Output ONLY JSON: {"narration": string}. Same facts, same numbers, same length, plain concrete spoken words. Never add or change a number.',
+        system: 'You remove generic AI-sounding phrasing from one line of a video script. Output ONLY JSON: {"narration": string}. Same facts, same numbers, same length, plain concrete spoken words. Never add or change a number. Keep the language of the line.',
         messages: [{role: 'user', content: `Line: ${s.narration}`}]});
       const cand = String((extractJson(res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('')) as {narration?: unknown}).narration ?? '').trim();
       if (cand && digits(cand) === digits(s.narration) && !slopHits(cand).length) scenes[i] = {...s, narration: cand} as Sc;
