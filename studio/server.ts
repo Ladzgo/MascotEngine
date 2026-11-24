@@ -90,7 +90,7 @@ type Stage = 'voice' | 'direct' | 'preview' | 'final' | 'shorts';
 type Job = {id: string; episode: string; stages: Stage[]; current: Stage | null; done: Stage[]; log: string[]; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'; engine: string; createdAt: number; error?: string; progress: number; clients: Set<http.ServerResponse>; child?: ReturnType<typeof spawn>};
 const jobs = new Map<string, Job>();
 // Jobs survive a Studio restart: a run that was mid-flight becomes an error with a Retry button, queued runs resume.
-const JOBS_FILE = `${ROOT}data/jobs.json`;
+const JOBS_FILE = process.env.STUDIO_JOBS_FILE ?? `${ROOT}data/jobs.json`;
 let jobsTimer: ReturnType<typeof setTimeout> | undefined;
 const persistJobs = () => { jobsTimer ??= setTimeout(() => { jobsTimer = undefined; try { fs.mkdirSync(`${ROOT}data`, {recursive: true}); fs.writeFileSync(JOBS_FILE, JSON.stringify([...jobs.values()].slice(-40).map(({clients, child, ...j}) => ({...j, log: j.log.slice(-200)})))); } catch { /* best effort */ } }, 500); };
 function loadJobs() {
@@ -180,7 +180,9 @@ async function runJob(job: Job, engine: string) {
     job.current = stage; job.progress = 0; emit(job);
     const args = STAGE_CMD[stage](job.episode, {engine, final: job.stages.includes('final')});
     await new Promise<void>(ok => {
-      const child = spawn(path.join(ROOT, 'node_modules/.bin/tsx'), [`${ROOT}src/pipeline/cli.ts`, ...args], {cwd: ROOT, env: process.env});
+      const child = process.env.STUDIO_TEST_FAKE_JOBS // tests: a sleeping stand-in, never a real tts/render
+        ? spawn(process.execPath, ['-e', 'setTimeout(()=>{},60000)'])
+        : spawn(path.join(ROOT, 'node_modules/.bin/tsx'), [`${ROOT}src/pipeline/cli.ts`, ...args], {cwd: ROOT, env: process.env});
       job.child = child;
       const onData = (buf: Buffer) => {
         for (const line of buf.toString().split('\n').filter(Boolean)) {

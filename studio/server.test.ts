@@ -8,14 +8,15 @@ import fs from 'node:fs';
 const PORT = 4197, BASE = `http://localhost:${PORT}`;
 const ROOT = new URL('../', import.meta.url).pathname;
 let child: ChildProcess;
+const JOBS_TMP = `/private/tmp/studio-test-jobs-${process.pid}.json`;
 const J = {'Content-Type': 'application/json'};
 
 before(async () => {
-  child = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(PORT), STUDIO_TEST: '1'}, stdio: 'ignore'});
+  child = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(PORT), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: JOBS_TMP}, stdio: 'ignore'});
   for (let i = 0; i < 100; i++) { try { if ((await fetch(`${BASE}/api/readiness`)).ok) return; } catch { /* not up yet */ } await new Promise(r => setTimeout(r, 300)); }
   throw new Error('server did not start');
 });
-after(() => { child?.kill(); fs.rmSync(`${ROOT}data/uploads/zz-test.mp4`, {force: true}); });
+after(() => { child?.kill(); fs.rmSync(JOBS_TMP, {force: true}); fs.rmSync(`${ROOT}data/uploads/zz-test.mp4`, {force: true}); });
 
 test('guard: bad host, foreign origin and non-JSON mutations are rejected', async () => {
   assert.equal((await fetch(`${BASE}/api/queue`)).status, 200);
@@ -112,4 +113,38 @@ test('POST bodies are schema-validated: wrong types give 400', async () => {
   assert.equal((await post('/presets', {id: 3})).status, 400);
   assert.equal((await post('/episodes/none/generate', {stages: 'voice'})).status, 404); // unknown episode checked first
   assert.equal((await fetch(`${BASE}/api/make`, {method: 'POST', headers: J, body: '[1]'})).status, 400);
+});
+
+test('queue: 20 active runs max (429), identical queued run is 409, cancel frees a slot (fake jobs)', async () => {
+  const ids = Array.from({length: 21}, (_, i) => `zz-qtest-${i}`);
+  for (const id of ids) { fs.mkdirSync(`${ROOT}episodes/${id}`, {recursive: true}); fs.writeFileSync(`${ROOT}episodes/${id}/episode.json`, '{}'); }
+  const enq = (episode: string) => fetch(`${BASE}/api/queue`, {method: 'POST', headers: J, body: JSON.stringify({episode, stages: ['preview']})});
+  const jobIds: string[] = [];
+  try {
+    for (const id of ids.slice(0, 20)) { const r = await enq(id); assert.equal(r.status, 202, id); jobIds.push(((await r.json()) as {jobId: string}).jobId); }
+    assert.equal((await enq(ids[20])).status, 429);
+    assert.equal((await enq(ids[19])).status, 429); // limit is checked before the duplicate rule
+    const del = await fetch(`${BASE}/api/queue/${jobIds[19]}`, {method: 'DELETE'}); assert.equal(del.status, 200);
+    assert.equal((await enq(ids[18])).status, 409); // same episode + stages already waiting
+    assert.equal((await enq(ids[20])).status, 202);
+  } finally {
+    const q = await (await fetch(`${BASE}/api/queue`)).json() as {running: {jobId: string} | null; queued: {jobId: string}[]};
+    for (const j of [...q.queued, ...(q.running ? [q.running] : [])]) await fetch(`${BASE}/api/queue/${j.jobId}`, {method: 'DELETE'});
+    for (const id of ids) fs.rmSync(`${ROOT}episodes/${id}`, {recursive: true, force: true});
+  }
+});
+
+test('interrupted job: after a restart a running run is an error with Retry text, queued runs resume', async () => {
+  const file = `/private/tmp/studio-test-jobs-restart-${process.pid}.json`, port = 4198;
+  const base = {stages: ['preview'], current: 'preview', done: [], log: [], engine: 'auto', progress: 0.4};
+  fs.writeFileSync(file, JSON.stringify([{...base, id: 'j-run', episode: 'zz-x', status: 'running', createdAt: 1}, {...base, id: 'j-wait', episode: 'zz-y', status: 'queued', current: null, createdAt: 2}]));
+  const c = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(port), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: file}, stdio: 'ignore'});
+  try {
+    let q: {running: {jobId: string} | null; recent: {jobId: string; status: string; error?: string}[]} | undefined;
+    for (let i = 0; i < 100 && !q; i++) { try { q = await (await fetch(`http://localhost:${port}/api/queue`)).json() as typeof q; } catch { await new Promise(r => setTimeout(r, 300)); } }
+    assert.ok(q);
+    const dead = q.recent.find(j => j.jobId === 'j-run');
+    assert.equal(dead?.status, 'error'); assert.match(dead?.error ?? '', /Interrupted.*Retry/);
+    assert.equal(q.running?.jobId, 'j-wait');
+  } finally { c.kill(); fs.rmSync(file, {force: true}); }
 });
