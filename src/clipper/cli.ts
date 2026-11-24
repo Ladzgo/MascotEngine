@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {detectAligner, probeDuration, runAligner} from '../pipeline/align.js';
+import {detectAligner, probeDuration, runAligner, whisperModel} from '../pipeline/align.js';
+import {whisperLang} from './lang.js';
 import {spawnSync} from 'node:child_process';
 import {findCandidates} from './segment.js';
 import {cropPath, cropWidth, sampleTrack} from './crop.js';
@@ -13,7 +14,7 @@ function arg(name: string, def: string) { const i = process.argv.indexOf(`--${na
 
 async function main() {
   const file = process.argv.slice(2).find(a => !a.startsWith('--') && !/^\d+(\.\d+)?$/.test(a));
-  if (!file || !fs.existsSync(file)) throw new Error('usage: npm run clip -- <file> [--min 20 --max 60 --count 5] [--words words.json] [--no-render]');
+  if (!file || !fs.existsSync(file)) throw new Error('usage: npm run clip -- <file> [--min 20 --max 60 --count 5] [--lang auto|hu|en] [--words words.json] [--no-render]');
   const min = +arg('min', '20'), max = +arg('max', '60'), count = +arg('count', '5');
   const dir = path.resolve(arg('out', `out/clips/${path.basename(file, path.extname(file))}`));
   fs.mkdirSync(dir, {recursive: true});
@@ -24,7 +25,7 @@ async function main() {
   else {
     const al = detectAligner();
     if (al !== 'whisper-cli') throw new Error('whisper.cpp + data/models/ggml-base.en.bin needed (or pass --words words.json)');
-    words = runAligner(al, file).map(r => ({w: r.w, start: r.start, end: r.end}));
+    words = runAligner(al, file, whisperLang(whisperModel() ?? '', arg('lang', ''))).map(r => ({w: r.w, start: r.start, end: r.end}));
     fs.writeFileSync(path.join(dir, 'words.json'), JSON.stringify(words));
   }
 

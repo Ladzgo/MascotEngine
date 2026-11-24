@@ -166,3 +166,13 @@ test('person blob: motion of the densest skin cluster wins over louder skin-colo
   const still = centroidX(a, a.map((v, i) => (i % W >= 50 && i % W < 70 ? 255 : v)), W, H, 12, undefined, skin);
   assert.equal(still.conf, 0);
 });
+
+import {whisperLang} from './lang.js';
+test('whisperLang: en for .en models, auto for multilingual, errors on mismatch or junk', () => {
+  assert.equal(whisperLang('/m/ggml-base.en.bin'), 'en');
+  assert.equal(whisperLang('/m/ggml-base.bin'), 'auto');
+  assert.equal(whisperLang('/m/ggml-small.bin', 'HU'), 'hu');
+  assert.equal(whisperLang('/m/ggml-base.en.bin', 'en'), 'en');
+  assert.throws(() => whisperLang('/m/ggml-base.en.bin', 'hu'), /English-only/);
+  assert.throws(() => whisperLang('/m/ggml-base.bin', 'hu; rm'), /--lang must be/);
+});
