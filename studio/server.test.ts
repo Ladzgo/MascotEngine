@@ -53,3 +53,35 @@ test('clip: validation, root restriction, upload and listing', async () => {
   assert.ok(list.sources.includes('zz-test.mp4'));
   assert.equal((await fetch(`${BASE}/api/clips/../etc/x.mp4`)).status, 404);
 });
+
+test('episode ZIP: export, import under a new id, rejects traversal and duplicates', async () => {
+  const del = () => { for (const id of ['zz-ziptest', 'zz-ziptest2']) fs.rmSync(`${ROOT}episodes/${id}`, {recursive: true, force: true}); };
+  del();
+  try {
+    assert.equal((await fetch(`${BASE}/api/episodes`, {method: 'POST', headers: J, body: JSON.stringify({id: 'zz-ziptest'})})).status, 201);
+    fs.writeFileSync(`${ROOT}episodes/zz-ziptest/audio/scene-1.wav`, 'RIFFx');
+    fs.mkdirSync(`${ROOT}episodes/zz-ziptest/build/chunks`, {recursive: true});
+    fs.writeFileSync(`${ROOT}episodes/zz-ziptest/build/video-preview.mp4`, 'big');
+    const z = await fetch(`${BASE}/api/episodes/zz-ziptest/export`);
+    assert.equal(z.headers.get('content-type'), 'application/zip');
+    const buf = Buffer.from(await z.arrayBuffer());
+    const imp = (b: Buffer, q = '') => fetch(`${BASE}/api/episodes/import${q}`, {method: 'POST', headers: {'Content-Type': 'application/zip'}, body: new Uint8Array(b)});
+    assert.equal((await imp(buf)).status, 409); // same id exists
+    assert.equal((await imp(buf, '?id=zz-ziptest2')).status, 201);
+    assert.ok(fs.existsSync(`${ROOT}episodes/zz-ziptest2/audio/scene-1.wav`));
+    assert.ok(!fs.existsSync(`${ROOT}episodes/zz-ziptest2/build/video-preview.mp4`));
+    assert.equal(JSON.parse(fs.readFileSync(`${ROOT}episodes/zz-ziptest2/episode.json`, 'utf8')).id, 'zz-ziptest2');
+    assert.equal((await imp(Buffer.from('nope'), '?id=zz-ziptest3')).status, 422);
+    const evil = new Uint8Array(await new Promise<Buffer>(ok => { const p = spawn('python3', ['-c', "import zipfile,sys,io;b=io.BytesIO();z=zipfile.ZipFile(b,'w');z.writestr('episode.json','{}');z.writestr('../evil.txt','x');z.close();sys.stdout.buffer.write(b.getvalue())"]); const c: Buffer[] = []; p.stdout.on('data', d => c.push(d)); p.on('close', () => ok(Buffer.concat(c))); }));
+    assert.equal((await imp(Buffer.from(evil), '?id=zz-ziptest3')).status, 422);
+    assert.ok(!fs.existsSync(`${ROOT}episodes/zz-ziptest3`) && !fs.existsSync(`${ROOT}episodes/evil.txt`));
+  } finally { del(); }
+});
+
+test('path traversal: ids with dots/slashes never reach the filesystem', async () => {
+  for (const u of ['/api/episodes/..%2f..%2fpackage.json', '/api/episodes/..%2fchannels', '/api/channels/..%2f..', '/api/episodes/x/versions/..%2f..%2fepisode', '/api/episodes/x/audio/..%2f1']) {
+    const r = await fetch(`${BASE}${u}`);
+    assert.ok([400, 404].includes(r.status), `${u} -> ${r.status}`);
+  }
+  assert.equal((await fetch(`${BASE}/api/episodes`, {method: 'POST', headers: J, body: JSON.stringify({id: '../evil'})})).status, 400);
+});

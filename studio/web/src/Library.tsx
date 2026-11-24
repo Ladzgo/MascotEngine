@@ -39,11 +39,22 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
     setBusy(false); setPick(failed.length ? new Set(ids.filter(id => failed.some(f => f.startsWith(`${id}:`)))) : null); onChanged?.();
     setMsg(failed.length ? `${ids.length - failed.length} done, ${failed.length} failed. ${failed.join(' ')}` : kind === 'archive' ? `Archived ${ids.length}.` : `Queued ${ids.length} ${ids.length === 1 ? 'preview' : 'previews'}. See the Queue.`);
   };
+  const importZip = async (f?: File) => {
+    if (!f) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch('/api/episodes/import', {method: 'POST', headers: {'Content-Type': 'application/zip'}, body: f}), j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error ?? `Import failed (${r.status})`);
+      setMsg(`Imported ${j.id}.`); onChanged?.();
+    } catch (e) { setMsg((e as Error).message); }
+    setBusy(false);
+  };
   const count = (s: string) => scoped.filter(e => !s || statusOf(e) === s).length;
   return (
     <div className="page">
       <div className="page-head"><div><h1 className="display" tabIndex={-1}>Library</h1><p className="muted">Every episode{ch === 'all' ? ' in every channel' : ` in ${chName(ch)}`}. Press Enter on a row to open it.</p></div>
         <button type="button" className="btn" aria-pressed={!!pick} onClick={() => { setPick(p => (p ? null : new Set())); setMsg(null); }}>{pick ? 'Done selecting' : 'Select'}</button>
+        <label className="btn" aria-disabled={busy}>Import ZIP<input type="file" accept=".zip,application/zip" className="sr" disabled={busy} onChange={e => { void importZip(e.target.files?.[0]); e.target.value = ''; }} /></label>
         <a className="btn primary" href={`${hashFor({page: 'today', ch})}`} onClick={() => setTimeout(() => document.getElementById('new')?.scrollIntoView(), 50)}><Plus size={16} />New episode</a></div>
       <div className="lib-tools">
         <label className="field lib-q"><span className="sr">Search episodes</span><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Search title or id" /></label>
@@ -57,6 +68,7 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
           <button type="button" className="btn sm" onClick={() => setPick(new Set(rows.map(r => r.id)))}>Select all shown</button>
           <button type="button" className="btn sm" disabled={!pick.size || busy} onClick={() => void batch('preview')}>Queue previews</button>
           <button type="button" className="btn sm" disabled={!pick.size || busy} onClick={() => void batch('archive')}>Archive</button>
+          <button type="button" className="btn sm" disabled={!pick.size} onClick={() => [...pick].forEach((id, i) => setTimeout(() => { const a = document.createElement('a'); a.href = `/api/episodes/${id}/export`; a.download = `${id}.zip`; a.click(); }, i * 400))}>Export ZIP</button>
         </div>
       )}
       {msg && <p className="small" role="status">{msg}</p>}

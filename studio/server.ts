@@ -5,6 +5,7 @@ import {scheduleRows, toCsv} from '../src/publish/scheduleExport.js';
 import {summarize} from '../src/analytics/summary.js';
 import {checkReadiness} from '../src/doctor/doctor.js';
 import {checkRequest, underRoots} from '../src/guard.js';
+import {exportEpisodeZip, importEpisodeZip} from './archive.js';
 import {friendlyError} from '../src/errors.js';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -41,7 +42,7 @@ const AUDIO_EXT: Record<string, string> = {wav: 'audio/wav', mp3: 'audio/mpeg', 
 const MAX_AUDIO = 50 * 1024 * 1024;
 const readRaw = (req: http.IncomingMessage, max: number) => new Promise<Buffer>((ok, bad) => {
   const parts: Buffer[] = []; let n = 0, over = false;
-  req.on('data', (c: Buffer) => { if (over) return; n += c.length; if (n > max) { over = true; bad(new HttpError(413, `Audio file too large (max ${max / 1024 / 1024} MB).`)); req.resume(); return; } parts.push(c); });
+  req.on('data', (c: Buffer) => { if (over) return; n += c.length; if (n > max) { over = true; bad(new HttpError(413, `File too large (max ${max / 1024 / 1024} MB).`)); req.resume(); return; } parts.push(c); });
   req.on('end', () => { if (!over) ok(Buffer.concat(parts)); }); req.on('error', bad);
 });
 const sceneCount = (d: string) => readJson<{scenes?: unknown[]}>(`${d}episode.json`)?.scenes?.length ?? 0;
@@ -611,6 +612,24 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
   const p = url.pathname.replace(/^\/api\//, '').split('/');
   const m = req.method ?? 'GET';
   try {
+    if (p[0] === 'episodes' && p[1] === 'import' && p.length === 2 && m === 'POST') {
+      const buf = await readRaw(req, 500 * 1024 * 1024);
+      const want = url.searchParams.get('id');
+      if (want !== null && !ID_RE.test(want)) return json(res, 400, {error: 'Use lowercase letters, numbers and dashes only.'});
+      const tmpId = `import-${randomUUID().slice(0, 8)}`, tmpDir = `${EPISODES}.${tmpId}/`;
+      try {
+        importEpisodeZip(buf, tmpDir);
+        const ep = Episode.safeParse(readJson(`${tmpDir}episode.json`));
+        if (!ep.success) throw new HttpError(422, `episode.json in the ZIP is invalid: ${ep.error.issues[0]?.message ?? ''}`);
+        const id = want ?? ep.data.id;
+        if (!ID_RE.test(id)) throw new HttpError(422, 'The episode id in the ZIP is not valid.');
+        if (fs.existsSync(epDir(id))) throw new HttpError(409, `Episode ${id} already exists. Pass ?id=<new-id> to import under another name.`);
+        fs.writeFileSync(`${tmpDir}episode.json`, JSON.stringify({...ep.data, id}, null, 2));
+        fs.renameSync(tmpDir, epDir(id));
+        return json(res, 201, episodeSummary(id));
+      } catch (e) { if (e instanceof HttpError) throw e; throw new HttpError(422, (e as Error).message); }
+      finally { fs.rmSync(tmpDir, {recursive: true, force: true}); }
+    }
     if (p[0] === 'episodes' && p.length === 1) {
       if (m === 'GET') {
         const ch = url.searchParams.get('channel');
@@ -664,6 +683,10 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
           return json(res, 200, {ok: true});
         }
         if (m === 'GET') { const a = sceneAudio(d, n); if (!a) return json(res, 404, {error: 'No recording for this scene.'}); return sendFile(req, res, `${d}audio/${a.file}`); }
+      }
+      if (p[2] === 'export' && p.length === 3 && m === 'GET') {
+        const z = exportEpisodeZip(d);
+        res.writeHead(200, {'Content-Type': 'application/zip', 'Content-Length': z.length, 'Content-Disposition': `attachment; filename="${id}.zip"`}); res.end(z); return;
       }
       if (p[2] === 'generate' && m === 'POST') {
         return json(res, 202, {jobId: enqueue(id, await body(req)).jobId});

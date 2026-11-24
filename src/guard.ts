@@ -8,7 +8,7 @@ export function checkRequest(r: {host?: string; origin?: string; method?: string
   const method = r.method ?? 'GET';
   if (!(r.url ?? '').startsWith('/api/') || method === 'GET' || method === 'HEAD') return null;
   if (r.origin && !allowed.has(r.origin.replace(/^https?:\/\//, ''))) return {code: 403, msg: 'Bad origin'}; // CSRF
-  const raw = /^\/api\/(episodes\/[^/]+\/audio\/\d+|clips\/upload)(\?|$)/.test(r.url ?? '');
+  const raw = /^\/api\/(episodes\/[^/]+\/audio\/\d+|clips\/upload|episodes\/import)(\?|$)/.test(r.url ?? '');
   if (!raw && r.contentLength !== undefined && r.contentLength !== '0' && !(r.contentType ?? '').startsWith('application/json')) return {code: 415, msg: 'JSON only'};
   return null;
 }
