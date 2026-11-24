@@ -106,7 +106,7 @@ export async function draftEpisode(o: {
       content: `The JSON failed validation. Fix these errors and output the full corrected JSON only:\n- ${errors.join('\n- ')}`,
     });
   }
-  throw new Error(`Draft failed validation after 4 tries:\n- ${last.join('\n- ')}`);
+  throw new Error(`Draft failed validation after retry (4 tries):\n- ${last.join('\n- ')}`);
 }
 
 export function writeDraft(root: string, ep: Episode): string {
