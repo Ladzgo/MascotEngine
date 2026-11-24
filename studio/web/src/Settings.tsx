@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {api, type LlmStatus, type Readiness, type Settings as S} from './api';
 import {Check, Alert} from './icons';
+import {resetOnboarding} from './Onboarding';
 import {t} from './i18n';
 
 export type Check = {key: string; label: string; ok: boolean; fix: string};
@@ -47,6 +48,7 @@ export function Settings({onSaved}: {onSaved: () => void}) {
         <ul>{readiness(s, engine).map(c => <li key={c.key} className={c.ok ? 'ok' : 'bad'}>{c.ok ? <Check size={14} /> : <Alert size={14} />}<b>{c.label}</b><span>{c.ok ? 'ready' : c.fix}</span></li>)}</ul>
       </div>}
       <ReadinessPanel />
+      <p className="small"><button type="button" className="btn sm" onClick={() => { resetOnboarding(); location.hash = '#/today'; location.reload(); }}>Run first-run setup again</button> <span className="muted">(only shows while there are no episodes)</span></p>
       <AiPanel />
       <label className="field"><span>{t('Voice engine')}</span>
         <select value={engine} onChange={e => setEngine(e.target.value)}>

@@ -2,6 +2,7 @@ import React, {Suspense, useCallback, useEffect, useMemo, useRef, useState} from
 import {api, type ChannelRow, type Settings as SettingsT, type Summary} from './api';
 import {Alert} from './icons';
 import {Library} from './Library';
+import {Onboarding, needsOnboarding} from './Onboarding';
 import {Overview} from './Overview';
 import {Palette} from './Palette';
 import {Rail} from './Rail';
@@ -50,6 +51,7 @@ export function App() {
   const [chans, setChans] = useState<ChannelRow[]>([]);
   const [cfg, setCfg] = useState<SettingsT | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [welcome, setWelcome] = useState(needsOnboarding);
   const [pal, setPal] = useState(false), [help, setHelp] = useState(false);
   const jobs = useJobs();
   const first = useRef(true);
@@ -101,7 +103,7 @@ export function App() {
   {
     let page: React.ReactNode;
     switch (route.page) {
-      case 'today': page = <Overview ch={route.ch} chans={chans} eps={eps} cfg={cfg} onChanged={changed} />; break;
+      case 'today': page = welcome && epsLoaded && eps.length === 0 && chans.length ? <Onboarding chans={chans} onDone={id => { setWelcome(false); changed(); if (id) setRoute({ch: id}); }} /> : <Overview ch={route.ch} chans={chans} eps={eps} cfg={cfg} onChanged={changed} />; break;
       case 'library': page = <Library route={route} eps={eps} chans={chans} loaded={epsLoaded} onChanged={changed} />; break;
       case 'ideas': page = <Ideas channel={active} cfg={cfg} chans={chans} f={route.f} />; break;
       case 'channels': page = <Channels route={route} active={route.ch} onPick={onPick} onChanged={changed} />; break;
