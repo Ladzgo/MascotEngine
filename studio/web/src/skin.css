@@ -130,3 +130,5 @@ hr { border: 0; border-top: 1px solid var(--line); }
 /* lazy-loaded page sheets load after this file: raise specificity for type + checkbox */
 #root h1, #root h2, #root h3, #root .display { font-family: var(--sans); font-weight: 600; letter-spacing: -.02em; }
 #root input[type='checkbox'], #root input[type='radio'] { accent-color: var(--accent); }
+#root h1[tabindex]:focus, #root h1[tabindex]:focus-visible, #root h2[tabindex]:focus-visible { outline: none; }
+#root h1 + p, #root h1 + .muted { margin-top: 4px; }
