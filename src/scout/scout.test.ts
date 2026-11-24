@@ -17,3 +17,12 @@ test('fetchHeadlines dedupes, drops banned topics, survives failures', async () 
   assert.match(scoutFocus(hs), /Fresh news/);
   assert.equal(scoutFocus([]), '');
 });
+
+import {dropUsed, nicheSeeds} from './scout.js';
+test('dropUsed removes headlines that overlap our own titles; niche seeds per family', () => {
+  const hs = [{title: 'Why inflation is eating your savings account', url: 'u', source: 's'}, {title: 'Mortgage rates fall again this week', url: 'u2', source: 's'}];
+  assert.deepEqual(dropUsed(hs, ['Why Your Savings Are Quietly Shrinking: inflation']).map(h => h.url), ['u2']);
+  assert.ok(nicheSeeds('consumer tech explained').some(q => /chip/.test(q)));
+  assert.ok(nicheSeeds('ancient history').some(q => /archaeology/.test(q)));
+  assert.deepEqual(nicheSeeds('cooking'), []);
+});

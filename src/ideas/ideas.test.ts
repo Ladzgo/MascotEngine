@@ -31,7 +31,7 @@ test('generates, lints banned and duplicates', async () => {
 });
 
 test('retries once on invalid, then fails', async () => {
-  const ok = JSON.stringify({ideas: [idea('Fine idea')]});
+  const ok = JSON.stringify({ideas: [idea('Why fine ideas need real numbers')]});
   const c = mk(['nope', ok]);
   assert.equal((await generateIdeas({client: c, channel: ch, count: 1, used: []})).ideas.length, 1);
   assert.equal(c.calls.length, 2);
@@ -43,8 +43,34 @@ test('merge keeps existing ids and statuses', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ideas-'));
   const f = path.join(dir, 'c', 'ideas.json');
   const mkI = (t: string, status: any = 'new') => ({...idea(t), id: slug(t), status, createdAt: 'now'}) as any;
-  writeIdeas(f, {generatedAt: 'a', ideas: [mkI('One', 'drafted')]});
-  const m = mergeIdeas(readIdeas(f), [mkI('One'), mkI('Two')], 'b');
-  assert.deepEqual(m.ideas.map(i => [i.id, i.status]), [['one', 'drafted'], ['two', 'new']]);
+  writeIdeas(f, {generatedAt: 'a', ideas: [mkI('Why one tiny fee matters', 'drafted')]});
+  const m = mergeIdeas(readIdeas(f), [mkI('Why one tiny fee matters'), mkI('Why two small habits compound')], 'b');
+  assert.deepEqual(m.ideas.map(i => [i.id, i.status]), [['why-one-tiny-fee-matters', 'drafted'], ['why-two-small-habits-compound', 'new']]);
   assert.equal(lintIdeas(m.ideas, {banned: [], used: []}).kept.length, 2);
+});
+
+import {specificity} from './ideas.js';
+test('specificity: numbers up, vague and clickbait down; vague ideas are dropped', () => {
+  assert.ok(specificity({title: 'Why $500 a month beats a $50,000 lump sum', needsSources: ['x']}) >= 3);
+  assert.ok(specificity({title: 'Everything you need to know about money', needsSources: []}) < 0);
+  assert.ok(specificity({title: 'Credit', needsSources: []}) < 0);
+  assert.ok(specificity({title: 'The shocking secret banks hide from you today', needsSources: []}) < 0);
+});
+
+test('stemmed duplicate detection, and a top-up call fills the gap', async () => {
+  const c = mk([
+    JSON.stringify({ideas: [idea('Why index funds beat most stock pickers'), idea('Why index fund beats most stock picker'), idea('Everything about investing')]}),
+    JSON.stringify({ideas: [idea('How a 0.5% fee quietly eats 12% of your pension'), idea('Why index funds beat most stock pickers')]}),
+  ]);
+  const r = await generateIdeas({client: c, channel: ch, count: 2, used: []});
+  assert.equal(c.calls.length, 2);
+  assert.deepEqual(r.ideas.map(i => i.title), ['How a 0.5% fee quietly eats 12% of your pension', 'Why index funds beat most stock pickers']);
+  assert.match(c.calls[1].messages[0].content, /Why index funds beat most stock pickers/); // told what to avoid
+  assert.ok(r.dropped.some(d => /duplicate/.test(d)) && r.dropped.some(d => /vague/.test(d)));
+});
+
+test('a failing top-up call does not lose the ideas already found', async () => {
+  const c = mk([JSON.stringify({ideas: [idea('Why $500 a month beats waiting for a raise')]}), 'garbage']);
+  const r = await generateIdeas({client: c, channel: ch, count: 3, used: []});
+  assert.equal(r.ideas.length, 1);
 });
