@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {Episode} from '../schema.js';
-import {autoFixEpisode, lintEpisode} from './lint.js';
+import {autoFixEpisode, lintEpisode, repeatedPhrases} from './lint.js';
 import {extractJson, type Client} from '../llm/llm.js';
 
 export const MODEL = 'claude-sonnet-5-5';
@@ -43,7 +43,7 @@ Scene types (pick what fits the content):
 - compare {narration, emotion, left:{title,value}, right:{title,value}}
 - list {narration, emotion, items: 1-6 strings}
 emotion is one of: neutral, smug, worried, shocked, happy, excited, thinking, explaining, angry, sad, confused, sweating.
-Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact or claim. One clear angle. Every number shown (big_number, chart, or quoted in narration) must come from a real source whose URL is listed in "sources". Never invent URLs or data; if unsure, leave the number out. No guarantees, no advice phrasing. Narration is spoken text: spell out numbers naturally. This is a draft a human will rewrite.`;
+Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact or claim. One clear angle. Every number shown (big_number, chart, or quoted in narration) must come from a real source whose URL is listed in "sources". Never invent URLs or data; if unsure, leave the number out. Never repeat a metaphor, simile, joke or phrase across scenes: each scene brings a fresh image or a plain fact. No guarantees, no advice phrasing. Narration is spoken text: spell out numbers naturally. This is a draft a human will rewrite.`;
 }
 
 export function buildUser(topic: string, id: string, angle?: string): string {
@@ -89,20 +89,24 @@ export async function draftEpisode(o: {
   const system = buildSystem(o.voice, o.channelContext);
   const messages: Msg[] = [{role: 'user', content: buildUser(o.topic, o.id, o.angle)}];
   let last: string[] = [];
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await o.client.messages.create({
-      model: o.model ?? MODEL, max_tokens: 8000, system, messages,
-    });
-    const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let text = '';
+    try {
+      const res = await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 8000, system, messages});
+      text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
+    } catch (e) { last = [`LLM call failed: ${(e as Error).message.slice(0, 160)}`]; if (attempt === 3) break; continue; }
     const {ep, errors} = validate(text, o.id, o.channel);
     if (ep) return ep;
     last = errors;
-    messages.push({role: 'assistant', content: text}, {
+    const unparsable = errors.length === 1 && errors[0].startsWith('Output is not valid JSON');
+    // unusable output: start over with a fresh, clearly worded request instead of piling on a broken reply
+    if (unparsable) { messages.splice(0, messages.length, {role: 'user', content: `${buildUser(o.topic, o.id, o.angle)}\nReturn ONLY one complete JSON object, nothing before or after it, and keep it short enough to finish.`}); continue; }
+    messages.push({role: 'assistant', content: text.slice(0, 12000)}, {
       role: 'user',
       content: `The JSON failed validation. Fix these errors and output the full corrected JSON only:\n- ${errors.join('\n- ')}`,
     });
   }
-  throw new Error(`Draft failed validation after retry:\n- ${last.join('\n- ')}`);
+  throw new Error(`Draft failed validation after 4 tries:\n- ${last.join('\n- ')}`);
 }
 
 export function writeDraft(root: string, ep: Episode): string {
@@ -144,14 +148,16 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
     if (s.narration.trim().split(/\s+/).length >= thin) continue;
     try {
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
-        system: 'You expand one line of narration in an explainer video script. Output ONLY JSON: {"narration": string}. 2 or 3 short spoken sentences, 28 to 45 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Keep every fact; do not add any new number, name or statistic.',
-        messages: [{role: 'user', content: `Video: ${ep.title}\nPrevious line: ${scenes[i - 1].narration}\nThis scene (${s.type}) shows: ${sceneData(s)}\nCurrent narration: ${s.narration}\nNext line: ${scenes[i + 1]?.narration ?? '(end)'}\nExpand the current narration so it flows between the previous and next lines.`}]});
+        system: 'You expand one line of narration in an explainer video script. Output ONLY JSON: {"narration": string}. 2 or 3 short spoken sentences, 28 to 45 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Keep every fact; do not add any new number, name or statistic. Never reuse a metaphor, simile or phrase from the other lines.',
+        messages: [{role: 'user', content: `Video: ${ep.title}\nPrevious line: ${scenes[i - 1].narration}\nThis scene (${s.type}) shows: ${sceneData(s)}\nCurrent narration: ${s.narration}\nNext line: ${scenes[i + 1]?.narration ?? '(end)'}\nAlready used elsewhere (do not repeat these images or phrases): ${scenes.filter((_, j) => j !== i).map(x => x.narration).join(' ').slice(0, 900)}\nExpand the current narration so it flows between the previous and next lines.`}]});
       const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
       const cand = String((extractJson(text) as {narration?: unknown}).narration ?? '').trim();
       const words = cand.split(/\s+/).length;
       const known = new Set([...numsIn(s.narration), ...numsIn(sceneData(s)), ...numsIn(ep.title)]);
       if (!cand || words <= s.narration.trim().split(/\s+/).length || words > 70 || numsIn(cand).some(n => !known.has(n))) { o.log?.(`expand: kept scene ${i + 1} as is`); continue; }
       const fixed = autoFixEpisode({...ep, scenes: [{...s, narration: 'x'}, {...s, narration: cand}] as Episode['scenes']}).scenes[1].narration; // slot 0 is a dummy: the fixer treats it as the hook
+      const others = scenes.filter((_, j) => j !== i).map(x => x.narration);
+      if (repeatedPhrases([...others, cand]).length > repeatedPhrases(others).length) { o.log?.(`expand: scene ${i + 1} repeats a phrase, kept as is`); continue; }
       if (fixed === cand) scenes[i] = {...s, narration: cand} as Episode['scenes'][number];
     } catch { /* keep the thin scene */ }
   }

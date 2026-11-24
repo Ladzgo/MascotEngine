@@ -51,3 +51,25 @@ export function sourceFlags(ep: Episode): {vetted: string[]; dropped: string[]; 
   if (dropped.length) (notes[0] ??= []).push(`Removed unvetted sources: ${dropped.join(', ')}`);
   return {vetted, dropped, notes};
 }
+
+const STOP = new Set('a an the of to in on at for and or but is are was were be it its this that with as by from you your they them their we our not no so if than then there here have has had do does did will would can could just about into over out up'.split(' '));
+const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9'\s-]/g, ' ').split(/\s+/).filter(Boolean);
+
+/** Repeated 3-word phrases (with at least 2 content words) and repeated "like a X" similes across different scenes. Advisory: never blocks a draft. */
+export function repeatedPhrases(narrations: string[]): string[] {
+  const seen = new Map<string, Set<number>>();
+  narrations.forEach((n, i) => {
+    const w = words(n);
+    for (let k = 0; k + 3 <= w.length; k++) {
+      const g = w.slice(k, k + 3);
+      if (g.filter(x => !STOP.has(x)).length < 2) continue;
+      const key = g.join(' ');
+      (seen.get(key) ?? seen.set(key, new Set()).get(key)!).add(i);
+    }
+    for (const m of n.toLowerCase().matchAll(/\b(?:like|as) (?:a|an|the) ([a-z-]+)/g)) {
+      const key = `like a ${m[1]}`;
+      (seen.get(key) ?? seen.set(key, new Set()).get(key)!).add(i);
+    }
+  });
+  return [...seen].filter(([, v]) => v.size > 1).map(([k]) => k);
+}
