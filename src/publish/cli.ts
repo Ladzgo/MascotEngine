@@ -1,5 +1,6 @@
 import path from 'node:path';
 import {resolveProvider, providerClient} from '../llm/llm.js';
+import {loadChannel} from '../channel/channel.js';
 import {MODEL, buildPack, loadEpisodeFile, loadTimings, writePack} from './publish.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
@@ -12,7 +13,7 @@ try {
   const {timings, totalSec} = loadTimings(dir);
   let client: any;
   if (await resolveProvider()) client = providerClient();
-  const pack = await buildPack({ep, timings, totalSec, client, model: process.env.DRAFT_MODEL ?? MODEL});
+  const pack = await buildPack({ep, timings, totalSec, client, model: process.env.DRAFT_MODEL ?? MODEL, channel: (() => { try { return loadChannel(ep.channel ?? 'default'); } catch { return undefined; } })()});
   console.log(`PACK_OK ${writePack(dir, pack)}`);
 } catch (e) {
   die(`Publish pack failed: ${(e as Error).message}`);

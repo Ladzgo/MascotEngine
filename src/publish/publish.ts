@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {Episode, type Scene} from '../schema.js';
 import {MODEL} from '../draft/draft.js';
 import {NO_PROVIDER, extractJson, type Client} from '../llm/llm.js';
+import type {Channel} from '../channel/channel.js';
 
 export {MODEL};
 
@@ -12,6 +13,8 @@ export type Pack = {
   titles: string[]; description: string; tags: string[]; chapters: Chapter[];
   thumbnailText: string[]; source: 'ai' | 'fallback';
   uploadNotes?: string[]; // manual YouTube Studio steps (AI disclosure etc.)
+  category?: {id: number; name: string}; // YouTube video category (Studio > Details > Show more)
+  pinnedComment?: string; // post and pin right after publishing
 };
 export type SceneTiming = {index: number; startSec: number};
 
@@ -133,16 +136,42 @@ export function fallbackTags(ep: Episode): string[] {
   return out;
 }
 
-export function fallbackMeta(ep: Episode, totalSec = 0): Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> {
+export type Kind = 'finance' | 'tech' | 'history' | 'generic';
+/** Channel family from its niche text (the presets: finance, tech, history). */
+export const kindOf = (niche = ''): Kind => /finance|money|invest|saving|econom/i.test(niche) ? 'finance' : /tech|software|computer|gadget|\bai\b|internet/i.test(niche) ? 'tech' : /histor|ancient|empire|\bwar\b/i.test(niche) ? 'history' : 'generic';
+const CATEGORY: Record<Kind, {id: number; name: string}> = {finance: {id: 27, name: 'Education'}, tech: {id: 28, name: 'Science & Technology'}, history: {id: 27, name: 'Education'}, generic: {id: 27, name: 'Education'}};
+export const categoryFor = (k: Kind) => CATEGORY[k];
+
+/** Title endings per channel voice: dry maths for finance, "how it works" for tech, story framing for history. */
+const TITLE_TONE: Record<Kind, {pre?: (t: string) => string; post: string[]}> = {
+  finance: {post: ['the maths', 'what the numbers say', 'in plain English']},
+  tech: {pre: t => `How it works: ${t}`, post: ['explained simply', 'what is really happening', 'the simple version']},
+  history: {pre: t => `What really happened: ${t}`, post: ['the real story', 'myth versus evidence', 'what the sources say']},
+  generic: {post: ['explained', 'the short version', 'in plain English']},
+};
+
+/** Pinned-comment text: one question that invites replies, where the sources are, and the finance disclaimer when it applies. */
+export function pinnedComment(ep: Episode, kind: Kind): string {
+  const q: Record<Kind, string> = {
+    finance: 'Which number in this video surprised you most? Tell us below, and what myth should we check next?',
+    tech: 'Which part of this did you not know how it worked? Tell us below, and what should we explain next?',
+    history: 'Which part of this story did you hear differently before? Tell us below, and which period should we cover next?',
+    generic: 'What surprised you most in this video? Tell us below, and what should we cover next?',
+  };
+  return [q[kind], ep.sources.length ? 'Sources are listed in the description.' : '', kind === 'finance' && ep.disclaimer ? DISCLAIMER : ''].filter(Boolean).join('\n\n');
+}
+
+export function fallbackMeta(ep: Episode, totalSec = 0, kind: Kind = 'finance'): Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> {
   const t = ep.title.trim().replace(/[.?!]+$/, '');
   const short = shortTitle(ep.title);
   const bn = ep.scenes.find(s => s.type === 'big_number');
   const num = bn && bn.type === 'big_number' ? `${bn.prefix}${bn.value.toLocaleString('en-US', {maximumFractionDigits: bn.decimals})}${bn.suffix}` : '';
   const mins = Math.max(1, Math.round(totalSec / 60));
-  const cand = [ep.title.trim(),
+  const tone = TITLE_TONE[kind];
+  const cand = [ep.title.trim(), ...(tone.pre ? [tone.pre(t)] : []),
     ...(num && bn?.type === 'big_number' && !/\d/.test(bn.label) ? [`${num} ${bn.label.replace(/\s+/g, ' ').trim().toLowerCase()}: the maths step by step`] : []),
     ...(totalSec >= 90 ? [`${short || t} explained in ${mins} minute${mins > 1 ? 's' : ''}`] : []),
-    `${short || t}: what the numbers say`, `${t} in plain English`, `${t}: the maths`, `${t}: the numbers, explained`];
+    ...tone.post.map(x => `${short || t}: ${x}`), ...tone.post.map(x => `${t}: ${x}`)];
   const titles = [...new Set(cand.map(x => clip(upFirst(x), 100)))].slice(0, 5);
   return {titles, tags: fallbackTags(ep), thumbnailText: fallbackThumbs(ep)};
 }
@@ -154,6 +183,7 @@ export function validatePack(p: Pick<Pack, 'titles' | 'description' | 'tags' | '
   if (Buffer.byteLength(p.description) > 5000) out.push(`description is ${Buffer.byteLength(p.description)} bytes (max 5000)`);
   if (/[<>]/.test(p.description)) out.push('description contains < or > (YouTube rejects them)');
   if (p.tags.join(',').length > 500) out.push('tags exceed 500 characters');
+  if ('pinnedComment' in p && typeof (p as {pinnedComment?: string}).pinnedComment === 'string' && (p as {pinnedComment: string}).pinnedComment.length > 500) out.push('pinned comment is over 500 characters (long pinned comments get collapsed)');
   p.tags.filter(t => t.length > 30).forEach(t => out.push(`tag "${t}" is over 30 chars`));
   const ch = p.chapters;
   if (ch.length) {
@@ -197,8 +227,9 @@ const Meta = z.object({
   if (m.tags.join(',').length > 500) ctx.addIssue({code: 'custom', message: 'tags exceed 500 characters total'});
 });
 
-export function buildSystem(): string {
-  return `You write YouTube packaging for an educational personal-finance explainer channel. Tone: casual, dry, no hype. Titles are specific and honest: no clickbait, no fear-baiting, no guarantees, no advice ("you should buy"), max 100 characters. thumbnailText options have at most 4 words each.
+export function buildSystem(channel?: Channel): string {
+  const voice = channel ? `Channel: ${channel.name} (${channel.niche}). Audience: ${channel.audience}. Voice: ${channel.tone}${channel.bannedTopics.length ? ` Never touch: ${channel.bannedTopics.join(', ')}.` : ''}` : 'Channel: educational explainers. Tone: casual, dry, no hype.';
+  return `You write YouTube packaging for an educational explainer channel. ${voice} Titles are specific and honest: no clickbait, no fear-baiting, no guarantees, no advice ("you should buy"), max 100 characters. thumbnailText options have at most 4 words each.
 Output ONLY one JSON object (no prose, no code fences): {"titles": [5 strings], "tags": [5-15 strings], "thumbnailText": [3 strings]}`;
 }
 
@@ -206,11 +237,11 @@ export function buildUser(ep: Episode): string {
   return `Episode title: ${ep.title}\nHook: ${ep.scenes[0].narration}\nScenes:\n${ep.scenes.map((s, i) => `${i + 1}. [${s.type}] ${s.narration}`).join('\n')}`;
 }
 
-export async function aiMeta(client: Client, ep: Episode, model = MODEL): Promise<z.infer<typeof Meta>> {
+export async function aiMeta(client: Client, ep: Episode, model = MODEL, channel?: Channel): Promise<z.infer<typeof Meta>> {
   const messages: Array<{role: 'user' | 'assistant'; content: string}> = [{role: 'user', content: buildUser(ep)}];
   let errors: string[] = [];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await client.messages.create({model, max_tokens: 2000, system: buildSystem(), messages});
+    const res = await client.messages.create({model, max_tokens: 2000, system: buildSystem(channel), messages});
     const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
     try {
       const r = Meta.safeParse(extractJson(text));
@@ -223,19 +254,20 @@ export async function aiMeta(client: Client, ep: Episode, model = MODEL): Promis
 }
 
 export async function buildPack(o: {
-  ep: Episode; timings: SceneTiming[]; totalSec: number; client?: Client; model?: string; warn?: (m: string) => void;
+  ep: Episode; timings: SceneTiming[]; totalSec: number; client?: Client; model?: string; warn?: (m: string) => void; channel?: Channel;
 }): Promise<Pack> {
+  const kind = kindOf(o.channel?.niche);
   const warn = o.warn ?? console.error;
   const chapters = buildChapters(o.ep.scenes, o.timings, o.totalSec, o.ep.title);
   if (!chapters.length) warn('Warning: video too short for YouTube chapters (need 3 chapters of 10s+); chapters omitted.');
   const description = buildDescription(o.ep, chapters);
-  let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep, o.totalSec);
+  let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep, o.totalSec, kind);
   let source: Pack['source'] = 'fallback';
   if (o.client) {
-    try { meta = await aiMeta(o.client, o.ep, o.model); source = 'ai'; }
+    try { meta = await aiMeta(o.client, o.ep, o.model, o.channel); source = 'ai'; }
     catch (e) { warn(`AI metadata failed, using fallback: ${(e as Error).message}`); }
   } else warn(`${NO_PROVIDER} Using offline fallback titles.`);
-  const pack = fixPack({...meta, description, chapters, source, uploadNotes: UPLOAD_NOTES});
+  const pack = fixPack({...meta, description, chapters, source, uploadNotes: [...UPLOAD_NOTES, 'After publishing, post the text in pinnedComment as the first comment and pin it (Studio > Comments > three dots > Pin).', `Category: ${categoryFor(kind).name} (Studio > Details > Show more).`], category: categoryFor(kind), pinnedComment: pinnedComment(o.ep, kind)});
   validatePack(pack).forEach(m => warn(`Publish pack: ${m}`));
   return pack;
 }

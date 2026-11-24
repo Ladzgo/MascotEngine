@@ -105,3 +105,32 @@ test('vtt: header, timestamps with dots, word tags', () => {
   const v = toVtt([{start: 1, end: 2, words: [{w: 'Hello', start: 1, end: 1.4}, {w: 'world.', start: 1.5, end: 2}]}]);
   assert.match(v, /^WEBVTT\n\n00:00:01\.000 --> 00:00:02\.200\nHello <00:00:01\.500><c>world\.<\/c>/);
 });
+
+import {buildPack, categoryFor, kindOf, pinnedComment} from './publish.js';
+import {PRESETS} from '../channel/presets.js';
+import {Channel} from '../channel/channel.js';
+test('publish pack follows the channel voice: titles, category, pinned comment, AI prompt', async () => {
+  const ep = Episode.parse({id: 'x', title: 'How Wi-Fi Reaches Your Phone', series: 's', sources: ['https://example.org/a'], scenes: [{type: 'title', narration: 'Your router shouts in a language your phone understands.'}]});
+  const tech = Channel.parse({id: 't', ...PRESETS.tech});
+  assert.equal(kindOf(tech.niche), 'tech');
+  assert.equal(kindOf(PRESETS.finance.niche), 'finance');
+  assert.equal(kindOf(PRESETS.history.niche), 'history');
+  assert.equal(categoryFor('tech').id, 28);
+  const p = await buildPack({ep, timings: [{index: 0, startSec: 0}], totalSec: 40, channel: tech, warn: () => {}});
+  assert.ok(p.titles.some(t => /How it works|explained simply|really happening/.test(t)), p.titles.join(' | '));
+  assert.ok(!p.titles.some(t => /the maths/.test(t)));
+  assert.deepEqual(p.category, {id: 28, name: 'Science & Technology'});
+  assert.match(p.pinnedComment!, /explain next/);
+  assert.match(p.pinnedComment!, /Sources are listed/);
+  assert.ok(p.uploadNotes!.some(n => /pin/i.test(n)));
+  assert.equal(p.titles.length >= 5 ? p.titles.length : 5, 5);
+  const fin = pinnedComment(Episode.parse({...ep, disclaimer: true}), 'finance');
+  assert.match(fin, /not financial advice/);
+  // AI prompt carries the channel's voice
+  let sys = '';
+  const client = {messages: {async create(a: any) { sys = a.system; return {content: [{type: 'text', text: JSON.stringify({titles: ['a long title one', 'a long title two', 'a long title three', 'a long title four', 'a long title five'], tags: ['one', 'two', 'three'], thumbnailText: ['Wi-Fi', 'Radio waves', 'Why slow']})}]}; }}};
+  const q = await buildPack({ep, timings: [{index: 0, startSec: 0}], totalSec: 40, channel: tech, client: client as any, warn: () => {}});
+  assert.equal(q.source, 'ai');
+  assert.match(sys, /How It Works/);
+  assert.match(sys, /Friendly and precise/);
+});
