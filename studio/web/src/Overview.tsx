@@ -2,7 +2,7 @@
 import React, {useEffect, useState} from 'react';
 import {ago, api, initial, type ChannelRow, type OverviewRow, type Settings, type Summary} from './api';
 import {Alert, Bulb, Check, Play, Plus} from './icons';
-import {readiness} from './Settings';
+import {readiness, ReadinessPanel} from './Settings';
 import {hashFor, nextStep, setRoute, STEP_LABEL} from './router';
 
 function next(r: OverviewRow, cfg: Settings | null, eps: Summary[]): {text: string; href: string; label: string} {
@@ -15,7 +15,7 @@ const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-
 export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: ChannelRow[]; eps: Summary[]; cfg: Settings | null; onChanged: () => void}) {
   const [rows, setRows] = useState<OverviewRow[] | null>(null), [err, setErr] = useState<string | null>(null);
   const [topic, setTopic] = useState(''), [angle, setAngle] = useState(''), [newId, setNewId] = useState('');
-  const [drafting, setDrafting] = useState(false), [formErr, setFormErr] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false), [stop, setStop] = useState(true), [formErr, setFormErr] = useState<string | null>(null);
   useEffect(() => { api.overview().then(x => setRows(x.channels)).catch(e => setErr(e.message)); }, [eps.length]);
   const warn = cfg ? readiness(cfg, cfg.engine).filter(c => !c.ok) : [];
   const target = ch === 'all' ? chans[0]?.id ?? 'default' : ch;
@@ -33,7 +33,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
   const make = async () => {
     if (!topic.trim() || drafting) return;
     setDrafting(true); setFormErr(null);
-    try { const {id} = await api.makeVideo(topic, angle, target); onChanged(); setRoute({page: 'ep', ep: id, ch: target, step: 'render'}); }
+    try { const {id} = await api.makeVideo(topic, angle, target, stop); onChanged(); setRoute({page: 'ep', ep: id, ch: target, step: 'render'}); }
     catch (x) { setFormErr((x as Error).message); } finally { setDrafting(false); }
   };
   const create = async (e: React.FormEvent) => {
@@ -48,6 +48,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
       {warn.length > 0 && (
         <div className="panel ready-warn"><h2 className="label">Setup needed</h2><ul>{warn.map(c => <li key={c.key}><Alert size={14} /><b>{c.label}</b> {c.fix}</li>)}</ul><p><a className="link" href="#/settings">Open Settings</a></p></div>
       )}
+      <ReadinessPanel onlyMissing />
       <div className="today-grid">
         <section aria-labelledby="t-todo" className="panel today-card">
           <h2 id="t-todo" className="display">Unfinished</h2>
@@ -62,6 +63,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
           <label className="field"><span>From a topic</span><input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. why savings accounts lose to inflation" disabled={drafting} /></label>
           <label className="field"><span>Angle <em>· optional</em></span><input value={angle} onChange={e => setAngle(e.target.value)} disabled={drafting} /></label>
           <div className="row"><button className="btn primary" type="submit" disabled={drafting || !topic.trim() || !!draftBlock}><Play size={15} />{drafting ? 'Drafting… (about a minute)' : 'Draft script'}</button><button type="button" className="btn" onClick={() => void make()} disabled={drafting || !topic.trim() || !!draftBlock} title="Draft, voice and preview in one go (free, local)"><Play size={15} />Make video</button>{draftBlock && <span className="small muted">{draftBlock}</span>}</div>
+          <label className="small" style={{display: 'flex', gap: 8, alignItems: 'center', flexDirection: 'row'}}><input style={{width: 'auto', margin: 0}} type="checkbox" checked={stop} onChange={e => setStop(e.target.checked)} />Stop at preview <span className="muted">{stop ? '(voice, plan, preview)' : '(voice, plan, final render)'}</span></label>
           {formErr && <p className="err-text" role="alert">{formErr}</p>}
           <div className="row blank-ep"><label className="field grow"><span>Or a blank episode</span><input value={newId} onChange={e => setNewId(e.target.value)} placeholder="ep003-topic" /></label><button type="button" className="btn" onClick={create} disabled={!newId.trim()}>Create</button></div>
         </form>

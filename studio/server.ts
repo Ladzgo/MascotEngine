@@ -681,7 +681,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (p[2] === 'shorts' && p[3]) return sendFile(req, res, `${d}build/shorts/${path.basename(p[3])}`);
     }
     if (p[0] === 'make' && m === 'POST') { // one click: draft -> voice -> direct -> preview
-      const b = await body<{topic?: unknown; angle?: unknown; channel?: unknown}>(req);
+      const b = await body<{topic?: unknown; angle?: unknown; channel?: unknown; stopAtPreview?: unknown}>(req);
       const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ') : '';
       const angle = typeof b.angle === 'string' ? b.angle.trim().replace(/[\r\n]+/g, ' ') : '';
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
@@ -689,7 +689,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       needChannel(channel);
       const {id} = await draftEpisode(topic, angle, channel, undefined);
       const engine = String(readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
-      return json(res, 202, {id, jobId: enqueue(id, {stages: ['voice', 'direct', 'preview'], engine}).jobId});
+      return json(res, 202, {id, jobId: enqueue(id, {stages: b.stopAtPreview === false ? ['voice', 'direct', 'final'] : ['voice', 'direct', 'preview'], engine}).jobId});
     }
     if (p[0] === 'draft' && m === 'POST') {
       const b = await body<{topic?: unknown; angle?: unknown; id?: unknown; channel?: unknown}>(req);

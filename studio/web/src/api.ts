@@ -18,6 +18,7 @@ export type Stage = 'voice' | 'direct' | 'preview' | 'final' | 'shorts';
 export type JobState = {id: string; episode: string; status: 'running' | 'done' | 'error' | 'cancelled'; current: Stage | null; done: Stage[]; stages: Stage[]; progress: number; error?: string; log: string[]};
 export type LlmStatus = {phase: 'idle' | 'starting' | 'pulling' | 'ready' | 'error'; model?: string; pct?: number; message?: string; reachable: boolean; models: string[]; chosen: string | null};
 export type Settings = {elevenKeySet: boolean; voiceId: string; model: string; engine: string; ffmpeg: boolean; draftInstalled: boolean; ideasInstalled: boolean; publishInstalled: boolean};
+export type Readiness = {ok: boolean; items: {id: string; label: string; ok: boolean; detail: string; fix: string}[]};
 export type Channel = {id: string; name: string; description: string; niche: string; audience: string; tone: string; language: string; voiceId?: string; bannedTopics: string[]; postingPerWeek: number; createdAt: string};
 export type ChannelRow = Channel & {episodes: number};
 export type Idea = {id: string; title: string; angle: string; hook: string; whyInteresting: string; format: string; difficulty: string; needsSources: string[]; status: 'new' | 'drafted' | 'dismissed'; episodeId?: string; createdAt: string};
@@ -57,7 +58,8 @@ export const api = {
   create: (id: string, channel: string) => call<Summary>('/api/episodes', {method: 'POST', body: JSON.stringify({id, channel})}),
   save: (ep: EpisodeDoc) => call<{ok: boolean}>(`/api/episodes/${ep.id}`, {method: 'PUT', body: JSON.stringify(ep)}),
   generate: (id: string, stages: Stage[], engine: string) => call<{jobId: string}>(`/api/episodes/${id}/generate`, {method: 'POST', body: JSON.stringify({stages, engine})}),
-  makeVideo: (topic: string, angle: string, channel: string) => call<{id: string; jobId: string}>('/api/make', {method: 'POST', body: JSON.stringify({topic, angle, channel})}),
+  makeVideo: (topic: string, angle: string, channel: string, stopAtPreview = true) => call<{id: string; jobId: string}>('/api/make', {method: 'POST', body: JSON.stringify({topic, angle, channel, stopAtPreview})}),
+  readiness: () => call<Readiness>('/api/readiness'),
   makeThumb: (id: string, text?: string) => call<{ok: boolean; at: number}>(`/api/episodes/${id}/thumbnail`, {method: 'POST', body: JSON.stringify({text})}),
   draft: (topic: string, angle: string, channel: string) => call<{id: string}>('/api/draft', {method: 'POST', body: JSON.stringify({topic, angle, channel})}),
   channels: () => call<ChannelRow[]>('/api/channels'),

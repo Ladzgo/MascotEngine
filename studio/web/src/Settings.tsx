@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {api, type LlmStatus, type Settings as S} from './api';
+import {api, type LlmStatus, type Readiness, type Settings as S} from './api';
 import {Check, Alert} from './icons';
 
 export type Check = {key: string; label: string; ok: boolean; fix: string};
@@ -9,6 +9,21 @@ export function readiness(s: S, engine: string): Check[] {
     ...(engine === 'eleven' ? [{key: 'eleven', label: 'ElevenLabs key + voice ID', ok: s.elevenKeySet && !!s.voiceId, fix: 'Add them in Settings'}] : []),
     {key: 'ffmpeg', label: 'ffmpeg', ok: s.ffmpeg, fix: 'Install ffmpeg (brew install ffmpeg)'},
   ];
+}
+
+/** Machine readiness from GET /api/readiness: what is installed, and the command that fixes what is not. */
+export function ReadinessPanel({onlyMissing = false}: {onlyMissing?: boolean}) {
+  const [r, setR] = useState<Readiness | null>(null);
+  useEffect(() => { api.readiness().then(setR).catch(() => setR(null)); }, []);
+  if (!r || (onlyMissing && r.ok)) return null;
+  const items = onlyMissing ? r.items.filter(i => !i.ok) : r.items;
+  return (
+    <div className={onlyMissing ? 'panel ready-warn' : 'ready'} aria-label="Machine readiness">
+      <h2 className="label">{onlyMissing ? 'Missing on this machine' : 'This machine'}</h2>
+      <ul>{items.map(i => <li key={i.id} className={i.ok ? 'ok' : 'bad'}>{i.ok ? <Check size={14} /> : <Alert size={14} />}<b>{i.label}</b><span>{i.ok ? i.detail || 'ready' : i.fix}</span></li>)}</ul>
+      {onlyMissing && <p><a className="link" href="#/settings">Open Settings</a></p>}
+    </div>
+  );
 }
 
 export function Settings({onSaved}: {onSaved: () => void}) {
@@ -26,10 +41,11 @@ export function Settings({onSaved}: {onSaved: () => void}) {
     <form className="settings panel" onSubmit={save}>
       <h1 className="display" tabIndex={-1}>Settings</h1>
       <p className="muted">Stored in the project's <code>.env</code> file. The API key never leaves this computer and is never shown again.</p>
-      <div className="ready" aria-label="Readiness">
+      {readiness(s, engine).some(c => !c.ok) && <div className="ready" aria-label="Readiness">
         <h2 className="label">Readiness</h2>
         <ul>{readiness(s, engine).map(c => <li key={c.key} className={c.ok ? 'ok' : 'bad'}>{c.ok ? <Check size={14} /> : <Alert size={14} />}<b>{c.label}</b><span>{c.ok ? 'ready' : c.fix}</span></li>)}</ul>
-      </div>
+      </div>}
+      <ReadinessPanel />
       <AiPanel />
       <label className="field"><span>Voice engine</span>
         <select value={engine} onChange={e => setEngine(e.target.value)}>
