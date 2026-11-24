@@ -4,7 +4,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
-import {episodeDir, loadEpisode, type Episode} from '../schema.js';
+import {episodeDir, loadEpisode, parseDecisions, type Episode} from '../schema.js';
 import type {Timings} from './tts.js';
 import type {EpisodeDecisions} from '../director/types.js';
 import type {CharacterAssets} from '../character/Mascot.js';
@@ -57,7 +57,7 @@ export async function render(idArg: string, mode: 'preview' | 'final') {
   const dir = episodeDir(ep0.id);
   const {episode: ep, publicDir, cleanup} = withArt(ep0, dir);
   const timings: Timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
-  const decisions: EpisodeDecisions = JSON.parse(fs.readFileSync(`${dir}build/decisions.json`, 'utf8'));
+  const decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8')) as EpisodeDecisions;
   const assets = loadCharacterAssets();
   const fps = 30;
 

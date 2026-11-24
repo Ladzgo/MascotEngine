@@ -35,3 +35,11 @@ test('on-screen numbers come from file', () => {
   assert.ok(ch && ch.type === 'chart');
   assert.equal(ch.chart.values.at(-1), 7441);
 });
+
+test('parseDecisions accepts a director output and rejects overlapping scenes', async () => {
+  const {parseDecisions} = await import('./schema.js');
+  const sc = (i: number, startSec: number) => ({index: i, type: 'talk', layout: 'a', charSide: 'left', pose: 'neutral', camera: 'static', transition: 'cut', startSec, durSec: 2, speechStart: -0.2, speechEnd: 1.5, punchIns: [], sfx: [], elements: []});
+  const d = {episodeId: 'x', seed: 0, accent: 'blue', background: 'plain', captionStyle: 'bar', intro: 'pop', music: {mood: 'calm', track: null}, totalSec: 4, scenes: [sc(0, 0), sc(1, 2)]};
+  assert.equal(parseDecisions(JSON.stringify(d)).scenes.length, 2);
+  assert.throws(() => parseDecisions(JSON.stringify({...d, scenes: [sc(0, 0), sc(1, 1)]})), /before the previous/);
+});

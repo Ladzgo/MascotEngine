@@ -79,3 +79,34 @@ export function loadEpisode(idOrPrefix: string): Episode {
   }
   return ep;
 }
+
+// ---- Unified timeline schema (decisions.json): written by the director and by the clipper, validated before every render.
+const sec = z.number().finite();
+const Hook = z.object({kind: z.enum(['punch_in', 'slow_open']), atSec: sec});
+export const SceneDecisionSchema = z.object({
+  index: z.number().int().min(0), type: z.string(), layout: z.string(), charSide: z.enum(['left', 'right', 'center']), pose: z.string(), camera: z.string(), transition: z.string(),
+  startSec: sec.min(0), durSec: sec.positive(), speechStart: sec, speechEnd: sec,
+  punchIns: z.array(z.object({t: sec, scale: sec.positive(), dur: sec.positive()})),
+  sfx: z.array(z.object({t: sec, kind: z.enum(['pop', 'whoosh', 'tick', 'ding']), variant: z.number().int().min(0)})),
+  hook: Hook.optional(), elements: z.array(sec),
+});
+export const DecisionsSchema = z.object({
+  episodeId: z.string(), seed: z.number(), accent: z.string(),
+  background: z.enum(['plain', 'grid', 'dots', 'vignette']), captionStyle: z.enum(['bar', 'pill', 'outline']), intro: z.enum(['ink_draw', 'pop', 'slide']),
+  music: z.object({mood: z.string(), track: z.string().nullable()}), totalSec: sec.positive(), hook: Hook.optional(),
+  scenes: z.array(SceneDecisionSchema).min(1),
+}).superRefine((d, ctx) => {
+  d.scenes.forEach((s, i) => {
+    const prev = d.scenes[i - 1];
+    if (prev && s.startSec < prev.startSec + prev.durSec - 1e-3) ctx.addIssue({code: 'custom', path: ['scenes', i, 'startSec'], message: 'scene starts before the previous one ends'});
+    if (s.startSec + s.durSec > d.totalSec + 1e-3) ctx.addIssue({code: 'custom', path: ['scenes', i, 'durSec'], message: 'scene runs past totalSec'});
+  });
+});
+export type DecisionsParsed = z.infer<typeof DecisionsSchema>;
+
+/** Parse + validate a decisions.json text; throws one readable error listing every problem. */
+export function parseDecisions(text: string): DecisionsParsed {
+  const r = DecisionsSchema.safeParse(JSON.parse(text));
+  if (!r.success) throw new Error(`Invalid decisions.json:\n- ${r.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('\n- ')}`);
+  return r.data;
+}
