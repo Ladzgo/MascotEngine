@@ -12,6 +12,7 @@ const run = (bin: string, args: string[]) => {
 };
 const hasBin = (b: string) => spawnSync('sh', ['-c', `command -v ${b}`], {stdio: 'ignore'}).status === 0;
 
+const FONT = [process.env.CLIP_FONT, '/System/Library/Fonts/Supplemental/Impact.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'].find(f => f && fs.existsSync(f));
 const AF = 'highpass=f=80';
 const LOUD = 'I=-14:TP=-1.5:LRA=11';
 
@@ -38,7 +39,7 @@ function captionList(clip: Clip, dir: string): string | null {
   ws.forEach((w, i) => {
     const c0 = i - (i % 3), chunk = ws.slice(c0, c0 + 3);
     const img = path.join(dir, `c${i}.png`);
-    const parts = chunk.flatMap((cw, k) => ['(', '-background', 'none', '-fill', c0 + k === i ? '#FFD400' : 'white', '-stroke', 'black', '-strokewidth', '7', '-font', 'Helvetica-Bold', '-pointsize', '84', `label:${cw.w.toUpperCase().replace(/^@/, '\\@')}`, '-bordercolor', 'none', '-border', '12x0', ')']);
+    const parts = chunk.flatMap((cw, k) => ['(', '-background', 'none', '-fill', c0 + k === i ? '#FFD400' : 'white', '-stroke', 'black', '-strokewidth', '7', ...(FONT ? ['-font', FONT] : []), '-pointsize', '84', `label:${cw.w.toUpperCase().replace(/^@/, '\\@')}`, '-bordercolor', 'none', '-border', '12x0', ')']);
     run('magick', [...parts, '+append', '-gravity', 'center', '-background', 'none', '-extent', '1080x260', img]);
     const next = ws[i + 1];
     add(img, (next && next.s - w.e < 0.6 ? next.s : w.e + 0.15) - w.s);

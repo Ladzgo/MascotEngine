@@ -20,11 +20,14 @@
     "ideas": "tsx src/ideas/cli.ts",
     "publish-pack": "tsx src/publish/cli.ts",
     "channel": "tsx src/channel/cli.ts",
-    "art": "tsx src/art/cli.ts"
+    "art": "tsx src/art/cli.ts",
+    "clip": "tsx src/clipper/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",
     "@fontsource/archivo-black": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/poppins": "^5.3.0",
     "@remotion/bundler": "^4.0.546",
     "@remotion/cli": "^4.0.546",
