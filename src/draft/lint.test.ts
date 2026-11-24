@@ -45,3 +45,10 @@ test('repairDraft: timeline and before_after shapes', async () => {
   assert.deepEqual(r.scenes.map((s: any) => s.type), ['timeline', 'talk', 'before_after']);
   assert.ok(Episode.safeParse({id: 'x-1', title: 't', scenes: r.scenes}).success);
 });
+
+test('repairDraft drops placeholder-narration scenes', async () => {
+  const {repairDraft} = await import('./draft.js');
+  const mk = (n: string) => ({type: 'talk', narration: n});
+  const r = repairDraft({scenes: [mk('Hook.'), mk('...'), mk('Real one.'), mk('Another.'), mk('Last.')]});
+  assert.deepEqual(r.scenes.map((s: any) => s.narration), ['Hook.', 'Real one.', 'Another.', 'Last.']);
+});

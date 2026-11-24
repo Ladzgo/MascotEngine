@@ -4,13 +4,15 @@ import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
+import {editPass, fixEpisode} from './editor.js';
+import {isHu} from './lang.js';
 import {sourceFlags} from './lint.js';
 import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
 const {values, positionals} = parseArgs({
   allowPositionals: true,
-  options: {id: {type: 'string'}, angle: {type: 'string'}, dry: {type: 'boolean'}, channel: {type: 'string'}, 'no-punchup': {type: 'boolean'}, 'no-expand': {type: 'boolean'}},
+  options: {id: {type: 'string'}, angle: {type: 'string'}, dry: {type: 'boolean'}, channel: {type: 'string'}, 'no-punchup': {type: 'boolean'}, 'no-expand': {type: 'boolean'}, 'no-edit': {type: 'boolean'}},
 });
 const topic = positionals.join(' ').trim();
 const id = values.id;
@@ -38,7 +40,14 @@ try {
   const ep1 = values['no-expand'] ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const ep1b = values['no-expand'] ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const ep2 = values['no-punchup'] ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL, lang);
-  const ep = ensurePayoff(await criticPass(client, ep2, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)}), lang);
+  const ep3 = await criticPass(client, ep2, {model: process.env.DRAFT_MODEL ?? MODEL, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  // editor pass: grammar/word-form repair with the local model (on by default for Hungarian, DRAFT_EDIT=1 for other languages), then deterministic fixers
+  let ep4 = ep3;
+  if (!values['no-edit'] && (isHu(lang) || process.env.DRAFT_EDIT === '1')) {
+    const r = await editPass(client, ep3, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
+    ep4 = r.ep; console.log(`DRAFT_NOTE editor pass: ${r.changed}/${r.tried} scenes rewritten`);
+  }
+  const ep = ensurePayoff(fixEpisode(ep4, lang), lang);
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);

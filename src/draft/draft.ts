@@ -90,6 +90,9 @@ export function repairDraft(raw: any): any {
     if (sc.emphasis !== undefined && !Array.isArray(sc.emphasis)) sc.emphasis = [str(sc.emphasis)];
     return sc;
   });
+  // a scene with no real narration (placeholder dots) is dropped, never shown; keep the draft if that would leave fewer than 4 scenes
+  const real = raw.scenes.filter((sc: any, i: number) => i === 0 || !/^[.\s…]*$/.test(str(sc.narration)));
+  if (real.length >= 4) raw.scenes = real;
   return raw;
 }
 
