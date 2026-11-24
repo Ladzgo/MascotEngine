@@ -138,3 +138,19 @@ test('captionChunks: <=3 words, contiguous, visible while spoken', () => {
   for (const w of ws) assert.ok(ch.some(c => w.start + 0.1 >= c.from && w.start + 0.1 < c.to), `word at ${w.start} uncovered`);
   for (let i = 1; i < ch.length; i++) assert.ok(ch[i].from >= ch[i - 1].to - 1e-9, 'no overlap');
 });
+
+import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {snapClip} from './snap.js';
+test('snapClip on real audio: cuts land inside the silent gap (1.0-1.6 s)', () => {
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'snap-')), 't.wav');
+  const r = spawnSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=3', '-af', "volume=enable='between(t,1,1.6)':volume=0", f]);
+  assert.equal(r.status, 0);
+  const s = snapClip(f, 0.4, 0.98 + 0.0); // end near the start of the gap
+  assert.ok(s.end >= 1.0 && s.end <= 1.6, `end ${s.end}`);
+  const t = snapClip(f, 1.62, 2.8); // start just after the gap
+  assert.ok(t.start >= 1.0 && t.start <= 1.62, `start ${t.start}`);
+  fs.rmSync(path.dirname(f), {recursive: true, force: true});
+});

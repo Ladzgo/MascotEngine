@@ -4,6 +4,10 @@ Minden parancs a projekt gyökeréből fut (`/…/ytAutomation`). Minden ingyene
 
 ## 1. Telepítés a Linux gépen, internet nélkül
 
+Gyors út: az internetes gépen `npm run bundle`, a Linux gépen `./setup-linux.sh` (részletek és kézi lépések: `docs/OFFLINE.md`). Első smoke teszt: `npm run e2e`.
+
+Kézi út:
+
 Előkészítés egy internetes gépen, aztán másolás (pendrive, `rsync`). A repó: `https://github.com/Ladzgo/MascotEngine`.
 
 1. **Node 20+** és `npm ci`. Ha a célgépen nincs csomagtár, másold át a `node_modules` mappát is.
@@ -13,7 +17,7 @@ Előkészítés egy internetes gépen, aztán másolás (pendrive, `rsync`). A r
 5. **whisper.cpp**: építsd meg a `whisper-cli`-t, tedd a `PATH`-ra, a `ggml-base.en.bin` fájlt másold a `data/models/` mappába (vagy `WHISPER_MODEL=<út>`). Nélküle a szószintű felirat és a Clipper nem működik.
 6. **Szebb hang (opcionális)**: `piper` + `.onnx` hang, `.env`-ben `PIPER_BIN` és `PIPER_MODEL`. Nélküle espeak-ng a hang (gépies, de működik).
 7. **Zene**: a licencelt számok az `assets/music/` mappába kerülnek (a mellékelt hangulat-pad-ek benne vannak).
-8. **Ellenőrzés**: `npm run app`, majd a böngészőben `http://localhost:4177`; a Settings oldal és a `GET /api/readiness` felsorol minden hiányzó dolgot a javítással együtt. SSH-n át: `ssh -L 4177:localhost:4177 gép`.
+8. **Ellenőrzés**: `npm run doctor` (kiír minden hiányzót a javítással), majd `npm run app`, majd a böngészőben `http://localhost:4177`; a Settings oldal és a `GET /api/readiness` felsorol minden hiányzó dolgot a javítással együtt. SSH-n át: `ssh -L 4177:localhost:4177 gép`.
 
 Render-gyorsítás: macOS-en alapból `angle` GL-t használ (2,4-szer gyorsabb előnézet). Linuxon az alap marad; próbáld ki: `RENDER_GL=angle npm run render -- <id>`, és mérd: `npx tsx scripts/qa/benchRender.ts <id> 300`.
 
