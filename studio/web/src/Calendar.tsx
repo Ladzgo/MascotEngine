@@ -3,6 +3,7 @@ import {dataApi, useHashParam, type CalEpisode} from './api-data';
 import {conflicts, dayKey, nextSlots} from './cadence';
 import './data.css';
 import {t, getLang} from './i18n';
+import {Loading} from './Loading';
 
 const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const when = (e: CalEpisode) => (e.status.state === 'published' ? e.status.publishedAt : e.status.state === 'scheduled' ? e.status.scheduledFor : undefined);
@@ -51,7 +52,7 @@ export default function Calendar({ch}: {ch?: string}) {
           <b className="d-month" aria-live="polite">{month.toLocaleString(getLang(), {month: 'long', year: 'numeric'})}</b>
           <button className="btn sm" aria-label={t('Next month')} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>{t('Next')}</button></div></div>
       {err && <div className="alert" role="alert"><span>{err}</span></div>}
-      {!eps ? !err && <p className="muted">{t('Loading…')}</p> : (
+      {!eps ? !err && <Loading /> : (
         <div className="d-cal-wrap">
           <div className="d-cal panel" role="grid" aria-label={t('Month')}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => <div key={w} className="d-dow label" role="columnheader">{t(w)}</div>)}

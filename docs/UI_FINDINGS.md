@@ -12,3 +12,9 @@ Click-through on localhost:4177 (desktop width; the browser tool could not shrin
 6. **Contrast**: muted text `--muted: #8b919b` on `--paper: #0a0b0d` is about 6:1 (fine); on `--paper-3: #181a1e` (chips, Pipeline cards) about 5:1. Raise to `#9aa0aa` for small (12 px) text on cards.
 7. **Calendar**: day cells are empty-looking and the conflict marker "!" inherits `--ink`; colour it: `.d-num b { color: var(--err); }`. Today cell outline is good.
 8. **Settings** panel is 560 px wide but contains the long readiness list; two columns for the list (`.ready ul { columns: 2 }` above 900 px) would shorten the page.
+9. **Loading skeletons need CSS** (`Loading.tsx` emits the classes, no style yet):
+   `.skeleton { background: var(--paper-3); border-radius: 6px; animation: sk 1.2s ease-in-out infinite alternate; } .sk-title { height: 28px; width: 40%; margin: 12px 0; } .sk-row { height: 48px; margin: 8px 0; } @keyframes sk { to { opacity: .45 } } @media (prefers-reduced-motion: reduce) { .skeleton { animation: none } }`. While unstyled the placeholder shows only the "Loading…" text (the bars are empty divs).
+
+Phone width (390 px, checked via same-origin iframes, no horizontal page scroll anywhere; no JS errors on any route):
+10. **Pipeline board**: `.d-col` sections extend past 390 px (the board needs its own horizontal scroll: `.d-board { overflow-x: auto; scroll-snap-type: x mandatory }`, columns `min-width: 78vw`).
+11. **Episode stepper** (`.stp`, `.stp-l`) overflows at 390 px: make the stepper `overflow-x: auto` or hide the labels (`.stp-l { display: none }` below 520 px, keep the numbers).

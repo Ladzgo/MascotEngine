@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {api, type AnalyticsSummary} from './api';
 import {Alert} from './icons';
 import {t as tr} from './i18n';
+import {Loading} from './Loading';
 
 /** What viewers do: retention by scene type and by hook kind, from YouTube Studio exports (npm run analytics). */
 export function Analytics() {
@@ -12,7 +13,7 @@ export function Analytics() {
     <div className="page">
       <div className="page-head"><div><h1 className="display" tabIndex={-1}>{tr('Analytics')}</h1><p className="muted">{tr('Which scene types keep viewers, and which hooks hold them. Needs YouTube Studio exports.')}</p></div></div>
       {err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span></div>}
-      {!s ? <p className="muted" role="status">{tr('Loading…')}</p> : s.withCurve === 0 ? (
+      {!s ? <Loading /> : s.withCurve === 0 ? (
         <section className="panel empty-box" aria-label={tr('How to import')}>
           <h2 className="display">{tr('No retention data yet')}</h2>
           <p>{tr('After a video has been public for a few days, export its numbers from YouTube Studio and import them here.')}</p>

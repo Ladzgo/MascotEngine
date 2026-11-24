@@ -11,6 +11,7 @@ import {ShortcutSheet, useGlobalShortcuts} from './Shortcuts';
 import {TopBar, useJobs} from './TopBar';
 import {PAGE_LABEL, STEP_LABEL, hasPage, nextStep, optionalPages, setRoute, useRoute, type RouteInput} from './router';
 import {t, useLang} from './i18n';
+import {Loading} from './Loading';
 
 // rarely visited pages load on demand (smaller first bundle)
 const lazyNamed = <T extends React.ComponentType<any>>(f: () => Promise<Record<string, unknown>>, n: string) => React.lazy(() => f().then(m => ({default: m[n] as T})));
@@ -97,7 +98,7 @@ export function App() {
   const Queue = useMemo(() => lazyPage('Queue'), []);
 
   const optional = (C: React.LazyExoticComponent<Loaded> | null, name: string, hint: string) => C
-    ? <Boundary name={name}><Suspense fallback={<p className="muted pad" role="status">Loading…</p>}><C ch={route.ch} /></Suspense></Boundary> : <Soon name={name} hint={hint} />;
+    ? <Boundary name={name}><Suspense fallback={<Loading />}><C ch={route.ch} /></Suspense></Boundary> : <Soon name={name} hint={hint} />;
 
   let body: React.ReactNode;
   {
@@ -114,9 +115,9 @@ export function App() {
       case 'clipper': page = <Boundary name="Clipper"><Clipper /></Boundary>; break;
       case 'queue': page = optional(Queue, 'Queue', 'The render queue is being built. The Jobs chip shows the current run.'); break;
       default: page = Workspace && route.ep
-        ? <Boundary name="Episode"><Suspense fallback={<p className="muted pad" role="status">Loading…</p>}><Workspace key={route.ep} id={route.ep} step={route.step} scene={route.scene} onRoute={onRoute} /></Suspense></Boundary> : null;
+        ? <Boundary name="Episode"><Suspense fallback={<Loading />}><Workspace key={route.ep} id={route.ep} step={route.step} scene={route.scene} onRoute={onRoute} /></Suspense></Boundary> : null;
     }
-    body = <main className="main" id="main" tabIndex={-1}>{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<p className="muted pad" role="status">Loading…</p>}>{page}</Suspense></main>;
+    body = <main className="main" id="main" tabIndex={-1}>{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<Loading />}><Boundary name={pageName}>{page}</Boundary></Suspense></main>;
   }
 
   return (

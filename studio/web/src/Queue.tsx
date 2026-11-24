@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {askNotifications, dataApi, useQueueNotifications, type JobBrief} from './api-data';
 import './data.css';
 import {t} from './i18n';
+import {Loading} from './Loading';
 
 const label = (j: JobBrief) => j.stages.join(' > ');
 function Row({j, onCancel, onRetry, busy}: {j: JobBrief; onCancel?: () => void; onRetry?: () => void; busy?: boolean}) {
@@ -32,7 +33,7 @@ export default function Queue() {
       <div className="page-head"><div><h1 ref={h1} tabIndex={-1} className="d-h1">{t('Queue')}</h1><p className="muted">{t('One run at a time; the rest wait here in order.')}</p></div>
         {perm === 'default' && <button className="btn sm" onClick={() => askNotifications().then(() => setPerm(Notification.permission))}>{t('Notify me when runs finish')}</button>}</div>
       {err && <div className="alert" role="alert"><span>{err}</span></div>}
-      {!q ? <p className="muted">Loading…</p> : <>
+      {!q ? <Loading /> : <>
         {empty && <div className="d-empty panel"><p className="muted">{t('Nothing is running or waiting.')}</p><a className="btn primary" href="#/library">{t('Open library to generate')}</a></div>}
         {q.running && <section><h2 className="label">{t('Running')}</h2><ul className="d-jobs"><Row j={q.running} busy={busy} onCancel={() => cancel(q.running!.jobId)} /></ul></section>}
         {q.queued.length > 0 && <section><h2 className="label">{t('Waiting')} ({q.queued.length})</h2><ul className="d-jobs">{q.queued.map(j => <Row key={j.jobId} j={j} busy={busy} onCancel={() => cancel(j.jobId)} />)}</ul></section>}

@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {dataApi, type VersionRow} from './api-data';
 import Compare from './Compare';
 import './data.css';
+import {Loading} from './Loading';
 
 /** Version history for one episode. onRestored: reload the episode in the workspace. */
 export default function Versions({id, onRestored}: {id: string; onRestored?: () => void}) {
@@ -16,7 +17,7 @@ export default function Versions({id, onRestored}: {id: string; onRestored?: () 
   return (
     <div className="d-versions">
       {err && <div className="alert" role="alert"><span>{err}</span></div>}
-      {!rows ? !err && <p className="muted small">Loading…</p> : rows.length === 0 ? <p className="small muted">No earlier versions yet. One is saved each time you edit the script.</p> : (
+      {!rows ? !err && <Loading /> : rows.length === 0 ? <p className="small muted">No earlier versions yet. One is saved each time you edit the script.</p> : (
         <ul className="d-vlist">
           {rows.map(v => (
             <li key={v.id}>

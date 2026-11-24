@@ -3,6 +3,7 @@ import {api, type LlmStatus, type Readiness, type Settings as S} from './api';
 import {Check, Alert} from './icons';
 import {resetOnboarding} from './Onboarding';
 import {t} from './i18n';
+import {Loading} from './Loading';
 
 export type Check = {key: string; label: string; ok: boolean; fix: string};
 /** What is missing before Generate / Draft can work. Voice checks only apply to the ElevenLabs engine. */
@@ -33,7 +34,7 @@ export function Settings({onSaved}: {onSaved: () => void}) {
   const [apiKey, setKey] = useState(''), [voiceId, setVoice] = useState(''), [model, setModel] = useState(''), [engine, setEngine] = useState('say');
   const [msg, setMsg] = useState<{ok: boolean; text: string} | null>(null);
   useEffect(() => { api.settings().then(x => { setS(x); setVoice(x.voiceId); setModel(x.model); setEngine(x.engine); }); }, []);
-  if (!s) return <div className="settings"><h1 className="display" tabIndex={-1}>Settings</h1><p className="muted">Loading…</p></div>;
+  if (!s) return <div className="settings"><h1 className="display" tabIndex={-1}>Settings</h1><Loading /></div>;
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     try { await api.saveSettings({apiKey, voiceId, model, engine}); setKey(''); setS(await api.settings()); setMsg({ok: true, text: 'Saved to .env on this machine.'}); onSaved(); }

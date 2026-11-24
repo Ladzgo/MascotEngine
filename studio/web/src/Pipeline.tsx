@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {dataApi, useHashParam, type Card, type Columns} from './api-data';
 import './data.css';
 import {t} from './i18n';
+import {Loading} from './Loading';
 
 const COLS: {key: keyof Columns; label: string; empty: string; cta: [string, string]}[] = [
   {key: 'idea', label: 'Ideas', empty: 'No open ideas.', cta: ['Get ideas', '#/ideas']},
@@ -22,7 +23,7 @@ export default function Pipeline({ch}: {ch?: string}) {
     <div className="page data-page">
       <div className="page-head"><div><h1 ref={h1} tabIndex={-1} className="d-h1">{t('Pipeline')}</h1><p className="muted">{t('Every idea and episode by stage')}{channel !== 'all' ? ` ${t('in')} ${channel}` : ''}.</p></div></div>
       {err && <div className="alert" role="alert"><span>{err}</span></div>}
-      {!cols ? !err && <p className="muted">{t('Loading…')}</p> : (
+      {!cols ? !err && <Loading /> : (
         <div className="d-board">
           {COLS.map(c => (
             <section key={c.key} className="d-col panel" aria-label={`${c.label}, ${cols[c.key].length}`}>

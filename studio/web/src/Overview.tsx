@@ -5,6 +5,7 @@ import {Alert, Bulb, Check, Play, Plus} from './icons';
 import {readiness, ReadinessPanel} from './Settings';
 import {hashFor, nextStep, setRoute, STEP_LABEL} from './router';
 import {t} from './i18n';
+import {Loading} from './Loading';
 
 function next(r: OverviewRow, cfg: Settings | null, eps: Summary[]): {text: string; href: string; label: string} {
   if (r.unfinished) { const s = eps.find(e => e.id === r.unfinished!.id); return {text: `Finish "${r.unfinished.title}". It has no final render yet.`, href: hashFor({page: 'ep', ep: r.unfinished.id, step: nextStep(s)}), label: 'Open episode'}; }
@@ -80,7 +81,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
           <div className="row blank-ep"><label className="field grow"><span>{t('Or a blank episode')}</span><input value={newId} onChange={e => setNewId(e.target.value)} placeholder="ep003-topic" /></label><button type="button" className="btn" onClick={create} disabled={!newId.trim()}>{t('Create')}</button></div>
         </form>
       </div>
-      {!rows ? <p className="muted">Loading…</p> : (
+      {!rows ? <Loading /> : (
         <ul className="ov">
           {shown.map(r => { const n = next(r, cfg, eps); return (
             <li key={r.channel.id} className={`panel ov-card ${r.channel.id === ch ? 'on' : ''}`}>

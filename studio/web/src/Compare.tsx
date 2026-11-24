@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import './data.css';
+import {Loading} from './Loading';
 
 type Doc = {title: string; scenes: {type: string; narration: string}[]};
 const fetchJson = async (u: string) => { const r = await fetch(u); const j = await r.json(); if (!r.ok) throw new Error(j.error ?? 'Request failed'); return j; };
@@ -13,7 +14,7 @@ export default function Compare({id, versionId, otherVersionId}: {id: string; ve
     (otherVersionId ? fetchJson(`/api/episodes/${id}/versions/${otherVersionId}`).then(v => v.episode) : fetchJson(`/api/episodes/${id}`).then(v => v.episode)).then(setB).catch(e => setErr(e.message));
   }, [id, versionId, otherVersionId]);
   if (err) return <div className="alert" role="alert"><span>{err}</span></div>;
-  if (!a || !b) return <p className="muted small">Loading…</p>;
+  if (!a || !b) return <Loading />;
   const n = Math.max(a.scenes.length, b.scenes.length);
   const changed = Array.from({length: n}, (_, i) => a.scenes[i]?.narration !== b.scenes[i]?.narration || a.scenes[i]?.type !== b.scenes[i]?.type);
   return (

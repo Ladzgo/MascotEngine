@@ -4,6 +4,7 @@ import {dataApi} from './api-data';
 import {Film, Plus} from './icons';
 import {hashFor, nextStep, setRoute, STEP_LABEL, type Route} from './router';
 import {t} from './i18n';
+import {Loading} from './Loading';
 
 const STATUSES: [string, string][] = [['', 'All'], ['draft', 'Draft'], ['rendered', 'Rendered'], ['scheduled', 'Scheduled'], ['published', 'Published']];
 export const statusOf = (e: Summary): string => e.status?.state === 'published' ? 'published' : e.status?.state === 'scheduled' ? 'scheduled' : e.stages.final ? 'rendered' : 'draft';
@@ -75,7 +76,7 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
         </div>
       )}
       {msg && <p className="small" role="status">{msg}</p>}
-      {!loaded ? <p className="muted">Loading…</p> : !rows.length ? (
+      {!loaded ? <Loading /> : !rows.length ? (
         <div className="panel empty-box"><Film size={28} /><h2 className="display">{t(scoped.length ? 'No episodes match' : 'No episodes yet')}</h2>
           <p>{t(scoped.length ? 'Clear the search or pick another status.' : 'Draft one from a topic and it will show up here.')}</p>
           {scoped.length ? <button className="btn" onClick={() => { setQ(''); setRoute({q: '', status: ''}, true); }}>{t('Clear filters')}</button> : <a className="btn primary" href={hashFor({page: 'today', ch})}>Start an episode</a>}
