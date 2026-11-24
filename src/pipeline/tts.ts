@@ -1,4 +1,5 @@
 import {spawnSync} from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {loadChannel} from '../channel/channel.js';
 import {langCode, langInfo} from '../channel/lang.js';
@@ -60,6 +61,15 @@ export class SilentTTS implements TTSAdapter {
     return {engine: this.name, fps: FPS, total: round(t), scenes};
   }
 }
+
+/** Per-scene audio cache: `scene-N.mp3.cache.json` holds a hash of everything that shapes the audio (engine, voice, language, text, aligner) plus the measured duration and word times. TTS_NOCACHE=1 disables. */
+type Cached = {key: string; dur: number; rel: RelWord[]};
+export const audioKey = (...parts: (string | undefined)[]) => crypto.createHash('sha1').update(parts.map(p => p ?? '').join('\u0001')).digest('hex').slice(0, 16);
+function cacheGet(file: string, key: string): Cached | null {
+  if (process.env.TTS_NOCACHE || !fs.existsSync(file)) return null;
+  try { const c = JSON.parse(fs.readFileSync(`${file}.cache.json`, 'utf8')) as Cached; return c.key === key ? c : null; } catch { return null; }
+}
+const cachePut = (file: string, c: Cached) => fs.writeFileSync(`${file}.cache.json`, JSON.stringify(c));
 
 /** The episode's channel language code (en when the channel is unknown). */
 export function episodeLang(ep: Episode): string {
@@ -177,15 +187,20 @@ export class SayTTS implements TTSAdapter {
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`;
       const aiff = `${outDir}audio/scene-${index + 1}.aiff`;
-      const r = spawnSync('say', ['-v', voice, '-o', aiff, '--', s.narration], {encoding: 'utf8'});
-      if (r.error || r.status !== 0) throw new Error(`say failed on scene ${index + 1} (voice "${voice}"): ${(r.stderr || r.error?.message || '').slice(0, 200)}. List voices with: say -v '?'`);
-      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', aiff, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
-      fs.rmSync(aiff, {force: true});
-      if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
-      const dur = probeDuration(file);
-      let rel: RelWord[] = [];
-      if (aligner && lang) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, lang)); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
-      if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
+      const key = audioKey('say', voice, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
+      let dur: number, rel: RelWord[];
+      if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
+        const r = spawnSync('say', ['-v', voice, '-o', aiff, '--', s.narration], {encoding: 'utf8'});
+        if (r.error || r.status !== 0) throw new Error(`say failed on scene ${index + 1} (voice "${voice}"): ${(r.stderr || r.error?.message || '').slice(0, 200)}. List voices with: say -v '?'`);
+        const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', aiff, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
+        fs.rmSync(aiff, {force: true});
+        if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
+        dur = probeDuration(file);
+        rel = [];
+        if (aligner && lang) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, lang)); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
+        if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
+        cachePut(file, {key, dur, rel});
+      }
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
       const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
       scenes.push({index, start: round(t), end: round(end), audioFile: file, words});
@@ -220,15 +235,21 @@ export class CliTTS implements TTSAdapter {
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`;
       const wav = `${outDir}audio/scene-${index + 1}.wav`;
-      const r = this.speak(s.narration, wav, episodeLang(ep));
-      if (r.error || r.status !== 0) throw new Error(`${this.name} failed on scene ${index + 1}: ${(r.stderr || r.error?.message || '').slice(0, 200)}`);
-      const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', wav, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
-      fs.rmSync(wav, {force: true});
-      if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
-      const dur = probeDuration(file);
-      let rel: RelWord[] = [];
-      if (aligner && lang) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, lang)); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
-      if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
+      const L = episodeLang(ep);
+      const key = audioKey(this.name, this.name === 'piper' ? piperModel(L) ?? '' : `${process.env.ESPEAK_VOICE || langInfo(L).espeak}/${process.env.ESPEAK_SPEED || '155'}`, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
+      let dur: number, rel: RelWord[];
+      if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
+        const r = this.speak(s.narration, wav, L);
+        if (r.error || r.status !== 0) throw new Error(`${this.name} failed on scene ${index + 1}: ${(r.stderr || r.error?.message || '').slice(0, 200)}`);
+        const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', wav, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
+        fs.rmSync(wav, {force: true});
+        if (c.error || c.status !== 0) throw new Error(`ffmpeg failed on scene ${index + 1}: ${(c.stderr || c.error?.message || '').slice(0, 200)}`);
+        dur = probeDuration(file);
+        rel = [];
+        if (aligner && lang) { try { rel = mapToNarration(s.narration, runAligner(aligner, file, lang)); } catch (e) { console.warn(`Aligner failed on scene ${index + 1}, using proportional timing: ${(e as Error).message.slice(0, 120)}`); } }
+        if (!rel.length) rel = proportionalWords(s.narration, 0, dur);
+        cachePut(file, {key, dur, rel});
+      }
       const words = rel.map(w => ({w: w.w, start: round(t + w.start), end: round(t + w.end)}));
       const end = Math.max(t + dur + 0.05, t + MIN_SCENE);
       scenes.push({index, start: round(t), end: round(end), audioFile: file, words});

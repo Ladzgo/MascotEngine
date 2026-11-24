@@ -101,3 +101,25 @@ test('Hungarian channel: language, say voice Tünde, espeak -v hu, piper model p
     assert.match(fs.readFileSync(`${bin}/espeak.args`, 'utf8'), /^-v hu /);
   } finally { back3(); }
 });
+
+test('scene audio cache: unchanged scenes are not re-synthesized, an edited sentence is, TTS_NOCACHE disables', async () => {
+  const bin = mockBin('espeak');
+  const calls = () => (fs.existsSync(`${bin}/count`) ? fs.readFileSync(`${bin}/count`, 'utf8').split('\n').filter(Boolean).length : 0);
+  fs.appendFileSync(`${bin}/espeak-ng`, `\necho x >> "${bin}/count"\n`);
+  const back = env({PATH: `${bin}:${process.env.PATH}`, ESPEAK_VOICE: undefined, TTS_NOCACHE: undefined, WHISPER_MODEL: '/nonexistent/m.bin'});
+  try {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tts-')) + '/';
+    const e = ep(3);
+    const t1 = await new CliTTS('espeak-ng').synthesize(e, dir);
+    assert.equal(calls(), 3);
+    const t2 = await new CliTTS('espeak-ng').synthesize(e, dir);
+    assert.equal(calls(), 3, 'second run fully cached');
+    assert.deepEqual(t2.scenes.map(s => [s.start, s.end]), t1.scenes.map(s => [s.start, s.end]));
+    const edited = Episode.parse({...e, scenes: e.scenes.map((s, i) => (i === 1 ? {...s, narration: 'A completely different second sentence.'} : s))});
+    await new CliTTS('espeak-ng').synthesize(edited, dir);
+    assert.equal(calls(), 4, 'only the edited scene was voiced again');
+    process.env.TTS_NOCACHE = '1';
+    await new CliTTS('espeak-ng').synthesize(edited, dir);
+    assert.equal(calls(), 7);
+  } finally { back(); }
+});
