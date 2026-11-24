@@ -29,7 +29,7 @@ export const HU_BANNED = [/garant[áa]l/i, /kock[áa]zatmentes/i, /biztos nyeres
 
 export const HU_TENSION = /(?<![\p{L}])(de|azonban|csapda|hiba|probléma|kockázat|drága|rosszabb|csavar|meglepetés|mítosz|tévedés|valójában)(?![\p{L}])/iu;
 export const HU_NUMBERISH = /\d|(?<![\p{L}])(százalék|dollár|forint|euró|ezer|millió|milliárd|száz|dupla|kétszer|fél)(?![\p{L}])/iu;
-export const HU_PAYOFF = /(?<![\p{L}])(szóval|emlékezz|tanulság|lényeg|legközelebb|kezdd|próbáld|ellenőrizd|nézd meg)(?![\p{L}])/iu;
+export const HU_PAYOFF = /(?<![\p{L}])(szóval|tehát|végül|összefoglalva|ne feledd|jegyezd meg|érdemes|emlékezz|tanuls\p{L}*|lényeg\p{L}*|legközelebb|kezd(?:d|j)\p{L}*|próbál(?:d|j)\p{L}*|ellenőrizd|nézd meg|nézz\p{L}*|számolj\p{L}*|hasonlítsd|kérdezd|olvasd|ne \p{L}+j)(?![\p{L}])/iu;
 
 export const CLOSERS = {
   en: 'The takeaway: check the numbers yourself before you decide.',

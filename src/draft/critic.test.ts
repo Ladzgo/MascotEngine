@@ -23,3 +23,10 @@ test('criticPass rewrites only when digits are unchanged', async () => {
   assert.equal((await criticPass(mk('{"narration":"Here are 5 facts."}'), ep)).scenes[1].narration, 'Here are 5 facts.');
   assert.equal((await criticPass(mk('{"narration":"Here are 6 facts."}'), ep)).scenes[1].narration, ep.scenes[1].narration);
 });
+
+test('Hungarian payoff: inflected and imperative closings are not flagged', () => {
+  const sc = (narration: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration});
+  const ep = (last: string): any => ({scenes: [sc('Kamat.'), sc('De a díj drága.'), sc('Ez 5 százalék.'), sc(last)]});
+  for (const t of ['A tanulsága egyszerű.', 'Érdemes összehasonlítani.', 'Kezdj a díjaknál.', 'Számolj utána!']) assert.ok(!arcGaps(ep(t)).includes('The last scene does not land a takeaway.'), t);
+  assert.ok(arcGaps(ep('Ennyi volt a hitel.')).includes('The last scene does not land a takeaway.'));
+});
