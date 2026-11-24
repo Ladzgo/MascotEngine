@@ -6,3 +6,4 @@ episodes/*/build
 data/models
 .playwright
 .claude/settings.local.json
+data/uploads

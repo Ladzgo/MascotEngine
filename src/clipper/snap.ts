@@ -32,18 +32,18 @@ function quietRuns(rms: number[], thr: number, minFrames: number): [number, numb
 }
 
 /**
- * Move a cut point onto real silence. `kind` 'end': nearest quiet run starting in [t-0.15, t+0.45], cut 70% into it (max 0.25 s of air).
- * 'start': nearest quiet run ending in [t-0.45, t+0.15], cut that much before its end. Unchanged when no silence is found.
+ * Move a cut point onto real silence: the quiet run nearest to `t` (0 distance when it contains t), searched in
+ * [t-0.5, t+0.3] for an end and [t-0.3, t+0.5] for a start. An end lands 70% into the run (max 0.25 s of air),
+ * a start the same amount before the run's end. Unchanged when no silence is found.
  */
 export function snapCut(e: {t0: number; rms: number[]}, t: number, kind: 'start' | 'end'): number {
   const runs = quietRuns(e.rms, quietThreshold(e.rms), 3).map(([a, b]) => [e.t0 + a * FRAME, e.t0 + b * FRAME] as [number, number]);
-  const air = (a: number, b: number) => Math.min(0.25, (b - a) * 0.7);
-  if (kind === 'end') {
-    const r = runs.filter(([a, b]) => b > t - 0.15 && a < t + 0.45).sort((x, y) => Math.abs(Math.max(x[0], t - 0.15) - t) - Math.abs(Math.max(y[0], t - 0.15) - t))[0];
-    return r ? Math.max(r[0], t - 0.15) + air(r[0], r[1]) : t;
-  }
-  const r = runs.filter(([a, b]) => a < t + 0.15 && b > t - 0.45).sort((x, y) => Math.abs(Math.min(x[1], t + 0.15) - t) - Math.abs(Math.min(y[1], t + 0.15) - t))[0];
-  return r ? Math.min(r[1], t + 0.15) - air(r[0], r[1]) : t;
+  const [lo, hi] = kind === 'end' ? [t - 0.5, t + 0.3] : [t - 0.3, t + 0.5];
+  const dist = ([a, b]: [number, number]) => (t < a ? a - t : t > b ? t - b : 0);
+  const r = runs.filter(([a, b]) => b > lo && a < hi).sort((x, y) => dist(x) - dist(y))[0];
+  if (!r) return t;
+  const air = Math.min(0.25, (r[1] - r[0]) * 0.7);
+  return kind === 'end' ? r[0] + air : r[1] - air;
 }
 
 /** Snap both cut points of a clip to silence (audio-based; whisper word times can be contiguous across sentences). */

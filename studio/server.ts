@@ -111,6 +111,21 @@ async function readiness() {
   return {ok: items.every(i => i.ok), items};
 }
 
+
+// ---------- clipper (long video -> 9:16 clips; docs/CLIPPER.md) ----------
+const VIDEO_RE = /\.(mp4|mov|mkv|webm|m4v)$/i;
+const CLIP_OUT = `${ROOT}out/clips/`;
+let clipJob: {status: 'idle' | 'running' | 'done' | 'error'; name?: string; log: string[]; error?: string} = {status: 'idle', log: []};
+const clipSafe = (n: unknown) => typeof n === 'string' && /^[A-Za-z0-9._-]+$/.test(n) && !n.startsWith('.') ? n : null;
+function listClips() {
+  if (!fs.existsSync(CLIP_OUT)) return [];
+  return fs.readdirSync(CLIP_OUT).flatMap(name => {
+    const tl = readJson<{source?: string; clips?: {id: string; start: number; end: number; score: number; reasons: string[]; text: string; file?: string}[]}>(`${CLIP_OUT}${name}/timeline.json`);
+    if (!tl?.clips) return [];
+    return [{name, source: tl.source ?? '', clips: tl.clips.map(c => ({id: c.id, start: c.start, end: c.end, score: c.score, reasons: c.reasons, text: c.text, video: c.file && fs.existsSync(c.file) ? path.basename(c.file) : null}))}];
+  });
+}
+
 // ---------- queue (one job runs, the rest wait) ----------
 const queueClients = new Set<http.ServerResponse>();
 const jobBrief = (j: Job) => ({jobId: j.id, episode: j.episode, stages: j.stages, status: j.status, current: j.current, done: j.done, progress: j.progress, error: j.error, engine: j.engine, createdAt: j.createdAt});
@@ -702,6 +717,36 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     }
     if (await globalDataApi(req, res, url, p, m)) return;
     if (p[0] === 'channels') return await channelApi(req, res, url, p, m);
+    if (p[0] === 'clips' && m === 'GET') {
+      if (!p[1]) return json(res, 200, {job: clipJob, sources: fs.existsSync(`${ROOT}data/uploads`) ? fs.readdirSync(`${ROOT}data/uploads`).filter(f => VIDEO_RE.test(f)) : [], items: listClips()});
+      const name = clipSafe(p[1]), file = clipSafe(p[2]);
+      if (!name || !file || !/\.mp4$/.test(file)) return json(res, 404, {error: 'Not found.'});
+      return sendFile(req, res, `${CLIP_OUT}${name}/${file}`);
+    }
+    if (p[0] === 'clips' && p[1] === 'upload' && m === 'POST') { // raw video body, streamed to data/uploads
+      const name = clipSafe(url.searchParams.get('name'));
+      if (!name || !VIDEO_RE.test(name)) throw new HttpError(400, 'Upload an mp4, mov, mkv, webm or m4v file.');
+      fs.mkdirSync(`${ROOT}data/uploads`, {recursive: true});
+      await new Promise<void>((ok, bad) => { const w = fs.createWriteStream(`${ROOT}data/uploads/${name}`); req.pipe(w); w.on('finish', ok); w.on('error', bad); req.on('error', bad); });
+      return json(res, 201, {name});
+    }
+    if (p[0] === 'clip' && m === 'POST') {
+      if (clipJob.status === 'running') throw new HttpError(409, 'A clip run is already in progress.');
+      if (!scriptInstalled('clip')) throw new HttpError(501, 'npm run clip is not installed.');
+      const b = await body<{path?: unknown; upload?: unknown; min?: unknown; max?: unknown; count?: unknown}>(req);
+      const up = clipSafe(b.upload);
+      const src = up ? `${ROOT}data/uploads/${up}` : typeof b.path === 'string' ? b.path.trim() : '';
+      if (!src) throw new HttpError(400, 'Choose an uploaded video or enter the path of a video file on this computer.');
+      if (!VIDEO_RE.test(src) || !fs.existsSync(src) || !fs.statSync(src).isFile()) throw new HttpError(400, `No video file found at ${src}.`);
+      const num = (v: unknown, d: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(Number(v)) && v !== '' && v !== undefined ? Number(v) : d));
+      const min = num(b.min, 20, 5, 120), max = Math.max(min + 5, num(b.max, 60, 10, 180)), count = Math.round(num(b.count, 5, 1, 10));
+      const name = path.basename(src, path.extname(src));
+      clipJob = {status: 'running', name, log: []};
+      void runNpm(['clip', '--', src, '--min', String(min), '--max', String(max), '--count', String(count)]).then(({code, out}) => {
+        clipJob = code === 0 ? {status: 'done', name, log: out.slice(-30)} : {status: 'error', name, log: out.slice(-30), error: out.filter(l => !l.startsWith('>')).slice(-1)[0] ?? 'Clipper failed.'};
+      });
+      return json(res, 202, {name});
+    }
     if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
     if (p[0] === 'overview' && m === 'GET') return json(res, 200, {channels: overview()});
     if (p[0] === 'jobs' && p[1]) {

@@ -32,7 +32,7 @@ export default function Pipeline({ch}: {ch?: string}) {
                     <li key={`${card.kind}-${card.id}`}>
                       <a className="d-card" href={href(card)}>
                         <b>{card.title}</b>
-                        <span className="small muted">{card.kind === 'idea' ? 'Idea' : `${card.scenes} scenes${card.totalSec ? ` · ${Math.round(card.totalSec)}s` : ''}`}{channel === 'all' ? ` · ${card.channel}` : ''}</span>
+                        <span className="small muted">{card.kind === 'idea' ? 'Idea' : `${card.scenes} ${card.scenes === 1 ? 'scene' : 'scenes'}${card.totalSec ? ` · ${Math.round(card.totalSec)}s` : ''}`}{channel === 'all' ? ` · ${card.channel}` : ''}</span>
                         {card.stale && (card.stale.preview || card.stale.final) && <span className="d-tag stale">Out of date</span>}
                         {card.state === 'scheduled' && card.scheduledFor && <span className="d-tag">Scheduled {card.scheduledFor.slice(0, 10)}</span>}
                       </a>

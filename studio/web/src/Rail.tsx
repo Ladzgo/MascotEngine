@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
-import {Bulb, Film, Gear, Home, Menu, Reel, Tv, X} from './icons';
+import {Bulb, Film, Gear, Home, Menu, Phone, Reel, Tv, X} from './icons';
 import {hashFor, type Page, type Route} from './router';
 
-const MAIN: {page: Page; label: string; Icon: typeof Home}[] = [{page: 'today', label: 'Today', Icon: Home}, {page: 'pipeline', label: 'Pipeline', Icon: Reel}, {page: 'library', label: 'Library', Icon: Film}, {page: 'ideas', label: 'Ideas', Icon: Bulb}];
+const MAIN: {page: Page; label: string; Icon: typeof Home}[] = [{page: 'today', label: 'Today', Icon: Home}, {page: 'pipeline', label: 'Pipeline', Icon: Reel}, {page: 'library', label: 'Library', Icon: Film}, {page: 'ideas', label: 'Ideas', Icon: Bulb}, {page: 'clipper', label: 'Clipper', Icon: Phone}];
 const FOOT: typeof MAIN = [{page: 'channels', label: 'Channels', Icon: Tv}, {page: 'settings', label: 'Settings', Icon: Gear}];
 
 export function Rail({route}: {route: Route}) {
