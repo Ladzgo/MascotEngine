@@ -37,7 +37,8 @@ export default function Calendar({ch}: {ch?: string}) {
   return (
     <div className="page data-page">
       <div className="page-head"><div><h1 ref={h1} tabIndex={-1} className="d-h1">Calendar</h1><p className="muted">Schedule rendered episodes and record what went live.</p></div>
-        <div className="row"><button className="btn sm" onClick={exportIcs} disabled={!scheduled.length} title={scheduled.length ? 'Download scheduled episodes as .ics' : 'Schedule an episode first'}>Export schedule (.ics)</button>
+        <div className="row"><a className="btn sm" href="/api/schedule.csv" download title="Titles, descriptions, tags, files and language of every finished video, Short and clip">Export upload sheet (.csv)</a>
+        <button className="btn sm" onClick={exportIcs} disabled={!scheduled.length} title={scheduled.length ? 'Download scheduled episodes as .ics' : 'Schedule an episode first'}>Export schedule (.ics)</button>
         <button className="btn sm" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>Prev</button>
           <b className="d-month" aria-live="polite">{month.toLocaleString(undefined, {month: 'long', year: 'numeric'})}</b>
           <button className="btn sm" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>Next</button></div></div>

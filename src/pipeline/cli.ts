@@ -9,7 +9,22 @@ const flag = (n: string) => {
   return i >= 0 ? rest[i + 1] ?? true : undefined;
 };
 
+/** `npm run shorts -- --all`: Shorts for every episode that has a final render and none yet. */
+async function allShorts() {
+  const {shorts} = await import('./shorts.js');
+  const root = new URL('../../', import.meta.url).pathname;
+  const ids = fs.readdirSync(`${root}episodes`).filter(d => /^[a-z0-9-]+$/.test(d) && fs.existsSync(`${root}episodes/${d}/build/${d}-final.mp4`) && !fs.existsSync(`${root}episodes/${d}/status.json.archived`));
+  let n = 0;
+  for (const d of ids) {
+    const done = fs.existsSync(`${root}episodes/${d}/build/shorts`) && fs.readdirSync(`${root}episodes/${d}/build/shorts`).some(f => f.endsWith('.mp4'));
+    if (done && !rest.includes('--force')) { console.log(`${d}: shorts exist (use --force to redo)`); continue; }
+    console.log(`${d}: making shorts`); await shorts(d, Number(flag('count') ?? 3)); n++;
+  }
+  console.log(`shorts batch: ${n} episode(s) done, ${ids.length - n} skipped`);
+}
+
 async function main() {
+  if (cmd === 'shorts' && id === '--all') return allShorts();
   if (!cmd || !id) {
     console.error('Usage: <new|tts|direct|render|shorts> <episode-id> [flags]');
     process.exit(1);

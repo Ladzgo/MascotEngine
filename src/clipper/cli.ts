@@ -13,7 +13,24 @@ import {TimelineSchema, WordSchema, type Timeline} from './timeline.js';
 
 function arg(name: string, def: string) { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : def; }
 
+/** `--dir <folder>`: run the clipper on every video in the folder (one child process each, so one bad file does not stop the batch). */
+function batchDir(dir: string) {
+  const vids = fs.readdirSync(dir).filter(f => /\.(mp4|mov|mkv|webm|m4v)$/i.test(f)).sort();
+  if (!vids.length) throw new Error(`no videos in ${dir}`);
+  const pass: string[] = []; const a = process.argv.slice(2);
+  for (let i = 0; i < a.length; i++) { if (a[i] === '--dir') { i++; continue; } if (a[i].startsWith('--')) { pass.push(a[i]); if (a[i + 1] && !a[i + 1].startsWith('--')) pass.push(a[++i]); } }
+  let bad = 0;
+  for (const v of vids) {
+    console.log(`== ${v}`);
+    const r = spawnSync(process.argv[0], [...process.execArgv, process.argv[1], path.join(dir, v), ...pass], {stdio: 'inherit'});
+    if (r.status !== 0) { bad++; console.error(`failed: ${v}`); }
+  }
+  console.log(`clip batch: ${vids.length - bad}/${vids.length} videos done`);
+  if (bad) process.exitCode = 1;
+}
+
 async function main() {
+  if (arg('dir', '')) return batchDir(path.resolve(arg('dir', '')));
   const file = process.argv.slice(2).find(a => !a.startsWith('--') && !/^\d+(\.\d+)?$/.test(a));
   if (!file || !fs.existsSync(file)) throw new Error('usage: npm run clip -- <file> [--min 20 --max 60 --count 5] [--lang auto|hu|en] [--channel <id>] [--words words.json] [--no-render]');
   const min = +arg('min', '20'), max = +arg('max', '60'), count = +arg('count', '5');

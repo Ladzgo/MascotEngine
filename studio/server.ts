@@ -1,6 +1,7 @@
 try { process.loadEnvFile(); } catch { /* .env optional */ }
 import {sceneWords, toVtt} from '../src/publish/subtitles.js';
 import {buildPhrases} from '../src/fx/captions.js';
+import {scheduleRows, toCsv} from '../src/publish/scheduleExport.js';
 import {summarize} from '../src/analytics/summary.js';
 import {checkReadiness} from '../src/doctor/doctor.js';
 import {checkRequest, underRoots} from '../src/guard.js';
@@ -748,6 +749,10 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         clipJob = code === 0 ? {status: 'done', name, log: out.slice(-30)} : {status: 'error', name, log: out.slice(-30), error: out.filter(l => !l.startsWith('>')).slice(-1)[0] ?? 'Clipper failed.'};
       });
       return json(res, 202, {name});
+    }
+    if (p[0] === 'schedule.csv' && m === 'GET') {
+      res.writeHead(200, {'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="schedule.csv"'});
+      return void res.end(toCsv(await scheduleRows(ROOT)));
     }
     if (p[0] === 'analytics' && m === 'GET') return json(res, 200, summarize(ROOT));
     if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
