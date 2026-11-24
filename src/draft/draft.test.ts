@@ -45,10 +45,10 @@ test('autoFix drops banned sentences, forces disclaimer, shortens a long hook', 
   assert.equal(ep.scenes[1].narration, 'Prices rose. Save more.');
 });
 
-test('fails after third invalid output', async () => {
-  const c = mk(['nope', 'still nope', 'nope3']);
+test('fails after fourth invalid output', async () => {
+  const c = mk(['nope', 'still nope', 'nope3', 'nope4']);
   await assert.rejects(draftEpisode({client: c, topic: 't', id: 'ep-test', voice: FALLBACK_VOICE}), /after retry/);
-  assert.equal(c.calls.length, 3);
+  assert.equal(c.calls.length, 4);
 });
 
 test('repairDraft fixes small-model schema drift without inventing numbers', async () => {
