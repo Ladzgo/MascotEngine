@@ -17,7 +17,9 @@ import {randomUUID} from 'node:crypto';
 import {createServer as createVite} from 'vite';
 import {deletePreset, listPresets, savePreset} from '../src/channel/userPresets.js';
 import react from '@vitejs/plugin-react';
+import {z} from 'zod';
 import {Episode} from '../src/schema.js';
+import {ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
 import {ensureOllama, llmSetupState, ollamaReachable, pickModel} from '../src/llm/llm.js';
 
 const ROOT = new URL('../', import.meta.url).pathname;
@@ -37,8 +39,11 @@ const readBody = (req: http.IncomingMessage) => new Promise<string>((ok, bad) =>
   req.on('data', c => { if (over) return; s += c; if (s.length > 5e6) { over = true; bad(new HttpError(413, 'Request body too large.')); req.resume(); } });
   req.on('end', () => { if (!over) ok(s); }); req.on('error', bad);
 });
-const body = async <T = Record<string, unknown>>(req: http.IncomingMessage): Promise<T> => {
-  try { const v = JSON.parse(await readBody(req)); if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object'); return v; } catch (e) { if (e instanceof HttpError) throw e; throw new HttpError(400, 'Request body is not valid JSON.'); }
+const body = async <S extends z.ZodType = z.ZodType<Record<string, unknown>>>(req: http.IncomingMessage, schema?: S): Promise<z.infer<S>> => {
+  let v: unknown;
+  try { v = JSON.parse(await readBody(req)); if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object'); } catch (e) { if (e instanceof HttpError) throw e; throw new HttpError(400, 'Request body is not valid JSON.'); }
+  if (!schema) return v as z.infer<S>;
+  try { return parseBody(v, schema); } catch (e) { throw new HttpError(400, (e as Error).message); }
 };
 const AUDIO_EXT: Record<string, string> = {wav: 'audio/wav', mp3: 'audio/mpeg', m4a: 'audio/mp4'};
 const MAX_AUDIO = 50 * 1024 * 1024;
@@ -425,16 +430,16 @@ async function episodeDataApi(req: http.IncomingMessage, res: http.ServerRespons
   }
   if (p[2] === 'status' && p.length === 3) {
     if (m === 'GET') { json(res, 200, readStatus(id)); return true; }
-    if (m === 'PUT') { const s = checkStatus(await body(req), readStatus(id)); writeStatus(id, s); json(res, 200, s); return true; }
+    if (m === 'PUT') { const s = checkStatus(await body(req, StatusBody), readStatus(id)); writeStatus(id, s); json(res, 200, s); return true; }
   }
   if (p[2] === 'archive' && p.length === 3 && m === 'POST') {
-    const b = await body<{archived?: unknown}>(req).catch(() => ({} as {archived?: unknown}));
+    const b = await body(req, ArchiveBody).catch(() => ({} as z.infer<typeof ArchiveBody>));
     const s = readStatus(id); const archived = b.archived !== false;
     if (archived) s.archived = true; else delete s.archived;
     writeStatus(id, s); json(res, 200, {ok: true, archived}); return true;
   }
   if (p[2] === 'duplicate' && p.length === 3 && m === 'POST') {
-    const b = await body<{id?: unknown}>(req);
+    const b = await body(req, DuplicateBody);
     if (typeof b.id !== 'string' || !ID_RE.test(b.id)) throw new HttpError(400, 'Use lowercase letters, numbers and dashes only.');
     const nd = epDir(b.id);
     if (fs.existsSync(nd)) throw new HttpError(409, `Episode ${b.id} already exists.`);
@@ -472,7 +477,7 @@ async function episodeDataApi(req: http.IncomingMessage, res: http.ServerRespons
   if (p[2] === 'notes' && p.length === 3) {
     if (m === 'GET') { json(res, 200, {notes: readJson<{notes?: unknown}>(`${d}notes.json`)?.notes ?? {}}); return true; }
     if (m === 'PUT') {
-      const b = await body<{notes?: unknown}>(req);
+      const b = await body(req, NotesBody);
       if (!b.notes || typeof b.notes !== 'object' || Array.isArray(b.notes)) throw new HttpError(422, 'notes must be an object of scene index to list of text.');
       const out: Record<string, string[]> = {};
       for (const [k, v] of Object.entries(b.notes)) {
@@ -486,7 +491,7 @@ async function episodeDataApi(req: http.IncomingMessage, res: http.ServerRespons
   if (p[2] === 'scenes' && p[3] && p[4] === 'regenerate' && p.length === 5 && m === 'POST') {
     const n = Number(p[3]), count = sceneCount(d);
     if (!/^\d+$/.test(p[3]) || n < 1 || n > count) throw new HttpError(400, `Scene must be 1 to ${count}.`);
-    const b = await body<{kind?: unknown; confirm?: unknown; engine?: unknown}>(req);
+    const b = await body(req, RegenerateBody);
     const engine = String(b.engine ?? readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
     if (b.kind === 'preview') { const r = enqueue(id, {stages: ['direct', 'preview'], engine}); json(res, 202, r); return true; }
     if (b.kind !== 'voice') throw new HttpError(400, 'kind must be voice or preview.');
@@ -537,7 +542,7 @@ async function globalDataApi(req: http.IncomingMessage, res: http.ServerResponse
   if (p[0] === 'queue') {
     if (p.length === 1 && m === 'GET') { json(res, 200, queueState()); return true; }
     if (p.length === 1 && m === 'POST') {
-      const b = await body<{episode?: unknown; stages?: unknown; engine?: unknown}>(req);
+      const b = await body(req, QueueBody);
       if (typeof b.episode !== 'string') throw new HttpError(400, 'episode is required.');
       json(res, 202, enqueue(b.episode, b)); return true;
     }
@@ -563,7 +568,7 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
   if (p.length === 1) {
     if (m === 'GET') return json(res, 200, listChannels().map(c => ({...c, episodes: episodesOf(c.id).length})));
     if (m === 'POST') {
-      const b = await body(req);
+      const b = await body(req, ChannelBody);
       const id = typeof b.id === 'string' && b.id ? b.id : String(b.name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const dir = chDir(id);
       ensureDefaultChannel();
@@ -579,7 +584,7 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
   if (p.length === 2) {
     if (m === 'GET') return json(res, 200, cur);
     if (m === 'PUT') {
-      const c = checkChannel(await body(req), id, cur.createdAt || new Date().toISOString());
+      const c = checkChannel(await body(req, ChannelBody), id, cur.createdAt || new Date().toISOString());
       fs.writeFileSync(`${dir}channel.json`, JSON.stringify(c, null, 2));
       return json(res, 200, c);
     }
@@ -594,7 +599,7 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
   if (p[2] === 'ideas') {
     if (p.length === 3 && m === 'GET') return json(res, 200, {...readIdeas(id), installed: scriptInstalled('ideas')});
     if (p[3] === 'generate' && p.length === 4 && m === 'POST') {
-      const b = await body<{focus?: unknown; count?: unknown}>(req);
+      const b = await body(req, IdeasGenerateBody);
       const focus = typeof b.focus === 'string' ? b.focus.trim().replace(/[\r\n]+/g, ' ').slice(0, 300) : '';
       const count = b.count === undefined ? 10 : Number(b.count);
       if (!Number.isInteger(count) || count < 1 || count > 20) throw new HttpError(400, 'Count must be a whole number from 1 to 20.');
@@ -614,7 +619,7 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
       return json(res, 200, {id: r.id});
     }
     if (p[3] && p.length === 4 && m === 'PATCH') {
-      const b = await body<{status?: unknown}>(req);
+      const b = await body(req, IdeaStatusBody);
       if (b.status !== 'new' && b.status !== 'dismissed') throw new HttpError(400, 'status must be new or dismissed.');
       const f = readIdeas(id), idea = f.ideas.find(i => i.id === p[3]);
       if (!idea) throw new HttpError(404, 'Idea not found.');
@@ -656,7 +661,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         return json(res, 200, ch === null ? all : all.filter(e => e.channel === ch));
       }
       if (m === 'POST') {
-        const {id, channel = 'default'} = await body<{id?: unknown; channel?: unknown}>(req);
+        const {id, channel = 'default'} = await body(req, NewEpisodeBody);
         if (typeof id !== 'string' || !ID_RE.test(id)) return json(res, 400, {error: 'Use lowercase letters, numbers and dashes only.'});
         needChannel(typeof channel === 'string' ? channel : '');
         const dir = epDir(id);
@@ -707,7 +712,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         res.writeHead(200, {'Content-Type': 'application/zip', 'Content-Length': z.length, 'Content-Disposition': `attachment; filename="${id}.zip"`}); res.end(z); return;
       }
       if (p[2] === 'generate' && m === 'POST') {
-        return json(res, 202, {jobId: enqueue(id, await body(req)).jobId});
+        return json(res, 202, {jobId: enqueue(id, await body(req, GenerateBody)).jobId});
       }
       if (await episodeDataApi(req, res, url, p, m, id, d)) return;
       if (p[2] === 'publish' && p.length === 3) {
@@ -725,7 +730,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         }
       }
       if (p[2] === 'thumbnail' && p.length === 3 && m === 'POST') {
-        const b = await body<{text?: unknown}>(req);
+        const b = await body(req, ThumbBody);
         const text = typeof b.text === 'string' ? b.text.trim().replace(/[\r\n]+/g, ' ').slice(0, 60) : '';
         const {code, out} = await runNpm(['thumbnail', '--', id, ...(text ? ['--text', text] : [])]);
         if (code === 0 && out.some(l => l.startsWith('THUMB_OK'))) return json(res, 200, {ok: true, at: Date.now()});
@@ -742,7 +747,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (p[2] === 'shorts' && p[3]) return sendFile(req, res, `${d}build/shorts/${path.basename(p[3])}`);
     }
     if (p[0] === 'make' && m === 'POST') { // one click: draft -> voice -> direct -> preview
-      const b = await body<{topic?: unknown; angle?: unknown; channel?: unknown; stopAtPreview?: unknown}>(req);
+      const b = await body(req, MakeBody);
       const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ').replace(/^-+\s*/, '') : ''; // a leading dash would be read as a CLI option
       const angle = typeof b.angle === 'string' ? b.angle.trim().replace(/[\r\n]+/g, ' ') : '';
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
@@ -753,7 +758,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return json(res, 202, {id, jobId: enqueue(id, {stages: b.stopAtPreview === false ? ['voice', 'direct', 'final'] : ['voice', 'direct', 'preview'], engine}).jobId});
     }
     if (p[0] === 'draft' && m === 'POST') {
-      const b = await body<{topic?: unknown; angle?: unknown; id?: unknown; channel?: unknown}>(req);
+      const b = await body(req, DraftBody);
       const topic = typeof b.topic === 'string' ? b.topic.trim().replace(/[\r\n]+/g, ' ').replace(/^-+\s*/, '') : ''; // a leading dash would be read as a CLI option
       const angle = typeof b.angle === 'string' ? b.angle.trim().replace(/[\r\n]+/g, ' ') : '';
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
@@ -765,7 +770,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     if (p[0] === 'presets') {
       if (m === 'GET' && p.length === 1) return json(res, 200, listPresets());
       if (m === 'POST' && p.length === 1) { // save a channel's profile as a user preset
-        const b = await body(req), c = needChannel(String(b.channel ?? ''));
+        const b = await body(req, PresetBody), c = needChannel(String(b.channel ?? ''));
         try { return json(res, 201, {id: savePreset(String(b.id ?? ''), c)}); } catch (e) { throw new HttpError(422, (e as Error).message); }
       }
       if (m === 'DELETE' && p.length === 2) { try { deletePreset(p[1]); } catch (e) { throw new HttpError(422, (e as Error).message); } return json(res, 200, {ok: true}); }
@@ -794,7 +799,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     if (p[0] === 'clip' && m === 'POST') {
       if (clipJob.status === 'running') throw new HttpError(409, 'A clip run is already in progress.');
       if (!scriptInstalled('clip')) throw new HttpError(501, 'npm run clip is not installed.');
-      const b = await body<{path?: unknown; upload?: unknown; min?: unknown; max?: unknown; count?: unknown}>(req);
+      const b = await body(req, ClipStartBody);
       const up = clipSafe(b.upload);
       const src = up ? `${ROOT}data/uploads/${up}` : typeof b.path === 'string' ? b.path.trim() : '';
       if (!src) throw new HttpError(400, 'Choose an uploaded video or enter the path of a video file on this computer.');
@@ -842,7 +847,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     if (p[0] === 'settings') {
       if (m === 'GET') { const e = readEnv(); return json(res, 200, {elevenKeySet: !!(e.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY), voiceId: e.ELEVENLABS_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID ?? '', model: e.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2', engine: e.STUDIO_ENGINE ?? 'auto', ffmpeg: await has('ffmpeg'), draftInstalled: draftInstalled(), ideasInstalled: scriptInstalled('ideas'), publishInstalled: scriptInstalled('publish-pack')}); }
       if (m === 'PUT') {
-        const b = await body<Record<string, unknown>>(req); const upd: Record<string, string> = {};
+        const b = await body(req, SettingsBody); const upd: Record<string, string> = {};
         if (typeof b.apiKey === 'string' && b.apiKey.trim()) upd.ELEVENLABS_API_KEY = b.apiKey.trim();
         if (typeof b.llmModel === 'string') upd.OLLAMA_MODEL = b.llmModel.trim();
         if (typeof b.voiceId === 'string') upd.ELEVENLABS_VOICE_ID = b.voiceId.trim();

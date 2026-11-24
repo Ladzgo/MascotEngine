@@ -102,3 +102,14 @@ test('channels keep profile fields (accent, voice, branding); presets list built
     assert.ok(presets.some(p => p.id === 'finance' && p.builtin));
   } finally { await fetch(`${BASE}/api/channels/${id}`, {method: 'DELETE', headers: J}); }
 });
+
+test('POST bodies are schema-validated: wrong types give 400', async () => {
+  const post = (p: string, b: unknown) => fetch(`${BASE}/api${p}`, {method: 'POST', headers: J, body: JSON.stringify(b)});
+  assert.equal((await post('/make', {topic: 5})).status, 400);
+  assert.equal((await post('/draft', {topic: 'x', channel: 7})).status, 400);
+  assert.equal((await post('/channels/default/ideas/generate', {count: 'many'})).status, 400);
+  assert.equal((await post('/channels/default/ideas/generate', {count: 99})).status, 400);
+  assert.equal((await post('/presets', {id: 3})).status, 400);
+  assert.equal((await post('/episodes/none/generate', {stages: 'voice'})).status, 404); // unknown episode checked first
+  assert.equal((await fetch(`${BASE}/api/make`, {method: 'POST', headers: J, body: '[1]'})).status, 400);
+});
