@@ -43,7 +43,7 @@ Scene types (pick what fits the content):
 - compare {narration, emotion, left:{title,value}, right:{title,value}}
 - list {narration, emotion, items: 1-6 strings}
 emotion is one of: neutral, smug, worried, shocked, happy, excited, thinking, explaining, angry, sad, confused, sweating.
-Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact or claim. One clear angle. Every number shown (big_number, chart, or quoted in narration) must come from a real source whose URL is listed in "sources". Never invent URLs or data; if unsure, leave the number out. Never repeat a metaphor, simile, joke or phrase across scenes: each scene brings a fresh image or a plain fact. No guarantees, no advice phrasing. Narration is spoken text: spell out numbers naturally. This is a draft a human will rewrite.`;
+Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact or claim. One clear angle. Every number shown (big_number, chart, or quoted in narration) must come from a real source whose URL is listed in "sources". Never invent URLs or data; if unsure, leave the number out. A big_number scene's "value" must be the exact number its own narration says out loud and must come from a source you list; if you do not know a real figure, write a talk scene instead (a big_number whose value the narration does not say is dropped). Never repeat a metaphor, simile, joke or phrase across scenes: each scene brings a fresh image or a plain fact. No guarantees, no advice phrasing. Narration is spoken text: spell out numbers naturally. This is a draft a human will rewrite.`;
 }
 
 export function buildUser(topic: string, id: string, angle?: string): string {
@@ -64,7 +64,15 @@ export function repairDraft(raw: any): any {
     if (typeof sc.narration !== 'string' || !sc.narration.trim() || /^[.\s…]+$/.test(sc.narration)) sc.narration = str(sc.text ?? sc.script ?? sc.label ?? (Array.isArray(sc.items) ? sc.items.map(str).join('. ') + '.' : '...'));
     if (!['title', 'talk', 'big_number', 'chart', 'compare', 'list'].includes(sc.type)) sc.type = 'talk';
     for (const k of ['left', 'right']) if (sc.type === 'compare') { const x = sc[k] && typeof sc[k] === 'object' ? sc[k] : {}; sc[k] = {title: str(x.title ?? x.label ?? x.name), value: str(x.value ?? x.number ?? x.amount)}; }
-    if (sc.type === 'big_number') { if (typeof sc.value === 'string') sc.value = Number(sc.value.replace(/[^0-9.\-]/g, '')); sc.label = str(sc.label); }
+    if (sc.type === 'big_number') { if (typeof sc.value === 'string') sc.value = parseFloat(sc.value.replace(/[^0-9.\-]/g, '')); sc.label = str(sc.label); }
+    if (sc.type === 'chart') { // rescue flat chart fields; a chart without real data becomes a talk scene (never invented)
+      const c = sc.chart && typeof sc.chart === 'object' ? sc.chart : {kind: sc.kind, labels: sc.labels, values: sc.values, yLabel: sc.yLabel};
+      const vals = Array.isArray(c.values) ? c.values.map((v: unknown) => Number(typeof v === 'string' ? v.replace(/[^0-9.\-]/g, '') : v)) : [];
+      const labels = Array.isArray(c.labels) ? c.labels.map(str) : [];
+      if (labels.length >= 2 && labels.length === vals.length && vals.every(Number.isFinite)) sc.chart = {kind: c.kind === 'bar' ? 'bar' : 'line', labels, values: vals, yLabel: str(c.yLabel)};
+      else { sc.type = 'talk'; delete sc.chart; }
+    }
+    if (sc.type === 'big_number' && !Number.isFinite(sc.value)) sc.type = 'talk';
     if (sc.type === 'list' && Array.isArray(sc.items)) sc.items = sc.items.map(str).filter(Boolean).slice(0, 6);
     if (sc.emphasis !== undefined && !Array.isArray(sc.emphasis)) sc.emphasis = [str(sc.emphasis)];
     return sc;
@@ -72,19 +80,21 @@ export function repairDraft(raw: any): any {
   return raw;
 }
 
-function validate(text: string, id: string, channel?: string): {ep?: Episode; errors: string[]} {
+export type DraftStats = {attempts: number; failures: string[][]; demoted: number};
+function validate(text: string, id: string, channel?: string, stats?: DraftStats): {ep?: Episode; errors: string[]} {
   let raw: any;
   try { raw = extractJson(text); } catch (e) { return {errors: [`Output is not valid JSON: ${(e as Error).message}`]}; }
   if (raw && typeof raw === 'object') { raw.id = id; if (channel) raw.channel = channel; repairDraft(raw); }
   const r = Episode.safeParse(raw);
   if (!r.success) return {errors: r.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)};
   const fixed = autoFixEpisode(r.data);
+  if (stats) stats.demoted += r.data.scenes.filter(x => x.type === 'big_number').length - fixed.scenes.filter(x => x.type === 'big_number').length;
   const errors = lintEpisode(fixed);
   return errors.length ? {errors} : {ep: fixed, errors: []};
 }
 
 export async function draftEpisode(o: {
-  client: Client; topic: string; id: string; angle?: string; voice: string; model?: string; channel?: string; channelContext?: string;
+  client: Client; topic: string; id: string; angle?: string; voice: string; model?: string; channel?: string; channelContext?: string; stats?: DraftStats;
 }): Promise<Episode> {
   const system = buildSystem(o.voice, o.channelContext);
   const messages: Msg[] = [{role: 'user', content: buildUser(o.topic, o.id, o.angle)}];
@@ -95,9 +105,11 @@ export async function draftEpisode(o: {
       const res = await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 8000, system, messages});
       text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
     } catch (e) { last = [`LLM call failed: ${(e as Error).message.slice(0, 160)}`]; if (attempt === 3) break; continue; }
-    const {ep, errors} = validate(text, o.id, o.channel);
+    if (o.stats) o.stats.attempts++;
+    const {ep, errors} = validate(text, o.id, o.channel, o.stats);
     if (ep) return ep;
     last = errors;
+    o.stats?.failures.push(errors);
     const unparsable = errors.length === 1 && errors[0].startsWith('Output is not valid JSON');
     // unusable output: start over with a fresh, clearly worded request instead of piling on a broken reply
     if (unparsable) { messages.splice(0, messages.length, {role: 'user', content: `${buildUser(o.topic, o.id, o.angle)}\nReturn ONLY one complete JSON object, nothing before or after it, and keep it short enough to finish.`}); continue; }

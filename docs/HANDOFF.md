@@ -33,3 +33,6 @@ Project: automated, non-template educational finance YouTube videos (hand-drawn 
 - Multi-agent work is welcome: split by lane with no shared files. Lane A = src/ (pipeline, director, scenes, character; one agent owns package.json), lane B = studio/ + DESIGN.md, lane C = docs/assets/scripts. Never call paid APIs (ElevenLabs/Anthropic) in tests; use mocks or cached audio.
 - Design work follows DESIGN.md (ink on paper, accent via --accent, min 12px, no gradients/glass). Impeccable skill is installed (`/impeccable`).
 - Append to docs/DECISIONS.md with a single append command and keep numbering unique (check the last number first).
+
+## Old episodes
+Old decisions.json (before J-cut, mood music bed, SFX variant memory) still render but look/sound the old way. Refresh with `npm run direct -- <id>` then `npm run render -- <id>` (and `npm run tts -- <id>` if the voice predates silence trimming). Not required.

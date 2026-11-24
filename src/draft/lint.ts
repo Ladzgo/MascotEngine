@@ -37,7 +37,7 @@ export function autoFixEpisode(ep: Episode): Episode {
     }
     return {...s, narration: n};
   }) as Episode['scenes'];
-  return {...ep, scenes, disclaimer: true};
+  return groundNumbers({...ep, scenes, disclaimer: true});
 }
 
 /** Hosts we trust for finance numbers: governments, central banks, statistics offices, international bodies, universities, major wires. */
@@ -73,4 +73,39 @@ export function repeatedPhrases(narrations: string[]): string[] {
     }
   });
   return [...seen].filter(([, v]) => v.size > 1).map(([k]) => k);
+}
+
+const ONES = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(' ');
+const TENS: Record<string, number> = {twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90};
+const SCALE: Record<string, number> = {thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12};
+const lookup = (w: string): number | undefined => (ONES.indexOf(w) >= 0 ? ONES.indexOf(w) : TENS[w]);
+
+/** Every number a listener would hear in a narration: digits ("86,542", "2.5 million") and spelled-out ("one percent", "five hundred thousand"). */
+export function spokenNumbers(text: string): number[] {
+  const out: number[] = [];
+  const t = text.toLowerCase().replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/[$%€£]/g, ' ');
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)(?:\s*(thousand|million|billion|trillion|k)\b)?/g)) out.push(Number(m[1]) * (m[2] ? (m[2] === 'k' ? 1e3 : SCALE[m[2]]) : 1));
+  const toks = t.replace(/(?<=[a-z])-(?=[a-z])/g, ' ').replace(/[^a-z\s]+/g, ' | ').split(/\s+/).filter(Boolean); // '|' = punctuation or digits break a number phrase
+  let total = 0, cur = 0, any = false;
+  const flush = () => { if (any) out.push(total + cur); total = 0; cur = 0; any = false; };
+  for (const w of toks) {
+    const v = lookup(w);
+    if (v !== undefined) { cur += v; any = true; }
+    else if (w === 'hundred' && any) cur = (cur || 1) * 100;
+    else if (SCALE[w] && any) { total += (cur || 1) * SCALE[w]; cur = 0; }
+    else if (w !== 'and' || !any) flush();
+  }
+  flush();
+  return out;
+}
+
+/** A big_number scene must show the number the narration actually says; an invented one (small models do this) is turned into a plain talk scene. */
+export function groundNumbers(ep: Episode): Episode {
+  const scenes = ep.scenes.map(s => {
+    if (s.type !== 'big_number') return s;
+    const heard = spokenNumbers(s.narration);
+    const ok = heard.some(n => Math.abs(n - s.value) <= 1e-9 * Math.max(1, Math.abs(s.value)));
+    return ok ? s : {type: 'talk' as const, narration: s.narration, emotion: s.emotion, emphasis: s.emphasis};
+  }) as Episode['scenes'];
+  return {...ep, scenes};
 }

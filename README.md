@@ -63,3 +63,6 @@ Prepare everything on a machine with internet, then copy it over (the repo is on
 5. Better voice (optional): piper binary + an `.onnx` voice, then `PIPER_BIN` and `PIPER_MODEL` in `.env`. Without it espeak-ng is used.
 6. Music: drop licensed tracks into `assets/music/` (an ambient pad is included).
 7. Check: `npm run app`, then `GET /api/readiness` (Studio server) lists every missing piece with its fix. Over SSH use `ssh -L 4177:localhost:4177 host` and open http://localhost:4177.
+
+## Upgrading old episodes (J-cut, mood music)
+Old `episodes/<id>/build/decisions.json` files predate the J-cut/L-cut offsets (negative `speechStart`), the mood music bed (`music.track`) and the SFX variant memory. They still render, but without those. To refresh one without redrafting: `npm run direct -- <id>` (then `npm run render -- <id>`). Regenerate the voice (`npm run tts -- <id>`) as well if it was made before the silence trimming. Old episodes do not need to be redone.
