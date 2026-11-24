@@ -75,3 +75,12 @@ test('paceOf classifies sentence length', () => {
   const long = 'Inflation is the gradual process by which the general level of prices across the whole economy rises over many months and years, quietly eroding what each unit of currency can buy.';
   assert.equal(paceOf(w(long), 12), 'explain');
 });
+
+test('no picture holds >4.5 s without a motion event; J-cut puts the next voice before the cut', async () => {
+  const d: EpisodeDecisions = JSON.parse(await run());
+  for (const sc of d.scenes) {
+    const ev = [0, ...sc.elements, ...sc.punchIns.map(p => p.t), sc.durSec].filter(x => x >= 0).sort((a, b) => a - b);
+    for (let k = 1; k < ev.length; k++) assert.ok(ev[k] - ev[k - 1] <= 4.5 + 1e-6, `scene ${sc.index} still for ${ev[k] - ev[k - 1]}s`);
+  }
+  assert.ok(d.scenes.slice(1).every(sc => sc.speechStart < 0));
+});

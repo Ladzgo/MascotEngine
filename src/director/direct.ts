@@ -92,6 +92,8 @@ function paceCamera(cam: string, pace: Pace): number {
 }
 const HOOK_EMOTIONS = ['shocked', 'excited'];
 const MIN_TAIL = 0.2;
+const JCUT = 0.3;
+const MAX_STILL = 4.5;
 function fitCamera(cam: string, s: Scene): number {
   if (s.type === 'list' || s.type === 'chart') return cam === 'static' || cam === 'slow_push' ? 1.5 : cam === 'drift' ? 0.4 : 0.8;
   if (s.type === 'compare') return cam === 'static' ? 1.4 : cam.startsWith('pan') ? 0.3 : 0.9;
@@ -229,7 +231,7 @@ export async function direct(idArg: string, opts: {final: boolean}) {
 
     // timing (relative to scene start)
     const speechDur = tm.end - tm.start;
-    const lead = i === 0 ? 0.3 : 0.1;
+    const lead = i === 0 ? 0.3 : 0.1 - JCUT; // J-cut: narration starts JCUT s before the picture cut (the transition midpoint); the tail below pays it back
     const words = tm.words.map(w => ({w: w.w, start: w.start - tm.start + lead, end: w.end - tm.start + lead}));
     const speechEnd = lead + speechDur;
     let elements: number[] = [];
@@ -257,7 +259,8 @@ export async function direct(idArg: string, opts: {final: boolean}) {
       tail *= pace === 'punchy' ? 0.8 : pace === 'explain' ? 1.2 : 1;
     }
     tail = Math.max(tail, MIN_TAIL);
-    const durSec = Math.max(speechEnd + tail, elements.length ? Math.max(...elements) + 0.3 : 0);
+    if (i < ep.scenes.length - 1) tail += JCUT; // next scene's voice starts early, so this scene's picture holds on (L-cut feel)
+    const durSec = Math.max(speechEnd + tail, elements.length ? Math.max(...elements) + 0.3 + (i < ep.scenes.length - 1 ? JCUT : 0) : 0);
 
     // punch-ins: emphasis words + surprising numbers
     const punchIns: SceneDecision['punchIns'] = [];
@@ -279,13 +282,16 @@ export async function direct(idArg: string, opts: {final: boolean}) {
       if (hookSignal && !punchIns.some(p => p.t <= 2)) punchIns.push({t: atSec, scale: 1.14, dur: 0.9});
       hook = {kind: hookSignal ? 'punch_in' : 'slow_open', atSec};
     }
-    // pacing: no scene runs ~6s without a visual change; add soft punch-ins on sentence starts
-    if (durSec > 9) {
-      const starts = words.filter((w, k) => k > 0 && /[.!?]$/.test(words[k - 1].w)).map(w => w.start);
-      for (const t of starts) {
-        const near = punchIns.map(p => p.t).filter(x => Math.abs(x - t) < 4.5);
-        if (!near.length) punchIns.push({t: round(t), scale: 1.07, dur: 0.8});
-      }
+    // pacing: no picture holds more than ~4.5 s without a motion event (scene start, element landing or punch-in): force a soft punch-in in the middle of any longer gap
+    for (let guard = 0; guard < 8; guard++) {
+      const ev = [0, ...elements, ...punchIns.map(p => p.t), durSec].filter(x => x >= 0).sort((a, b) => a - b);
+      let gapAt = -1;
+      for (let k = 1; k < ev.length; k++) if (ev[k] - ev[k - 1] > MAX_STILL) { gapAt = k; break; }
+      if (gapAt < 0) break;
+      const mid = (ev[gapAt] + ev[gapAt - 1]) / 2;
+      const starts = words.filter((w, k) => k > 0 && /[.!?]$/.test(words[k - 1].w)).map(w => w.start).filter(t => t > ev[gapAt - 1] + 1 && t < ev[gapAt] - 1);
+      const t = starts.length ? starts.reduce((b, x) => (Math.abs(x - mid) < Math.abs(b - mid) ? x : b)) : mid;
+      punchIns.push({t: round(t), scale: 1.07, dur: 0.8});
     }
     punchIns.sort((a, b) => a.t - b.t);
 
