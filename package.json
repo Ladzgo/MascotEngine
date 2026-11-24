@@ -15,7 +15,7 @@
     "studio": "remotion studio src/index.ts",
     "app": "tsx studio/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
+    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\" \"studio/*.test.ts\"",
     "draft": "tsx src/draft/cli.ts",
     "ideas": "tsx src/ideas/cli.ts",
     "publish-pack": "tsx src/publish/cli.ts",

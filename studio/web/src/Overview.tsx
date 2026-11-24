@@ -49,6 +49,17 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
         <div className="panel ready-warn"><h2 className="label">Setup needed</h2><ul>{warn.map(c => <li key={c.key}><Alert size={14} /><b>{c.label}</b> {c.fix}</li>)}</ul><p><a className="link" href="#/settings">Open Settings</a></p></div>
       )}
       <ReadinessPanel onlyMissing />
+      {eps.length === 0 && (
+        <section className="panel" aria-label="Getting started">
+          <h2 className="label">Getting started</h2>
+          <ol>
+            <li>Check <a className="link" href="#/settings">Settings</a>: everything under "This machine" should be ready (the free local AI and voice need no keys).</li>
+            <li>Type a topic below and press <b>Make video</b>. It drafts the script, voices it and renders a short preview, all on this computer.</li>
+            <li>Open the episode from the Library to fix the script, then render the final video and the Shorts.</li>
+          </ol>
+          <p className="small muted">No topic in mind? <a className="link" href={hashFor({page: 'ideas', ch})}>Get ideas</a> for this channel.</p>
+        </section>
+      )}
       <div className="today-grid">
         <section aria-labelledby="t-todo" className="panel today-card">
           <h2 id="t-todo" className="display">Unfinished</h2>

@@ -1,6 +1,7 @@
 try { process.loadEnvFile(); } catch { /* .env optional */ }
 import {sceneWords, toVtt} from '../src/publish/subtitles.js';
 import {buildPhrases} from '../src/fx/captions.js';
+import {summarize} from '../src/analytics/summary.js';
 import {checkReadiness} from '../src/doctor/doctor.js';
 import {checkRequest, underRoots} from '../src/guard.js';
 import {friendlyError} from '../src/errors.js';
@@ -748,6 +749,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       });
       return json(res, 202, {name});
     }
+    if (p[0] === 'analytics' && m === 'GET') return json(res, 200, summarize(ROOT));
     if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
     if (p[0] === 'overview' && m === 'GET') return json(res, 200, {channels: overview()});
     if (p[0] === 'jobs' && p[1]) {
@@ -805,4 +807,4 @@ const server = http.createServer((req, res) => {
   vite.middlewares(req, res);
 });
 ensureDefaultChannel();
-server.listen(PORT, '127.0.0.1', () => { console.log(`Mascot Engine Studio: http://localhost:${PORT}`); void ensureOllama().catch(e => console.log(`Local AI: ${(e as Error).message}`)); });
+server.listen(PORT, '127.0.0.1', () => { console.log(`Mascot Engine Studio: http://localhost:${PORT}`); if (!process.env.STUDIO_TEST) void ensureOllama().catch(e => console.log(`Local AI: ${(e as Error).message}`)); });

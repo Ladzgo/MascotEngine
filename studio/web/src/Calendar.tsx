@@ -23,12 +23,22 @@ export default function Calendar({ch}: {ch?: string}) {
     if (!cur) return;
     try { await dataApi.setStatus(cur.id, {state, ...(state === 'scheduled' ? {scheduledFor: new Date(`${date}T09:00`).toISOString()} : {}), ...(state === 'published' && url.trim() ? {youtubeUrl: url.trim()} : {})}); setUrl(''); await load(); } catch (e) { setErr((e as Error).message); }
   };
+  // schedule export: every scheduled episode (current channel scope) as an iCalendar file for any calendar app
+  const scheduled = list.filter(e => e.status.state === 'scheduled' && e.status.scheduledFor);
+  const exportIcs = () => {
+    const z = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const esc = (t: string) => t.replace(/[\\;,]/g, m => `\\${m}`).replace(/\n/g, ' ');
+    const ev = scheduled.map(e => { const s = new Date(e.status.scheduledFor!); return ['BEGIN:VEVENT', `UID:${e.id}@mascot-engine`, `DTSTAMP:${z(new Date())}`, `DTSTART:${z(s)}`, `DTEND:${z(new Date(s.getTime() + 3600e3))}`, `SUMMARY:${esc(`Publish: ${e.title}`)}`, `DESCRIPTION:${esc(`Episode ${e.id}`)}`, 'END:VEVENT'].join('\r\n'); });
+    const blob = new Blob([['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mascot Engine//Schedule//EN', ...ev, 'END:VCALENDAR'].join('\r\n') + '\r\n'], {type: 'text/calendar'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'publishing-schedule.ics'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
   const first = (month.getDay() + 6) % 7, dim = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const cells = Array.from({length: Math.ceil((first + dim) / 7) * 7}, (_, i) => (i < first || i >= first + dim ? null : new Date(month.getFullYear(), month.getMonth(), i - first + 1)));
   return (
     <div className="page data-page">
       <div className="page-head"><div><h1 ref={h1} tabIndex={-1} className="d-h1">Calendar</h1><p className="muted">Schedule rendered episodes and record what went live.</p></div>
-        <div className="row"><button className="btn sm" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>Prev</button>
+        <div className="row"><button className="btn sm" onClick={exportIcs} disabled={!scheduled.length} title={scheduled.length ? 'Download scheduled episodes as .ics' : 'Schedule an episode first'}>Export schedule (.ics)</button>
+        <button className="btn sm" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>Prev</button>
           <b className="d-month" aria-live="polite">{month.toLocaleString(undefined, {month: 'long', year: 'numeric'})}</b>
           <button className="btn sm" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>Next</button></div></div>
       {err && <div className="alert" role="alert"><span>{err}</span></div>}

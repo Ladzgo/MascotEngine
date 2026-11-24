@@ -5,9 +5,9 @@ import {readActive, saveActive, type Summary} from './api';
 export const STEPS = ['script', 'voice', 'visuals', 'render', 'publish'] as const;
 export type Step = (typeof STEPS)[number];
 export const STEP_LABEL: Record<Step, string> = {script: 'Script', voice: 'Voice', visuals: 'Visuals', render: 'Render', publish: 'Publish'};
-export type Page = 'today' | 'pipeline' | 'library' | 'ideas' | 'channels' | 'settings' | 'queue' | 'calendar' | 'clipper' | 'ep';
-export const PAGES: Page[] = ['today', 'pipeline', 'library', 'ideas', 'channels', 'settings', 'queue', 'calendar', 'clipper', 'ep'];
-export const PAGE_LABEL: Record<Page, string> = {today: 'Today', pipeline: 'Pipeline', library: 'Library', ideas: 'Ideas', channels: 'Channels', settings: 'Settings', queue: 'Queue', calendar: 'Calendar', clipper: 'Clipper', ep: 'Episode'};
+export type Page = 'today' | 'pipeline' | 'library' | 'ideas' | 'channels' | 'settings' | 'queue' | 'calendar' | 'clipper' | 'analytics' | 'ep';
+export const PAGES: Page[] = ['today', 'pipeline', 'library', 'ideas', 'channels', 'settings', 'queue', 'calendar', 'clipper', 'analytics', 'ep'];
+export const PAGE_LABEL: Record<Page, string> = {today: 'Today', pipeline: 'Pipeline', library: 'Library', ideas: 'Ideas', channels: 'Channels', settings: 'Settings', queue: 'Queue', calendar: 'Calendar', clipper: 'Clipper', analytics: 'Analytics', ep: 'Episode'};
 
 /** Everything a hash can say. `ch` null = not in URL. */
 export type RouteInput = {page: Page; ch?: string | null; ep?: string; step?: Step; scene?: number; tab?: string; q?: string; status?: string; f?: string; chanId?: string; isNew?: boolean};

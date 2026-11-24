@@ -1,3 +1,4 @@
+import {Analytics} from './Analytics';
 import {Clipper} from './Clipper';
 import React, {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {api, type ChannelRow, type Settings as SettingsT, type Summary} from './api';
@@ -102,6 +103,7 @@ export function App() {
       case 'settings': page = <Settings onSaved={loadCfg} />; break;
       case 'pipeline': page = optional(Pipeline, 'Pipeline', 'The board that shows every episode by stage is being built. Use the Library for now.'); break;
       case 'calendar': page = optional(Calendar, 'Calendar', 'The publishing calendar is being built. Use the Library for now.'); break;
+      case 'analytics': page = <Boundary name="Analytics"><Analytics /></Boundary>; break;
       case 'clipper': page = <Boundary name="Clipper"><Clipper /></Boundary>; break;
       case 'queue': page = optional(Queue, 'Queue', 'The render queue is being built. The Jobs chip shows the current run.'); break;
       default: page = Workspace && route.ep

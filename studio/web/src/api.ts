@@ -21,6 +21,7 @@ export type Settings = {elevenKeySet: boolean; voiceId: string; model: string; e
 export type Readiness = {ok: boolean; items: {id: string; label: string; ok: boolean; required?: boolean; detail: string; fix: string}[]};
 export type ClipItem = {id: string; start: number; end: number; score: number; reasons: string[]; text: string; video: string | null};
 export type ClipsData = {job: {status: 'idle' | 'running' | 'done' | 'error'; name?: string; log: string[]; error?: string}; sources: string[]; items: {name: string; source: string; clips: ClipItem[]}[]};
+export type AnalyticsSummary = {videos: number; withCurve: number; byType: {type: string; scenes: number; avgLossPer10s: number}[]; hooks: {episode: string; kind: string; retentionAfterHook: number}[]; best?: string; worst?: string; note: string};
 export type Channel = {id: string; name: string; description: string; niche: string; audience: string; tone: string; language: string; voiceId?: string; bannedTopics: string[]; postingPerWeek: number; createdAt: string};
 export type ChannelRow = Channel & {episodes: number};
 export type Idea = {id: string; title: string; angle: string; hook: string; whyInteresting: string; format: string; difficulty: string; needsSources: string[]; status: 'new' | 'drafted' | 'dismissed'; episodeId?: string; createdAt: string};
@@ -64,6 +65,7 @@ export const api = {
   clips: () => call<ClipsData>('/api/clips'),
   startClip: (b: {path?: string; upload?: string; min: number; max: number; count: number}) => call<{name: string}>('/api/clip', {method: 'POST', body: JSON.stringify(b)}),
   uploadClipSource: (file: File) => audioCall<{name: string}>(`/api/clips/upload?name=${encodeURIComponent(file.name.replace(/[^A-Za-z0-9._-]+/g, '_'))}`, {method: 'POST', body: file}),
+  analytics: () => call<AnalyticsSummary>('/api/analytics'),
   readiness: () => call<Readiness>('/api/readiness'),
   makeThumb: (id: string, text?: string) => call<{ok: boolean; at: number}>(`/api/episodes/${id}/thumbnail`, {method: 'POST', body: JSON.stringify({text})}),
   draft: (topic: string, angle: string, channel: string) => call<{id: string}>('/api/draft', {method: 'POST', body: JSON.stringify({topic, angle, channel})}),
