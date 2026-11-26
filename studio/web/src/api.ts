@@ -14,6 +14,7 @@ export type Decisions = {accent: string; background: string; captionStyle: strin
 export type Summary = {status?: {state: 'draft' | 'scheduled' | 'published'}; archived?: boolean; channel: string; stale: {preview: boolean; final: boolean}; id: string; title: string; scenes: number; accent: string | null; totalSec: number | null; stages: {voice: boolean; direct: boolean; preview: boolean; final: boolean; shorts: number}};
 export type EpisodeData = {episode: EpisodeDoc; decisions: Decisions | null; variety: string | null; summary: Summary; shorts: string[]; audio: SceneAudio[]};
 export type SceneAudio = {file: string; size: number; source: 'generated' | 'recording'} | null;
+export type DraftStatus = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; jobId?: string; startedAt: number; topic: string};
 export type Stage = 'voice' | 'direct' | 'preview' | 'final' | 'shorts';
 export type JobState = {id: string; episode: string; status: 'running' | 'done' | 'error' | 'cancelled'; current: Stage | null; done: Stage[]; stages: Stage[]; progress: number; error?: string; log: string[]};
 export type LlmStatus = {phase: 'idle' | 'starting' | 'pulling' | 'ready' | 'error'; model?: string; pct?: number; message?: string; reachable: boolean; models: string[]; chosen: string | null};
@@ -62,7 +63,7 @@ export const api = {
   create: (id: string, channel: string) => call<Summary>('/api/episodes', {method: 'POST', body: JSON.stringify({id, channel})}),
   save: (ep: EpisodeDoc) => call<{ok: boolean}>(`/api/episodes/${ep.id}`, {method: 'PUT', body: JSON.stringify(ep)}),
   generate: (id: string, stages: Stage[], engine: string) => call<{jobId: string}>(`/api/episodes/${id}/generate`, {method: 'POST', body: JSON.stringify({stages, engine})}),
-  makeVideo: (topic: string, angle: string, channel: string, stopAtPreview = true, format: 'wide' | 'short' = 'wide') => call<{id: string; jobId: string}>('/api/make', {method: 'POST', body: JSON.stringify({topic, angle, channel, stopAtPreview, format})}),
+  makeVideo: (topic: string, angle: string, channel: string, stopAtPreview = true, format: 'wide' | 'short' = 'wide', engine?: string, model?: string) => call<{id: string; draft: boolean}>('/api/make', {method: 'POST', body: JSON.stringify({topic, angle, channel, stopAtPreview, format, engine, model})}),
   clips: () => call<ClipsData>('/api/clips'),
   startClip: (b: {path?: string; upload?: string; min: number; max: number; count: number}) => call<{name: string}>('/api/clip', {method: 'POST', body: JSON.stringify(b)}),
   uploadClipSource: (file: File) => audioCall<{name: string}>(`/api/clips/upload?name=${encodeURIComponent(file.name.replace(/[^A-Za-z0-9._-]+/g, '_'))}`, {method: 'POST', body: file}),
@@ -82,7 +83,9 @@ export const api = {
   ideas: (ch: string) => call<IdeasData>(`/api/channels/${ch}/ideas`),
   genIdeas: (ch: string, count: number, focus: string) => call<IdeasData>(`/api/channels/${ch}/ideas/generate`, {method: 'POST', body: JSON.stringify({count, focus})}),
   setIdea: (ch: string, id: string, status: 'new' | 'dismissed') => call<Idea>(`/api/channels/${ch}/ideas/${id}`, {method: 'PATCH', body: JSON.stringify({status})}),
-  draftIdea: (ch: string, id: string) => call<{id: string}>(`/api/channels/${ch}/ideas/${id}/draft`, {method: 'POST'}),
+  draftIdea: (ch: string, id: string, format: 'wide' | 'short' = 'wide') => call<{id: string; draft: boolean}>(`/api/channels/${ch}/ideas/${id}/draft`, {method: 'POST', body: JSON.stringify({format})}),
+  draftStatus: (id: string) => call<DraftStatus>(`/api/drafts/${id}`),
+  job: (id: string) => call<JobState>(`/api/jobs/${id}`),
   pack: (id: string) => call<{pack: PublishPack | null}>(`/api/episodes/${id}/publish`),
   makePack: (id: string) => call<{pack: PublishPack}>(`/api/episodes/${id}/publish`, {method: 'POST'}),
   cancel: (jobId: string) => call<{ok: boolean}>(`/api/jobs/${jobId}/cancel`, {method: 'POST'}),

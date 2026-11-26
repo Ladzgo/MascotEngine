@@ -2,8 +2,9 @@ import React, {Suspense, useCallback, useEffect, useMemo, useRef, useState} from
 import {api, type ChannelRow, type Settings as SettingsT, type Summary} from './api';
 import {Alert} from './icons';
 import {Library} from './Library';
-import {Onboarding, needsOnboarding} from './Onboarding';
+import {NewVideo} from './NewVideo';
 import {Overview} from './Overview';
+import {Toasts} from './toast';
 import {Palette} from './Palette';
 import {Rail} from './Rail';
 import {Settings} from './Settings';
@@ -44,6 +45,12 @@ function Soon({name, hint}: {name: string; hint: string}) {
   return <div className="page"><div className="page-head"><div><h1 className="display" tabIndex={-1}>{name}</h1></div></div><div className="panel empty-box"><h2 className="display">{name} is not ready yet</h2><p>{hint}</p><a className="btn primary" href="#/library">Open Library</a></div></div>;
 }
 
+const PURPOSE: Partial<Record<string, string>> = {
+  pipeline: 'See every idea and episode by stage and what each one needs next.', library: 'Every episode in one place: search, filter, open or archive.', ideas: 'Video ideas for a channel. Pick one and the video is made for you.',
+  channels: 'Each channel has its own voice, topics and look.', settings: 'Voice, script model and keys. Defaults work; change only what you need.', queue: 'Renders run one at a time; the rest wait here.',
+  calendar: 'Schedule finished videos and record what went live.', clipper: 'Cut a long video into vertical clips.', analytics: 'What keeps viewers watching, from YouTube Studio exports.',
+};
+
 export function App() {
   const route = useRoute();
   const lang = useLang();
@@ -52,7 +59,6 @@ export function App() {
   const [chans, setChans] = useState<ChannelRow[]>([]);
   const [cfg, setCfg] = useState<SettingsT | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [welcome, setWelcome] = useState(needsOnboarding);
   const [pal, setPal] = useState(false), [help, setHelp] = useState(false);
   const jobs = useJobs();
   const first = useRef(true);
@@ -104,7 +110,8 @@ export function App() {
   {
     let page: React.ReactNode;
     switch (route.page) {
-      case 'today': page = welcome && epsLoaded && eps.length === 0 && chans.length ? <Onboarding chans={chans} onDone={id => { setWelcome(false); changed(); if (id) setRoute({ch: id}); }} /> : <Overview ch={route.ch} chans={chans} eps={eps} cfg={cfg} onChanged={changed} />; break;
+      case 'today': page = <Overview ch={route.ch} chans={chans} eps={eps} cfg={cfg} onChanged={changed} />; break;
+      case 'new': page = <NewVideo ch={route.ch} chans={chans} ep={route.ep} onChanged={changed} />; break;
       case 'library': page = <Library route={route} eps={eps} chans={chans} loaded={epsLoaded} onChanged={changed} />; break;
       case 'ideas': page = <Ideas channel={active} cfg={cfg} chans={chans} f={route.f} />; break;
       case 'channels': page = <Channels route={route} active={route.ch} onPick={onPick} onChanged={changed} />; break;
@@ -117,7 +124,7 @@ export function App() {
       default: page = Workspace && route.ep
         ? <Boundary name="Episode"><Suspense fallback={<Loading />}><Workspace key={route.ep} id={route.ep} step={route.step} scene={route.scene} onRoute={onRoute} /></Suspense></Boundary> : null;
     }
-    body = <main className="main" id="main" tabIndex={-1}>{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<Loading />}><Boundary name={pageName}>{page}</Boundary></Suspense></main>;
+    body = <main className="main" id="main" tabIndex={-1}>{PURPOSE[route.page] && <p className="purpose">{t(PURPOSE[route.page]!)}</p>}{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<Loading />}><Boundary name={pageName}>{page}</Boundary></Suspense></main>;
   }
 
   return (
@@ -128,6 +135,7 @@ export function App() {
       {body}
       <Palette open={pal} onClose={() => setPal(false)} eps={eps} chans={chans} ch={route.ch} onHelp={() => setHelp(true)} />
       <ShortcutSheet open={help} onClose={() => setHelp(false)} />
+      <Toasts />
     </div>
   );
 }

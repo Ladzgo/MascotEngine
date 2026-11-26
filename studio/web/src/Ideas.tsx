@@ -2,6 +2,8 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {api, nice, type Channel, type ChannelRow, type Idea, type IdeasData, type Settings} from './api';
 import {Alert, Bulb, Trash, Undo, Wand} from './icons';
 import {setRoute} from './router';
+import {t} from './i18n';
+import {toast} from './toast';
 
 type Filter = 'new' | 'drafted' | 'dismissed';
 
@@ -11,7 +13,7 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
   const setFilter = (x: Filter) => setRoute({f: x === 'new' ? '' : x}, true);
   const [focus, setFocus] = useState(''), [count, setCount] = useState(10);
   const [gen, setGen] = useState(false), [err, setErr] = useState<string | null>(null);
-  const [work, setWork] = useState<string | null>(null);
+  const [work, setWork] = useState<string | null>(null), [fmt, setFmt] = useState<'short' | 'wide'>('short');
   const id = channel?.id;
   const load = useCallback(() => { if (id) api.ideas(id).then(setData).catch(e => setErr(e.message)); }, [id]);
   useEffect(() => { setData(null); setErr(null); load(); }, [load]);
@@ -29,18 +31,23 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
     setWork(i.id); setErr(null);
     try { await f(); load(); } catch (x) { setErr((x as Error).message); } finally { setWork(null); }
   };
-  const draft = async (i: Idea) => { setWork(i.id); setErr(null); try { const r = await api.draftIdea(channel.id, i.id); try { sessionStorage.setItem('studio.drafted', r.id); } catch { /* blocked */ } setRoute({page: 'ep', ep: r.id}); } catch (x) { setErr((x as Error).message); setWork(null); } };
+  const draft = async (i: Idea) => {
+    setWork(i.id); setErr(null);
+    try { const r = await api.draftIdea(channel.id, i.id, fmt); toast(t('Started. Your video is being made.')); setRoute({page: 'new', ep: r.id, ch: channel.id}); } // the draft runs in the background; the progress page shows each step
+    catch (x) { setErr((x as Error).message); toast((x as Error).message, 'bad'); setWork(null); }
+  };
 
   const ideas = data?.ideas ?? [];
   const n = (s: Filter) => ideas.filter(i => i.status === s).length;
   const shown = ideas.filter(i => i.status === filter);
   return (
     <div className="page">
-      <div className="page-head"><div><h1 className="display" tabIndex={-1}>Ideas</h1><p className="muted">Video ideas for {channel.name}. Pick one and the script is drafted for you.</p></div></div>
+      <div className="page-head"><div><h1 className="display" tabIndex={-1}>Ideas</h1><p className="muted">Video ideas for {channel.name}. Pick one and the video is made for you.</p></div></div>
       <form className="panel idea-gen" onSubmit={run}>
         <label className="field grow"><span>Focus <em>· optional</em></span><input value={focus} onChange={e => setFocus(e.target.value)} placeholder="e.g. mortgage myths, or what happened this month" disabled={gen} maxLength={300} /></label>
         <label className="field cnt"><span>How many</span><input type="number" min={1} max={20} value={count} onChange={e => setCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))} className="num" disabled={gen} /></label>
-        <button className="btn primary" type="submit" disabled={gen || !!block}><Wand size={16} />{gen ? 'Thinking… (about a minute)' : 'Generate ideas'}</button>
+        <label className="field cnt"><span>{t('Format')}</span><select value={fmt} onChange={e => setFmt(e.target.value as 'short' | 'wide')}><option value="short">{t('Short')} 9:16</option><option value="wide">{t('Long')} 16:9</option></select></label>
+        <button className={`btn ${shown.length ? '' : 'primary'}`} type="submit" disabled={gen || !!block}><Wand size={16} />{gen ? 'Thinking… (about a minute)' : 'Generate ideas'}</button>
         {block && <p className="hint idea-block"><Alert size={13} />{block}</p>}
       </form>
       {err && <div className="alert" role="alert"><Alert size={18} /><span className="pre">{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}
@@ -65,7 +72,7 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
               <div className="chips">{i.format && <i>{nice(i.format)}</i>}{i.difficulty && <i>{nice(i.difficulty)}</i>}</div>
               {i.needsSources.length > 0 && <div className="small"><b>Needs sources</b><ul className="src">{i.needsSources.map((s, k) => <li key={k}>{s}</li>)}</ul></div>}
               <div className="row idea-actions">
-                {i.status === 'new' && <><button className="btn primary sm" disabled={work !== null} onClick={() => draft(i)}><Wand size={15} />{work === i.id ? 'Drafting…' : 'Draft script'}</button><button className="btn ghost sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'dismissed'))}><Trash size={15} />Dismiss</button></>}
+                {i.status === 'new' && <><button className="btn primary sm" disabled={work !== null} onClick={() => draft(i)}><Wand size={15} />{work === i.id ? t('Starting…') : t('Make video')}</button><button className="btn ghost sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'dismissed'))}><Trash size={15} />Dismiss</button></>}
                 {i.status === 'drafted' && (i.episodeId ? <a className="btn sm" href={`#/ep/${i.episodeId}?ch=${channel.id}`}>Open episode</a> : <span className="muted small">Drafted</span>)}
                 {i.status === 'dismissed' && <button className="btn sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'new'))}><Undo size={15} />Restore</button>}
               </div>

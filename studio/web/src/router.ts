@@ -5,9 +5,9 @@ import {readActive, saveActive, type Summary} from './api';
 export const STEPS = ['script', 'voice', 'visuals', 'render', 'publish'] as const;
 export type Step = (typeof STEPS)[number];
 export const STEP_LABEL: Record<Step, string> = {script: 'Script', voice: 'Voice', visuals: 'Visuals', render: 'Render', publish: 'Publish'};
-export type Page = 'today' | 'pipeline' | 'library' | 'ideas' | 'channels' | 'settings' | 'queue' | 'calendar' | 'clipper' | 'analytics' | 'ep';
-export const PAGES: Page[] = ['today', 'pipeline', 'library', 'ideas', 'channels', 'settings', 'queue', 'calendar', 'clipper', 'analytics', 'ep'];
-export const PAGE_LABEL: Record<Page, string> = {today: 'Today', pipeline: 'Pipeline', library: 'Library', ideas: 'Ideas', channels: 'Channels', settings: 'Settings', queue: 'Queue', calendar: 'Calendar', clipper: 'Clipper', analytics: 'Analytics', ep: 'Episode'};
+export type Page = 'today' | 'pipeline' | 'library' | 'ideas' | 'channels' | 'settings' | 'queue' | 'calendar' | 'clipper' | 'analytics' | 'new' | 'ep';
+export const PAGES: Page[] = ['today', 'pipeline', 'library', 'ideas', 'channels', 'settings', 'queue', 'calendar', 'clipper', 'analytics', 'new', 'ep'];
+export const PAGE_LABEL: Record<Page, string> = {new: 'New video', today: 'Today', pipeline: 'Pipeline', library: 'Library', ideas: 'Ideas', channels: 'Channels', settings: 'Settings', queue: 'Queue', calendar: 'Calendar', clipper: 'Clipper', analytics: 'Analytics', ep: 'Episode'};
 
 /** Everything a hash can say. `ch` null = not in URL. */
 export type RouteInput = {page: Page; ch?: string | null; ep?: string; step?: Step; scene?: number; tab?: string; q?: string; status?: string; f?: string; chanId?: string; isNew?: boolean};
@@ -21,6 +21,7 @@ export function parseHash(hash: string): Route {
   let page: Page = (PAGES as string[]).includes(seg[0]) && seg[0] !== 'ep' ? (seg[0] as Page) : 'today';
   let ep: string | undefined, step: Step | undefined, chanId: string | undefined;
   if (seg[0] === 'ep' && seg[1] && ID.test(seg[1])) { page = 'ep'; ep = seg[1]; if ((STEPS as readonly string[]).includes(seg[2])) step = seg[2] as Step; }
+  if (seg[0] === 'new' && seg[1] && ID.test(seg[1])) ep = seg[1];
   if (page === 'channels' && seg[1] && ID.test(seg[1])) chanId = seg[1];
   const chRaw = p.get('ch');
   const sc = p.get('scene');
@@ -28,7 +29,7 @@ export function parseHash(hash: string): Route {
 }
 
 export function hashFor(r: RouteInput): string {
-  const path = r.page === 'ep' && r.ep ? `/ep/${r.ep}${r.step ? `/${r.step}` : ''}` : r.page === 'channels' && r.chanId ? `/channels/${r.chanId}` : `/${r.page === 'ep' ? 'library' : r.page}`;
+  const path = r.page === 'ep' && r.ep ? `/ep/${r.ep}${r.step ? `/${r.step}` : ''}` : r.page === 'new' ? `/new${r.ep ? `/${r.ep}` : ''}` : r.page === 'channels' && r.chanId ? `/channels/${r.chanId}` : `/${r.page === 'ep' ? 'library' : r.page}`;
   const q = new URLSearchParams();
   if (r.ch) q.set('ch', r.ch);
   if (r.scene !== undefined) q.set('scene', String(r.scene));
