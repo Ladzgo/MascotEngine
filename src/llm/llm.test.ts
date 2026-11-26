@@ -87,3 +87,16 @@ test('groq and openrouter: OpenAI format, bearer key, json mode, testProvider ne
     assert.equal((await testProvider('bogus')).ok, false);
   } finally { restore(); }
 });
+
+test('groq: a 429 on one model (per-model daily quota) falls through to the next ranked model', async () => {
+  const used: string[] = [];
+  mockFetch((u, init) => {
+    if (u.endsWith('/models')) return j({data: [{id: 'openai/gpt-oss-120b'}, {id: 'qwen/qwen3-32b'}]});
+    const model = JSON.parse(init.body).model; used.push(model);
+    return model.includes('gpt-oss') ? j({}, 429) : j({choices: [{message: {content: 'next'}}]});
+  });
+  try {
+    assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'groq', GROQ_API_KEY: 'gsk_fb', LLM_RETRY_MS: '1'}}), 'next');
+    assert.deepEqual([...new Set(used)], ['openai/gpt-oss-120b', 'qwen/qwen3-32b']);
+  } finally { restore(); }
+});

@@ -157,33 +157,37 @@ const OPENAI_COMPAT = {
   groq: {url: 'https://api.groq.com/openai/v1/chat/completions', key: 'GROQ_API_KEY', model: 'GROQ_MODEL', def: 'openai/gpt-oss-120b', name: 'Groq'},
   openrouter: {url: 'https://openrouter.ai/api/v1/chat/completions', key: 'OPENROUTER_API_KEY', model: 'OPENROUTER_MODEL', def: 'meta-llama/llama-3.3-70b-instruct:free', name: 'OpenRouter'},
 } as const;
-/** Models come and go on free tiers: take the first preferred one the key can really use (cached per process). */
-const picked = new Map<string, string | undefined>();
-async function pickOpenAiModel(p: keyof typeof OPENAI_COMPAT, key: string): Promise<string | undefined> {
-  if (p !== 'groq') return undefined; // OpenRouter ids are stable enough; shortcut: extend when a :free id breaks
-  if (picked.has(p)) return picked.get(p);
-  let id: string | undefined;
+/** Models come and go on free tiers, and Groq counts the daily quota per model: rank the usable ones (cached per process). */
+const ranked = new Map<string, string[]>();
+async function rankOpenAiModels(p: keyof typeof OPENAI_COMPAT, key: string): Promise<string[]> {
+  if (p !== 'groq') return []; // OpenRouter ids are stable enough; shortcut: extend when a :free id breaks
+  if (ranked.has(p)) return ranked.get(p)!;
+  let out: string[] = [];
   try {
     const r = await fetch(OPENAI_COMPAT[p].url.replace('/chat/completions', '/models'), {headers: {Authorization: `Bearer ${key}`}, signal: AbortSignal.timeout(15000)});
-    const ids: string[] = ((await r.json()) as any).data?.filter((m: any) => m.active !== false && (m.output_modalities ?? ['text']).includes('text')).map((m: any) => m.id) ?? [];
-    id = ['gpt-oss-120b', 'llama-3.3-70b', 'qwen', 'gpt-oss-20b', 'llama'].map(k => ids.find(i => i.includes(k))).find(Boolean);
+    const ids: string[] = ((await r.json()) as any).data?.filter((m: any) => m.active !== false && (m.output_modalities ?? ['text']).includes('text') && !/whisper|guard|tts|allam/.test(m.id)).map((m: any) => m.id) ?? [];
+    out = [...new Set(['gpt-oss-120b', 'llama-3.3-70b', 'qwen', 'gpt-oss-20b', 'llama'].flatMap(k => ids.filter(i => i.includes(k))))];
   } catch { /* fall back to the default */ }
-  picked.set(p, id);
-  return id;
+  ranked.set(p, out);
+  return out;
 }
 /** Groq (gsk_ keys, free tier) and OpenRouter speak the OpenAI chat format. */
 async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
   const c = OPENAI_COMPAT[p], key = env[c.key]?.trim();
   if (!key) throw new Error(`${c.key} is missing (only needed when LLM_PROVIDER=${p}).`);
-  const model = env[c.model]?.trim() || await pickOpenAiModel(p, key) || c.def;
-  const body = JSON.stringify({model, temperature: 0.6, max_tokens: 4096, ...(json ? {response_format: {type: 'json_object'}} : {}), messages: [{role: 'system', content: system}, ...messages]});
+  const forced = env[c.model]?.trim();
+  const models = forced ? [forced] : [...(await rankOpenAiModels(p, key)), c.def].filter((m, i, a) => a.indexOf(m) === i);
   let res: Response | undefined;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    res = await fetch(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`}, body, signal: AbortSignal.timeout(120000)});
-    if (res.status !== 429) break;
-    if (attempt === 0) await sleep(Number(env.LLM_RETRY_MS ?? 5000));
+  for (const model of models) {
+    const body = JSON.stringify({model, temperature: 0.6, max_tokens: 4096, ...(json ? {response_format: {type: 'json_object'}} : {}), messages: [{role: 'system', content: system}, ...messages]});
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await fetch(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`}, body, signal: AbortSignal.timeout(120000)});
+      if (res.status !== 429) break;
+      if (attempt === 0) await sleep(Number(env.LLM_RETRY_MS ?? 5000));
+    }
+    if (res!.status !== 429) break; // 429 on this model: its quota is used up, try the next one
   }
-  if (res!.status === 429) throw new Error(`${c.name} free quota reached, try later`);
+  if (res!.status === 429) throw new Error(`${c.name} free quota reached for every model, try later`);
   if (res!.status === 401 || res!.status === 403) throw new Error(`${c.name} rejected the key (HTTP ${res!.status}). Check it is copied completely.`);
   if (!res!.ok) throw new Error(`${c.name} HTTP ${res!.status}: ${(await res!.text()).slice(0, 200)}`);
   const text = ((await res!.json()) as any).choices?.[0]?.message?.content;
