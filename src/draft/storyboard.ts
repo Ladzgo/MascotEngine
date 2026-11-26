@@ -78,17 +78,32 @@ export function repairShots(ep: Episode, raw: Record<number, Partial<Shot> & {st
   return {...ep, scenes: scenes as Episode['scenes']};
 }
 
+const STOP = new Set('about after again because before being could doesn every going little makes making might never other really should since still their there these thing think those through until where which while would years your yours actually most much more what when that this with from have just they them then than into over only even also'.split(' '));
+const contentWords = (t: string) => t.toLowerCase().replace(/[^a-z' ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !STOP.has(w));
+/** Fallback stock query: the topic's key words + the sentence's longest concrete-looking word. Never the drawn setting
+ *  ("living room" in every beat made every photo a living room, ep010). shortcut: longest word stands in for a noun, upgrade with a POS tagger. */
+export function fallbackQuery(title: string, narration: string, subject = ''): string[] {
+  const topic = contentWords(title).slice(0, 2), words = contentWords(narration).filter(w => !topic.includes(w)).sort((a, b) => b.length - a.length);
+  const subj = subject.replace(/_/g, ' ');
+  return [...words, subj, ''].map(w => [...topic, w].filter(Boolean).join(' ')); // alternatives, best first, so a repeat can step to the next
+}
+
 /** Choose which beats carry stock footage: 40-55% of beats, never the same query within 8 beats, LLM queries first, setting+subject fallbacks to reach the minimum. */
 export function pickStock(ep: Episode, raw: Record<number, {stock?: unknown}>, shots: Shot[]): (Stock | undefined)[] {
-  const cand = ep.scenes.map((s, i): {st: Stock; llm: boolean} | null => {
+  const cand = ep.scenes.map((s, i): {st: Stock; llm: boolean; alts?: string[]} | null => {
     if (NO_STOCK.has(s.type)) return null;
     const r = (raw[i]?.stock ?? s.stock) as {query?: unknown; kind?: unknown} | null | undefined, q = cleanQuery(r?.query);
     if (q) return {st: {query: q, kind: r?.kind === 'video' ? 'video' : 'photo'}, llm: true};
-    const fb = cleanQuery(`${shots[i].setting ?? ''} ${shots[i].subject.replace(/_/g, ' ')}`);
-    return fb ? {st: {query: fb, kind: 'photo'}, llm: false} : null;
+    const alts = fallbackQuery(ep.title ?? '', s.narration ?? '', shots[i].subject).map(cleanQuery).filter((x): x is string => !!x);
+    return alts.length ? {st: {query: alts[0], kind: 'photo'}, llm: false, alts} : null;
   });
   const n = ep.scenes.length, chosen = new Set<number>(), lastQ = new Map<string, number>();
-  const take = (i: number) => { const c = cand[i]; if (!c || chosen.has(i) || (lastQ.get(c.st.query) ?? -99) > i - STOCK_GAP) return; chosen.add(i); lastQ.set(c.st.query, i); };
+  const free = (q: string, i: number) => (lastQ.get(q) ?? -99) <= i - STOCK_GAP;
+  const take = (i: number) => {
+    const c = cand[i]; if (!c || chosen.has(i)) return;
+    const q = (c.alts ?? [c.st.query]).find(x => free(x, i)); if (!q) return;
+    c.st = {...c.st, query: q}; chosen.add(i); lastQ.set(q, i);
+  };
   cand.forEach((c, i) => { if (c?.llm) take(i); });
   const max = Math.floor(n * STOCK_MAX), min = Math.ceil(n * STOCK_MIN);
   for (let i = 0; i < n && chosen.size < min; i += 2) take(i); // fallbacks fill gaps on alternate beats first
@@ -100,7 +115,7 @@ export function pickStock(ep: Episode, raw: Record<number, {stock?: unknown}>, s
 }
 
 const sys = `You are the storyboard artist of a short explainer video. For every numbered beat decide what the picture shows at that exact moment.
-Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "setting": "3-5 words", "label": "text to show on screen, max 4 words, optional", "number": a number that appears in the beat (optional), "mood": ..., "camera": ..., "at": "the ONE word from the sentence at which this picture should appear (the thing being named)", "stock": {"query": "2-4 plain English words for a real photo or stock video of what is said (a place, activity or object, no brands, no text, no people's faces), e.g. \"runner morning park\"", "kind": "photo" or "video"} or null}]}
+Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "setting": "3-5 words", "label": "text to show on screen, max 4 words, optional", "number": a number that appears in the beat (optional), "mood": ..., "camera": ..., "at": "the ONE word from the sentence at which this picture should appear (the thing being named)", "stock": {"query": "2-4 plain English words for a real photo or stock video of what THIS sentence says: its concrete noun plus the video topic (a place, activity or object, no brands, no text, no people's faces, never the setting words), e.g. \"runner morning park\", \"credit card bill\"", "kind": "photo" or "video"} or null}]}
 subject = ONE concrete thing named or implied by the sentence, exactly one of: ${FB_KINDS.join(', ')}.
 action = what happens to it, one of: ${ACTIONS.join(', ')}.
 mood one of: ${MOODS.join(', ')}. camera one of: ${CAMERAS.join(', ')}.
