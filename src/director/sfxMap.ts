@@ -3,8 +3,8 @@
 import type {SfxKind} from './types.js';
 
 const COIN = new Set(['coin_stacks', 'cash', 'coin_spin', 'bills', 'paycheck', 'jar_fill', 'wallet', 'piggy', 'safe', 'vault']);
-const CLICK = new Set(['card_swipe', 'atm', 'card', 'keys', 'calculator', 'clipboard', 'phone', 'laptop', 'subscriptions', 'tax_form', 'person_atm']);
-const THUD = new Set(['hole', 'anchor', 'debt_counter', 'person_shocked', 'arrow_down', 'flame']);
+const CLICK = new Set(['card_swipe', 'atm', 'card', 'keys', 'calculator', 'clipboard', 'phone', 'laptop', 'subscriptions', 'tax_form', 'person_atm', 'stopwatch', 'chip', 'lock', 'magnifier', 'calendar']);
+const THUD = new Set(['hole', 'anchor', 'debt_counter', 'person_shocked', 'arrow_down', 'flame', 'dumbbell', 'price_up']);
 const WIN = new Set(['trophy', 'medal', 'person_celebrate', 'rocket', 'sprout', 'sun']);
 const FALLS = new Set(['sink', 'fall', 'drop', 'melt', 'burn', 'shrink']);
 
@@ -14,6 +14,6 @@ export function sfxForShot(shot: {subject?: string; action?: string} | undefined
   if (WIN.has(s) || a === 'check') return 'ding';
   if (THUD.has(s) || (FALLS.has(a) && !COIN.has(s))) return 'thud';
   if (COIN.has(s)) return 'coin';
-  if (CLICK.has(s)) return 'click';
+  if (CLICK.has(s) || a === 'lock' || a === 'unlock' || a === 'swipe') return 'click';
   return null;
 }

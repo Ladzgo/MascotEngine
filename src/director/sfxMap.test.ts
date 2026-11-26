@@ -11,6 +11,10 @@ test('object sounds follow subject and action; data beats stay silent here; new 
   assert.equal(sfxForShot({subject: 'trophy', action: 'pop_in'}, 'talk'), 'ding');
   assert.equal(sfxForShot({subject: 'card_swipe', action: 'swipe'}, 'talk'), 'click');
   assert.equal(sfxForShot({subject: 'heart', action: 'pulse'}, 'talk'), null);
+  assert.equal(sfxForShot({subject: 'stopwatch', action: 'none'}, 'talk'), 'click'); // theme packs, not only money
+  assert.equal(sfxForShot({subject: 'dumbbell', action: 'drop'}, 'talk'), 'thud');
+  assert.equal(sfxForShot({subject: 'medal', action: 'pop_in'}, 'talk'), 'ding');
+  assert.equal(sfxForShot({subject: 'house', action: 'unlock'}, 'talk'), 'click');
   assert.equal(sfxForShot({subject: 'coin_stacks', action: 'drop'}, 'big_number'), null);
   for (const k of ['coin', 'click', 'thud'] as const) { const w = synth(k, 2); assert.ok(w.length > 100 && w.every(Number.isFinite) && Math.max(...w.map(Math.abs)) > 0.05, k); }
 });
