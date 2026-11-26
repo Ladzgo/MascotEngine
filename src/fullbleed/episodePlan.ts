@@ -20,8 +20,11 @@ export const groupOf = (kind: string): string => Object.entries(GROUPS).find(([,
 
 /** Same group first, then anything unused: a picture is only repeated when nothing else fits. */
 const DEBT_TEXT = /\b(debts?|owe[sd]?|owing|loans?|borrow\w*)\b/i;
-function fresh(kind: string, recent: string[], also: string[] = [], text = '', home: string[] = []): string {
-  const bad = new Set([...recent, ...also]);
+/** Pictures that only mean money (coins, cards, bills, rates): a battery or sleep video never gets them, not even as a variety fallback (after-tech had a DEBT HOLE). */
+export const MONEY_ONLY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'jar_fill', 'coin_spin', 'vault', 'safe', 'bank', 'atm', 'card', 'card_swipe', 'paycheck', 'bills', 'receipts', 'tax_form', 'debt_counter', 'percent', 'price_up', 'pricetag', 'subscriptions', 'person_atm', 'person_bills', 'hole', 'snowball', 'ticker']);
+export const MONEY_TOPIC = /\$|\b(money|dollars?|cents?|debts?|loans?|invest\w*|sav(e|es|ed|ing|ings)|budget\w*|spend\w*|prices?|costs?|banks?|credit|tax(es)?|income|pay(s|ing|ment\w*)?|paid|cash|mortgage|rent|salary|wealth|retire\w*|stocks?|funds?|interest|cheap|expensive|afford\w*)\b/i;
+function fresh(kind: string, recent: string[], also: string[] = [], text = '', home: string[] = [], money = true): string {
+  const bad = new Set([...recent, ...also, ...(money ? [] : MONEY_ONLY)]);
   if (!DEBT_TEXT.test(text)) bad.add('debt_counter'); // the red 'you owe' panel only illustrates owing
   if (!bad.has(kind)) return kind;
   const pool = [...GROUPS[groupOf(kind)] ?? [], ...home.flatMap(g => GROUPS[g] ?? []), ...Object.values(GROUPS).flat()].filter(k => OBJECTS[k] && !bad.has(k));
@@ -37,14 +40,19 @@ const validSetting = (s: unknown): s is Setting => (SETTINGS as readonly string[
 export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): ScenePlan[] {
   const perScene: string[][] = [], out: ScenePlan[] = [];
   // the topic's own groups (what the storyboard's subjects belong to) are tried first when a picture must change: a running video never falls back to coins
+  const money = MONEY_TOPIC.test(scenes.map(s => s.narration ?? '').join(' '));
   const home = [...new Set(scenes.map(s => s.shot?.subject).filter((x): x is string => typeof x === 'string').map(groupOf))];
   const lastSix = () => perScene.slice(-8).flat(); // variety window = the last 8 beats (scenes), not 8 shots
   const envHist: Setting[] = []; // backdrops of drawn beats only (stock beats show footage)
   let prevEnv: Setting | undefined, prevLayout: Layout | undefined, prevCam = -1, talkN = 0;
   scenes.forEach((s, i) => {
     const sh = s.shot ?? {}, words = wordsPer[i] ?? [], dur = durs[i] ?? 4;
-    const raw = planShots(s, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
-    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    const visuals = money ? s.visuals : s.visuals?.filter((v: {kind: string}) => !MONEY_ONLY.has(objectFor(v.kind)));
+    const raw = planShots({...s, visuals: visuals?.length ? visuals : undefined}, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
+    // a topic word said in the sentence ("battery", "sleep", "coffee") beats a storyboard subject the sentence never names (after-tech: pie for "sluggish chemistry")
+    const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor), topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-2).flat().includes(k));
+    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!topical || said.includes(sh.subject))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    else if (topical) raw[0] = {kind: topical, at: 0, why: `shot.topic word -> ${topical}`};
     // the drawn subject lands when the voice says its word (max 1.2 s in; before that the backdrop/footage carries the beat)
     if (typeof sh.at === 'string' && raw[0]?.why?.startsWith('shot.')) {
       const w = words.find(x => x.w.toLowerCase().replace(/[^\p{L}\p{N}%$'-]/gu, '') === sh.at);
@@ -54,7 +62,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     const shots: PlannedShot[] = [];
     for (const [k, r] of raw.entries()) {
       const explicit = !!r.why?.startsWith('shot.') || !!r.why?.startsWith('visual') ;
-      const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home);
+      const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home, money);
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
     perScene.push(shots.map(x => x.kind));
@@ -69,7 +77,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     if (camera === prevCam) camera = (camera + 1) % 4;
     // layout: content decides first, talk beats rotate through the composed layouts
     let layout: Layout;
-    const companion = GROUPS[g]?.find(k => OBJECTS[k] && !shots.some(x => x.kind === k) && !lastSix().includes(k));
+    const companion = GROUPS[g]?.find(k => OBJECTS[k] && (money || !MONEY_ONLY.has(k)) && !shots.some(x => x.kind === k) && !lastSix().includes(k));
     if (typeof sh.layout === 'string' && (LAYOUTS as readonly string[]).includes(sh.layout)) layout = sh.layout as Layout;
     else if (s.type === 'chart') layout = 'dataviz';
     else if (s.stockFile) layout = talkN % 2 ? 'pip' : 'broll';
@@ -89,7 +97,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
   return out;
 }
 const SUBJECT_SET = new Set(Object.keys(OBJECTS));
-void candidatesFor;
+const TOPICAL = new Set(['sport', 'health', 'travel', 'tech', 'food', 'science', 'sleep'].flatMap(g => GROUPS[g]).filter(k => !['gears', 'bulb', 'person_walking', 'globe', 'sun'].includes(k)));
 
 /** Variety numbers of a plan: share of plain beats (one centred object on a talk beat), distinct pictures, closest repeat, stock share, layout mix. Targets: plain <= 25%, distinct >= 60%, repeat gap >= 8. */
 export function planStats(plans: ScenePlan[], scenes: {type: string; stockFile?: string; stock?: unknown}[]) {

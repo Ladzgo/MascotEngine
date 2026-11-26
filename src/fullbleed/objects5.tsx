@@ -153,5 +153,39 @@ export const Medal: Obj = ({t}) => (
   </g></Stage>
 );
 
+// battery, brain, bed, moon: the tech and sleep/memory topics (after-tech showed an anchor for "drains your battery", en-sleep a piggy bank for "slow-wave sleep")
+export const Battery: Obj = ({t}) => {
+  const lvl = 0.95 - 0.7 * seg(t, 0.3, 2.6), col = lvl > 0.55 ? 'green' : lvl > 0.35 ? 'gold' : 'red';
+  return <Stage t={t} rx={90}>
+    <rect x={170} y={40} width={60} height={26} rx={8} fill={url('grey')} /><rect x={120} y={60} width={160} height={262} rx={26} fill={url('navy')} /><rect x={134} y={74} width={132} height={234} rx={16} fill="#10182f" />
+    <rect x={142} y={82 + 218 * (1 - lvl)} width={116} height={218 * lvl} rx={10} fill={url(col)} />
+    <path d="M214 120 L170 200 H202 L186 270 L234 182 H202Z" fill="#fff" opacity={0.85} />
+    <rect x={136} y={80} width={18} height={200} rx={9} fill="#fff" opacity={0.12} />
+  </Stage>;
+};
+export const Brain: Obj = ({t}) => {
+  const g = 0.5 + Math.max(0, wave(t, 1.6)) * 0.5;
+  return <Stage t={t} rx={110}><g transform={`translate(0 ${wave(t, 2.6) * 4})`}>
+    <path d="M200 90 C150 60 90 80 86 140 C50 160 56 230 100 246 C104 290 160 310 200 286 C240 310 296 290 300 246 C344 230 350 160 314 140 C310 80 250 60 200 90Z" fill={url('roof')} />
+    <path d="M200 92 V284 M140 120 Q170 150 140 180 Q110 210 150 240 M260 120 Q230 150 260 180 Q290 210 250 240 M110 170 Q130 180 128 200 M290 170 Q270 180 272 200" stroke={PALETTES.roof[2]} strokeWidth={7} fill="none" strokeLinecap="round" />
+    {[[140, 150], [255, 140], [170, 230], [240, 225], [200, 180]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r={9} fill="#fff3b0" opacity={g * seg(t, 0.3 + i * 0.2, 0.6 + i * 0.2)} />)}
+    <ellipse cx={140} cy={110} rx={26} ry={12} fill="#fff" opacity={0.3} transform="rotate(-25 140 110)" />
+  </g></Stage>;
+};
+export const Bed: Obj = ({t}) => (
+  <Stage t={t} rx={160}>
+    <rect x={50} y={150} width={24} height={170} rx={8} fill={url('wall')} /><rect x={326} y={210} width={24} height={110} rx={8} fill={url('wall')} />
+    <rect x={60} y={232} width={284} height={56} rx={16} fill={url('grey')} /><path d="M150 214 Q240 196 340 214 V246 H150Z" fill={url('blue')} />
+    <ellipse cx={108} cy={222} rx={44} ry={20} fill="#fff" />
+    {[0, 1, 2].map(i => { const k = (t * 0.45 + i / 3) % 1; return <g key={i} opacity={0.9 * (1 - k)}><Txt x={150 + k * 120 + i * 8} y={180 - k * 130} size={30 + k * 26} fill="#fff">z</Txt></g>; })}
+  </Stage>
+);
+export const Moon: Obj = ({t}) => (
+  <Stage t={t} rx={80}><g>
+    {Array.from({length: 7}, (_, i) => <circle key={i} cx={60 + ((i * 71) % 290)} cy={50 + ((i * 53) % 150)} r={4 + (i % 3) * 2} fill="#fff3b0" opacity={0.4 + 0.6 * Math.abs(wave(t, 1.5 + i * 0.3))} />)}
+    <g transform={`rotate(${wave(t, 4) * 5} 200 190)`}><path d="M240 80 A110 110 0 1 0 300 260 A90 90 0 1 1 240 80Z" fill={url('gold')} /><circle cx={170} cy={230} r={12} fill={PALETTES.gold[2]} opacity={0.35} /><circle cx={150} cy={170} r={8} fill={PALETTES.gold[2]} opacity={0.3} /></g>
+  </g></Stage>
+);
+
 /** key -> renderer; the catalog's SUBJECTS lists the same names (a test keeps both in sync). */
-export const THEME_SUBJECTS: Record<string, Obj> = {shoe: Shoe, dumbbell: Dumbbell, stopwatch: Stopwatch, heart: Heart, apple: Apple, pill: Pill, drop: Drop, plane: Plane, globe: Globe, suitcase: Suitcase, mountain: Mountain, laptop: Laptop, chip: Chip, flask: Flask, atom: Atom, sprout: Sprout, sun: Sun, burger: Burger, book: Book, medal: Medal};
+export const THEME_SUBJECTS: Record<string, Obj> = {shoe: Shoe, dumbbell: Dumbbell, stopwatch: Stopwatch, heart: Heart, apple: Apple, pill: Pill, drop: Drop, plane: Plane, globe: Globe, suitcase: Suitcase, mountain: Mountain, laptop: Laptop, chip: Chip, flask: Flask, atom: Atom, sprout: Sprout, sun: Sun, burger: Burger, book: Book, medal: Medal, battery: Battery, brain: Brain, bed: Bed, moon: Moon};

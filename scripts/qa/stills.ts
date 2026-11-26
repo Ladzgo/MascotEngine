@@ -28,5 +28,5 @@ for (const [i, s] of decisions.scenes.entries()) {
   files.push(f);
 }
 const cols = Math.min(8, files.length), rows = Math.ceil(files.length / cols);
-spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(out, '%02d.png'), '-vf', `scale=240:-1,tile=${cols}x${rows}`, '-frames:v', '1', path.join(out, 'sheet.png')]);
+spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-reinit_filter', '0', '-i', path.join(out, '%02d.png'), '-vf', `scale=240:-1,tile=${cols}x${rows}`, '-frames:v', '1', path.join(out, 'sheet.png')]);
 console.log(`stills: ${files.length} beats -> ${out}/ (sheet.png, ${cols}x${rows})`);

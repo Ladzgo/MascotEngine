@@ -63,8 +63,8 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
           return <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 1.05, textTransform: 'uppercase', color: active ? '#ffe033' : '#fff', WebkitTextStroke: stroke, paintOrder: 'stroke fill', textShadow: '0 5px 0 rgba(0,0,0,0.5)', transform: `scale(${active ? 1.04 : 1})`, display: 'inline-block'}}>{x.w.replace(/[.,;:!?]+$/, '')}</span>;
         })}
       </div>
-      {pw && (() => { const e = easeOut(clamp((t - pw.start) / 0.14)), ps = Math.min(tall ? 210 : 170, (w * 0.86) / (Math.max(3, pw.w.replace(/\W/g, '').length) * 0.78)); return (
-        <div style={{position: 'absolute', left: 0, right: 0, top: tall ? 330 : h * 0.1, textAlign: 'center', opacity: e, transform: `rotate(${-4 * e}deg) scale(${0.6 + 0.5 * e})`}}>
+      {pw && (() => { const e = easeOut(clamp((t - pw.start) / 0.14)), ps = Math.min(tall ? 200 : 170, (w * 0.8) / (Math.max(3, pw.w.replace(/\W/g, '').length) * 0.8 + 0.5)); return ( // fits the frame incl. padding and the -4deg tilt (BEFORE was clipped, ep011)
+        <div style={{position: 'absolute', left: 0, right: 0, top: tall ? 330 : h * 0.1, textAlign: 'center', opacity: e, transform: `rotate(${-4 * e}deg) scale(${0.6 + 0.4 * e})`}}>
           <span style={{fontFamily: DISPLAY, fontSize: ps, textTransform: 'uppercase', color: '#fff', background: accent, padding: `0 ${ps * 0.2}px`, borderRadius: ps * 0.12, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', WebkitTextStroke: `${ps * 0.03}px rgba(0,0,0,0.35)`, display: 'inline-block'}}>{pw.w.replace(/[.,;:!?]+$/, '')}</span>
         </div>); })()}
     </>

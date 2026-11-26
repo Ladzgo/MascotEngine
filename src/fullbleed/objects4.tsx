@@ -234,7 +234,6 @@ export const Anchor: Obj = ({t}) => {
       <Shadow rx={110} cy={348} />
       <circle cx={200} cy={70} r={22} fill="none" stroke={url('grey')} strokeWidth={12} /><rect x={188} y={90} width={24} height={200} rx={8} fill={url('navy')} /><rect x={140} y={112} width={120} height={20} rx={8} fill={url('navy')} />
       <path d="M90 230 Q110 320 200 320 Q290 320 310 230" fill="none" stroke={url('navy')} strokeWidth={22} strokeLinecap="round" /><polygon points="76,226 112,214 104,262" fill={url('navy')} /><polygon points="324,226 288,214 296,262" fill={url('navy')} />
-      <Txt x={200} y={190} size={40} fill="#ff9a8a" stroke="#12142a">DEBT</Txt>
     </g>
   );
 };
@@ -243,7 +242,6 @@ export const Hole: Obj = ({t}) => (
   <g>
     <ellipse cx={200} cy={290} rx={170} ry={46} fill="#000" opacity={0.75} /><ellipse cx={200} cy={290} rx={170} ry={46} fill="none" stroke={P('wall', 2)} strokeWidth={10} />
     {Array.from({length: 6}, (_, i) => { const a = 0.15 + i * 0.4, u = clamp(((t - a) % 2.2) / 1.1); if (t < a) return null; return <g key={i} transform={`translate(${130 + i * 28} ${60 + u * u * 220}) scale(${1 - u * 0.7})`} opacity={1 - u * 0.5}><circle r={20} fill={url('gold')} /></g>; })}
-    <Txt x={200} y={60} size={40} fill="#ff9a8a" stroke="#12142a">DEBT HOLE</Txt>
   </g>
 );
 

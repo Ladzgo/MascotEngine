@@ -147,7 +147,7 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
 };
 
 /** Sub-shot framings [zoom, x shift (share of width), y shift (share of height)]: tight punch-in, wide pull-back, off-centre left/right. */
-export const SUB_FRAMES: [number, number, number][] = [[1.1, 0, 0.03], [0.88, 0, -0.02], [0.96, 0.06, 0.01], [0.96, -0.06, 0.01]]; // gentle: a bigger punch-in cut the hero off
+export const SUB_FRAMES: [number, number, number][] = [[1.1, 0, -0.03], [0.88, 0, -0.02], [0.96, 0.06, -0.01], [0.96, -0.06, -0.01]]; // gentle, and never downwards: a bigger punch-in cut the hero off, a lower one ran it into the captions
 /** How many 2-3 s sub-shots a beat of `dur` seconds gets (one per started 2.8 s). */
 export const subShots = (dur: number) => Math.max(1, Math.ceil(dur / 2.8));
 const CHARTY = new Set(['line_chart', 'bars3d', 'bars_arrow', 'chart', 'pie', 'gauge']);
@@ -226,12 +226,12 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const [subZ, subX, subY] = sub === 0 ? [1, 0, 0] : SUB_FRAMES[(sub + index) % SUB_FRAMES.length];
   const fixedStage = hasCallouts || versus;
   const stage = fixedStage ? `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})` : `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
-  // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
+  // hero stands on the ground plane (y = 70% of a tall frame, so it ends above the captions at 72-80%, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.15 : h * 1.05; // wider objects (scale, bars, calendar) span the whole 400 box: bigger and they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
-  const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.75) : h * 0.8, cy = groundY - 0.325 * hs;
+  const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.7) : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (

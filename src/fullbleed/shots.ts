@@ -6,6 +6,8 @@ const MIN_GAP = 1.5, MAX_SHOTS = 4;
 
 /** Narration word -> candidate objects, most specific first. A word can point at several (money -> coins, cash, wallet): the planner takes the first one not just shown. */
 const RULES: [string, RegExp][] = [
+  ['battery', /^(batter(y|ies)|charg\w*|recharg\w*|drain\w*|lithium|ions?|cells?)$/], ['bed', /^(sleep\w*|asleep|bed\w*|naps?|napping|rest\w*|insomnia|tired|night|nights|overnight|rem)$/], ['moon', /^(night\w*|midnight|dark|moon\w*|dreams?|dreaming|slow-wave)$/],
+  ['brain', /^(brains?|memor(y|ies)|recall\w*|remember\w*|mind|focus\w*|neurons?|cognit\w+|learn\w*|facts?|think\w*|concentrat\w+)$/],
   ['shoe', /^(run\w*|jog\w*|sneakers?|shoes?|marathon|sprint\w*|stride|footwear)$/], ['dumbbell', /^(gym|lift\w*|workouts?|strength|muscles?|weights?|train\w*|exercis\w+)$/], ['stopwatch', /^(pace|stopwatch|timer|speed|laps?|seconds)$/], ['medal', /^(medals?|race|podium|finish\w*)$/],
   ['heart', /^(heart|health\w*|cardio|pulse|wellness|healthy)$/], ['apple', /^(apples?|fruits?|vegetables?|nutrition|diet|fiber|vitamins?)$/], ['pill', /^(pills?|medicine|medic\w+|drugs?|supplements?|doctor)$/], ['drop', /^(water|hydrat\w+|drink\w*|sweat\w*)$/],
   ['plane', /^(fl(y|ight|ights|ying)|plane|airline|airport|travel\w*|trip|vacation|abroad)$/], ['globe', /^(world\w*|global\w*|countries|country|planet|earth|international)$/], ['suitcase', /^(luggage|suitcase|pack\w*|hotel|tourist\w*)$/], ['mountain', /^(mountains?|hik\w+|summit|peak|trail|climb\w*|nature)$/],
@@ -16,7 +18,7 @@ const RULES: [string, RegExp][] = [
   ['person_thinking', /^(think\w*|decid\w+|decision|consider\w*|wonder\w*|choos\w+)$/], ['person_walking', /^(walk\w*|journey|begin\w*|beginner\w*|first)$/],
   ['shopping_bag', /^(shopp\w+|retail|purchas\w+|buy\w*|bought|spree|spend\w*|splurg\w+)$/], ['keys', /^(keys?|landlord|tenants?|lease|renter|renting|rent)$/], ['tax_form', /^(tax\w*|irs|deduct\w*|filing|returns?)$/],
   ['ticker', /^(stocks?|shares?|ticker|trad(e|es|ing|er|ers)|dividends?|nasdaq|s&p)$/], ['rocket', /^(skyrocket\w*|rocket\w*|soar\w*|moon|boom\w*|surg\w+)$/], ['ladder', /^(ladder|climb\w*|steps?|rungs?|career|promotion)$/],
-  ['safe', /^(safe|stash\w*|savings|secure\w*)$/], ['hourglass', /^(wait\w*|patien\w*|years?|decades?|eventually|slowly|deadline|forever|retire\w*|long-term)$/], ['thermometer', /^(inflation|heat\w*|hot|overheat\w*|temperature|prices)$/],
+  ['safe', /^(safe|stash\w*|savings|secure\w*)$/], ['hourglass', /^(wait\w*|patien\w*|years?|decades?|eventually|slowly|deadline|forever|retire\w*|long-term)$/], ['thermometer', /^(inflation|heat\w*|hot|overheat\w*|temperatures?|prices|degrees|celsius|fahrenheit|cold|colder|freez\w*|frozen|warm\w*|winter)$/],
   ['gas_pump', /^(gas|fuel|petrol|gasoline)$/], ['groceries', /^(grocer\w*|food|supermarket|meals?|eggs|milk|bread)$/], ['coffee', /^(coffee|latte|lattes|cafe|espresso)$/], ['subscriptions', /^(subscri\w+|streaming|netflix|memberships?|recurring)$/],
   ['trophy', /^(win\w*|winners?|champion\w*|goals?|achiev\w+|success\w*|best)$/], ['tree', /^(tree|seeds?|plant\w*|compound\w*|decades)$/], ['anchor', /^(anchor\w*|burden\w*|drag\w*|heavy|weigh\w*)$/], ['hole', /^(hole|pit|spiral\w*|drain\w*|sink\w*|trapped)$/],
   ['flame', /^(burn\w*|wast\w+|fire|blow\w*|squander\w*)$/], ['dice', /^(risks?|risky|gambl\w*|luck\w*|chance|odds|bets?|volatil\w*)$/], ['umbrella', /^(rainy|emergenc\w+|cushion|buffer|unexpected)$/],
@@ -35,7 +37,7 @@ const RULES: [string, RegExp][] = [
   ['people', /^(people|persons?|famil\w+|friends?|customers?|investors?|folks|households?|americans?|workers?|borrowers?)$/], ['phone', /^(apps?|phones?|online|digital|mobile|notif\w+|automat\w+|text)$/],
   ['cart', /^(shop\w*|buy\w*|bought|purchas\w+|stores?|retail\w*|cart)$/], ['pricetag', /^(prices?|priced|costs?|sticker|discounts?|sales?|cheap\w*|expensive|pricey)$/],
   ['bulb', /^(ideas?|tips?|tricks?)$/], ['handshake', /^(deals?|handshake|negotiat\w+|partner\w*)$/],
-  ['gradcap', /^(school|college|students?|degrees?|educat\w+|tuition|university)$/], ['gears', /^(process|machine|engine|mechanism|gears?)$/], ['pin', /^(where|locat\w+|local|cit(y|ies)|nearby|map)$/],
+  ['gradcap', /^(school|college|students?|educat\w+|tuition|university)$/], ['gears', /^(process|machine|engine|mechanism|gears?)$/], ['pin', /^(where|locat\w+|local|cit(y|ies)|nearby|map)$/],
   ['magnifier', /^(print|inspect\w*|magnif\w*|hidden)$/], ['doc', /^(documents?|polic(y|ies)|paperwork|agreements?|forms?)$/],
   ['skyline', /^(econom\w+|business\w*|compan(y|ies)|corporat\w+|recession|industry)$/],
 ];
