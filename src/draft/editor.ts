@@ -17,10 +17,27 @@ export function huFix(text: string, hu = true): string {
   const seen = new Set<string>();
   t = (t.match(/[^.!?]+[.!?]*\s*/g) ?? [t]).filter(s => { const k = s.trim().toLowerCase(); if (!k || seen.has(k)) return false; seen.add(k); return true; }).join('').trim();
   if (hu) {
+    t = huRules(t);
     t = t.replace(/\d{1,3}(?:[,.]\d{3})+(?!\d)/g, m => m.replace(/[,.]/g, ' ')); // thousands: 1,234,567 -> 1 234 567
     t = t.replace(/(\d)\.(\d{1,2})(?!\d)/g, '$1,$2'); // decimals: 3.5 -> 3,5
   }
   return t;
+}
+
+const CASE_FIX: Record<string, string> = {grafikonon: 'grafikont', diagramon: 'diagramot', táblázaton: 'táblázatot'};
+/**
+ * Fixes for typical gemma3:12b / qwen2.5:7b Hungarian slips: sentence-initial filler (Nos, Hát, Hm), English-style tag questions
+ * ("..., nem, de?") and tags ("..., tudod."), filler "bizony", and "megnézni valamit"-verbs with a locative instead of accusative
+ * (nézd meg a grafikonon -> grafikont). Digits are never touched.
+ */
+export function huRules(text: string): string {
+  let t = text.replace(/(^|[.!?]\s+)(?:nos|hát|hm+|nézzük csak|na)\s*,\s*(\p{L})/giu, (_m, a: string, c: string) => a + c.toUpperCase());
+  t = t.replace(/,\s*nem,?\s+de\?/giu, '.').replace(/,\s*tudod(?=[.!?]|$)/giu, '').replace(/(?<=\s)bizony(?=[\s,])\s*,?/giu, '');
+  t = t.replace(/((?:nézd meg|nézzük meg|nézz rá|ezt) (?:a|az|ezt a) )(grafikonon|diagramon|táblázaton)(?![\p{L}])/giu, (_m, a: string, w: string) => a + CASE_FIX[w.toLowerCase()]);
+  const CHART: Record<string, string> = {chart: 'grafikon', chartban: 'grafikonon', chartot: 'grafikont', charton: 'grafikonon', chartra: 'grafikonra', 'chart-on': 'grafikonon'};
+  t = t.replace(/(?<![\p{L}-])(chart(?:ban|ot|on|ra|-on)?)(?![\p{L}])/giu, (_m, w: string) => CHART[w.toLowerCase()] ?? w); // English "chart" left in Hungarian narration; "ebben a chartban" -> "ebben a grafikonon" is fixed next
+  t = t.replace(/ebben a grafikonon/giu, m => (m[0] === 'E' ? 'Ezen a grafikonon' : 'ezen a grafikonon'));
+  return t.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?;:])/g, '$1');
 }
 
 /** Same numbers after huFix? (the formatting changes separators only: compare digit runs.) */

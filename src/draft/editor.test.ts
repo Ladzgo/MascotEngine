@@ -21,3 +21,11 @@ test('fixEpisode keeps digits; editPass accepts a clean rewrite, rejects changed
   assert.equal(r.ep.scenes[2].narration, 'A pénzed 54,3% lesz.'); // 99% rejected
   assert.equal(r.ep.scenes[0].narration, 'Hook line.'); // hook untouched
 });
+
+test('huRules: gemma/qwen filler, tag questions and case slips; digits untouched', () => {
+  assert.equal(huFix('Nos, a kamat 7,8 százalék. Hát, ez sok.'), 'A kamat 7,8 százalék. Ez sok.');
+  assert.equal(huFix('Ez bizony stresszes helyzet, nem, de? Kezdj spórolni, tudod.'), 'Ez stresszes helyzet. Kezdj spórolni.');
+  assert.equal(huFix('Nézd meg ezt a grafikonon a kamatot.'), 'Nézd meg ezt a grafikont a kamatot.');
+  assert.equal(huFix('Ebben a chartban látjuk a kamatot. Nézd a chartot.'), 'Ezen a grafikonon látjuk a kamatot. Nézd a grafikont.');
+  assert.equal(huFix('Nos, hogy nem.', false), 'Nos, hogy nem.'); // other languages untouched
+});

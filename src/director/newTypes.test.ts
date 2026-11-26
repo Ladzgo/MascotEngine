@@ -40,6 +40,7 @@ test('table / checklist / stats: schema, element timing, no repeated layout or t
           assert.ok(s.elements.every((e, k) => k === 0 || e >= s.elements[k - 1]), `elements ascend, scene ${i}`);
           assert.ok(s.durSec >= Math.max(...s.elements), `scene ${i} lasts until its last element`);
         }
+        if (i > 0 && s.camera !== 'static') assert.notEqual(s.camera, d.scenes[i - 1].camera, `camera repeat ${seed}/${i}`);
         if (i > 0) { assert.notEqual(s.layout, d.scenes[i - 1].layout, `layout repeat ${seed}/${i}`); assert.notEqual(s.transition, d.scenes[i - 1].transition, `transition repeat ${seed}/${i}`); }
       });
     }

@@ -235,7 +235,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
         if (c === 'slow_push') sc *= 2;
       } else if (isHook && c === 'static') sc *= 0.6;
       if (prev && prev.layout === l) sc *= s.layout ? 0.15 : 0.001; // practically never the same layout twice (a single-layout type still falls back to it)
-      if (prev && prev.camera === c && c !== 'static') sc *= 0.25;
+      if (prev && prev.camera === c && c !== 'static') sc *= s.camera ? 0.5 : 0.02; // the same camera move twice in a row reads as a loop
       if (prev && prev.charSide !== 'center' && sideOf(l) === prev.charSide) sc *= 0.5;
       sc *= sceneFreqPenalty(l, 'layout', recent) * sceneFreqPenalty(c, 'camera', recent);
       if (i >= 2) {
