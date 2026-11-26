@@ -124,6 +124,12 @@ export function qa(id: string, fileArg?: string) {
   add('longest pause', P.max <= LIMITS.maxPause, `${P.max.toFixed(2)} s (${P.count} pauses, avg ${P.avg.toFixed(2)})`, `<= ${LIMITS.maxPause} s`);
   add('pause share', P.share <= LIMITS.pauseShare, `${(P.share * 100).toFixed(1)}%`, `<= ${LIMITS.pauseShare * 100}%`);
 
+  // reference targets (docs/REFERENCE-ANALYSIS.md): 140-180 words per minute of speech, a new visual idea every <= 6 s on average
+  const nWords = dec.scenes.reduce((a: number, _: any, i: number) => a + tim.scenes[i].words.length, 0);
+  const wpm = nWords / Math.max(1, vdur * (1 - P.share)) * 60;
+  add('speaking pace', wpm >= 140 && wpm <= 180, `${wpm.toFixed(0)} wpm`, '140..180 wpm');
+  const perChange = dur / Math.max(1, dec.scenes.length);
+  add('visual change rate', perChange <= 6, `a new scene every ${perChange.toFixed(1)} s`, '<= 6 s (Shorts reference: 2-3 s)');
   const edge = edgeSilence((run('ffmpeg', ['-hide_banner', '-nostats', '-i', voice, '-vn', '-af', 'silencedetect=n=-38dB:d=0.1', '-f', 'null', '-']).err), vdur);
   add('pre-roll', edge.lead >= LIMITS.preRoll[0] && edge.lead <= LIMITS.preRoll[1], `${edge.lead.toFixed(2)} s before the first word`, `${LIMITS.preRoll[0]}..${LIMITS.preRoll[1]} s`);
   add('outro silence', voice === file || edge.tail >= LIMITS.outro, // with no voice.wav the music bed fills the tail: not measurable
