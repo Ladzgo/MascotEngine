@@ -1,5 +1,6 @@
 import React from 'react';
 import {clamp} from '../theme';
+import {EXTRA} from './objects2';
 import {IsoBox, PALETTES, Shadow, Txt, pop, seg, segIO, wave} from './kit';
 
 export type Obj = React.FC<{t: number; accent: string; value?: number; label?: string}>;
@@ -261,11 +262,11 @@ export const Doc: Obj = ({t}) => (
   </g>
 );
 
-export const OBJECTS: Record<string, Obj> = {skyline: Skyline, house: House, car: Car, coin_stacks: CoinStacks, bars3d: Bars3d, vault: Vault, card: Card, piggy: Piggy, clock: Clock, calendar: Calendar, scale: Scale, arrow_up: ArrowUp, arrow_down: ArrowDown, percent: Percent, shield: Shield, cash: Cash, bank: Bank, magnifier: Magnifier, doc: Doc};
+export const OBJECTS: Record<string, Obj> = {skyline: Skyline, house: House, car: Car, coin_stacks: CoinStacks, bars3d: Bars3d, vault: Vault, card: Card, piggy: Piggy, clock: Clock, calendar: Calendar, scale: Scale, arrow_up: ArrowUp, arrow_down: ArrowDown, percent: Percent, shield: Shield, cash: Cash, bank: Bank, magnifier: Magnifier, doc: Doc, ...EXTRA};
 export const FB_KINDS = Object.keys(OBJECTS);
 
 /** Paper-illustration kinds (and a few words) -> full-bleed object. */
 export const FB_FOR: Record<string, string> = {
   credit_card: 'card', coins: 'coin_stacks', jar: 'coin_stacks', house: 'house', car: 'car', bank: 'bank', piggy: 'piggy', calendar: 'calendar', clock: 'clock', hourglass: 'clock', percent: 'percent', shield: 'shield', check: 'shield', magnifier: 'magnifier',
-  receipt: 'doc', document: 'doc', arrow_up: 'arrow_up', arrow_down: 'arrow_down', scale: 'scale', people: 'skyline', phone: 'card', chart_up: 'bars3d', chart_down: 'arrow_down', bulb: 'percent', wallet: 'cash', cash: 'cash', lock: 'vault', question: 'magnifier', warning: 'arrow_down', target: 'percent',
+  receipt: 'receipts', document: 'doc', arrow_up: 'arrow_up', arrow_down: 'arrow_down', scale: 'scale', people: 'people', phone: 'phone', chart_up: 'bars3d', chart_down: 'arrow_down', bulb: 'bulb', wallet: 'wallet', cash: 'cash', lock: 'lock', question: 'magnifier', warning: 'arrow_down', target: 'percent', receipt_stack: 'receipts',
 };

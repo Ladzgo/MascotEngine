@@ -25,6 +25,18 @@ export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.Rea
         <div style={{...fill, transform: `translateX(${-e * W * 0.35}px) scale(${1 - e * 0.04})`, opacity: 1 - e * 0.6, filter: `blur(${mb * 10}px)`}}>{prev}</div>
         <div style={{...fill, transform: `translateX(${(1 - easeOut(p)) * W}px) skewX(${-(1 - easeOut(p)) * 6}deg)`, filter: `blur(${(1 - easeOut(p)) * 12}px)`}}>{cur}</div>
       </>;
+    case 'cam_pan': // clean camera whip: both scenes slide on one axis with light motion blur, backdrop underneath, no dimming
+      return <>
+        <div style={{position: 'absolute', inset: 0}}>{paper}</div>
+        <div style={{...fill, transform: `translateX(${-e * W}px)`, filter: `blur(${mb * 5}px)`}}>{prev}</div>
+        <div style={{...fill, transform: `translateX(${(1 - e) * W}px)`, filter: `blur(${mb * 5}px)`}}>{cur}</div>
+      </>;
+    case 'cam_push': // clean push-through: the old scene zooms past the lens while the new one settles in
+      return <>
+        <div style={{position: 'absolute', inset: 0}}>{paper}</div>
+        <div style={{...fill, transform: `scale(${1 + e * 0.35})`, opacity: 1 - clamp(p * 1.6 - 0.3)}}>{prev}</div>
+        <div style={{...fill, transform: `scale(${0.82 + 0.18 * e})`, opacity: clamp(p * 2 - 0.2)}}>{cur}</div>
+      </>;
     case 'wipe_ink':
       return <>
         <div style={fill}>{prev}</div>

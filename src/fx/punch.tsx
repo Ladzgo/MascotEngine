@@ -27,11 +27,11 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
   phrases.forEach((p, i) => { if (t >= p.start - 0.04 && t <= p.end + 0.3) idx = i; });
   if (idx < 0) return null;
   const phrase = phrases[idx], enter = clamp((t - (phrase.start - 0.04)) / 0.12), tall = h > w;
-  const size = tall ? 112 : 92, pw = punch ? punchWord(phrase, idx) : undefined;
+  const size = tall ? 100 : 88, pw = punch ? punchWord(phrase, idx) : undefined;
   const stroke = `${size * 0.16}px #000`;
   return (
     <>
-      <div style={{position: 'absolute', left: 0, right: 0, top: tall ? h * 0.69 : h * 0.76, display: 'flex', justifyContent: 'center', gap: size * 0.42, flexWrap: 'wrap', padding: `0 ${w * 0.06}px`, opacity: Math.min(1, enter * 2), transform: `scale(${0.88 + 0.12 * spring(enter)})`}}>
+      <div style={{position: 'absolute', left: 0, right: 0, top: tall ? h * 0.665 : h * 0.76, display: 'flex', justifyContent: 'center', gap: size * 0.42, flexWrap: 'wrap', padding: `0 ${w * 0.08}px`, opacity: Math.min(1, enter * 2), transform: `scale(${0.88 + 0.12 * spring(enter)})`}}>
         {phrase.words.map((x, i) => {
           const active = t >= x.start - 0.02 && t < x.end + 0.1 && isKey(x.w);
           return <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 1.05, textTransform: 'uppercase', color: active ? '#ffe033' : '#fff', WebkitTextStroke: stroke, paintOrder: 'stroke fill', textShadow: '0 8px 0 rgba(0,0,0,0.55)', transform: `scale(${active ? 1.07 : 1})`, display: 'inline-block'}}>{x.w.replace(/[.,;:!?]+$/, '')}</span>;

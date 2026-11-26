@@ -2,7 +2,7 @@ import React from 'react';
 import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
-import {GradDefs, IsoBox, Txt, seg} from './kit';
+import {GradDefs, IsoBox, Txt, pop, seg} from './kit';
 import {OBJECTS} from './objects';
 import {planShots} from './shots';
 
@@ -34,11 +34,39 @@ const Backdrop: React.FC<{w: number; h: number; theme: [string, string, string];
   );
 };
 
+/** Parts of each object a callout can point at (400x400 object box). Index i of a list points at anchor i. */
+const ANCHORS: Record<string, [number, number][]> = {
+  calendar: [[120, 200], [200, 250], [280, 200], [160, 300]], house: [[200, 280], [126, 240], [278, 240], [200, 110]], car: [[116, 296], [296, 296], [160, 200], [340, 250]], bars3d: [[60, 250], [172, 200], [284, 150], [340, 80]],
+  coin_stacks: [[90, 250], [170, 190], [250, 220], [325, 150]], card: [[106, 218], [200, 266], [300, 238], [200, 156]], clock: [[200, 100], [300, 190], [200, 290], [100, 190]], vault: [[200, 190], [320, 190], [140, 130], [260, 250]],
+  piggy: [[318, 246], [200, 166], [140, 320], [250, 150]], phone: [[200, 100], [160, 150], [200, 256], [280, 64]], people: [[110, 150], [200, 130], [290, 150], [200, 280]], cash: [[200, 270], [200, 220], [220, 190], [150, 290]],
+  receipts: [[110, 120], [200, 100], [290, 120], [200, 262]], percent: [[200, 120], [120, 190], [280, 190], [200, 270]], skyline: [[80, 120], [170, 150], [260, 120], [340, 190]], arrow_up: [[100, 260], [170, 250], [250, 180], [296, 130]], arrow_down: [[100, 140], [170, 160], [250, 220], [296, 290]],
+};
+const anchorOf = (kind: string, i: number): [number, number] => { const a = ANCHORS[kind]; return a ? a[i % a.length] : ([[200, 150], [150, 220], [250, 220], [200, 280]] as [number, number][])[i % 4]; };
+
+/** Coins and sparkles that fly out of the hero while it is on screen. */
+const Particles: React.FC<{t: number; w: number; h: number; cx: number; cy: number; money: boolean; accent: string; seed: number}> = ({t, w, h, cx, cy, money, accent, seed}) => {
+  const rnd = (i: number) => { const x = Math.sin((i + 1) * 78.233 + seed * 12.9) * 43758.5453; return x - Math.floor(x); };
+  return (
+    <svg width={w} height={h} style={{position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible'}}>
+      {Array.from({length: money ? 9 : 7}, (_, i) => {
+        const a = 0.25 + rnd(i) * 1.6, life = 1.6 + rnd(i + 9), u = ((t - a) % life + life) % life / life, born = t >= a;
+        if (!born) return null;
+        const ang = -Math.PI / 2 + (rnd(i + 3) - 0.5) * 2.2, d = u * (w * (0.25 + rnd(i + 5) * 0.3)), x = cx + Math.cos(ang) * d, y = cy + Math.sin(ang) * d + u * u * h * 0.14, o = Math.sin(Math.PI * u), r = (money ? 20 : 11) * (0.7 + rnd(i + 7) * 0.6);
+        return money
+          ? <g key={i} transform={`translate(${x} ${y}) scale(${Math.max(0.15, Math.abs(Math.cos(t * 5 + i)))} 1)`} opacity={o}><circle r={r} fill="#f2b705" /><circle r={r * 0.7} fill="#ffe27a" /><text y={r * 0.38} fontSize={r * 1.1} fontFamily="Archivo Black, sans-serif" textAnchor="middle" fill="#8a5a05">$</text></g>
+          : <path key={i} d={`M${x} ${y - r} L${x + r * 0.3} ${y - r * 0.3} L${x + r} ${y} L${x + r * 0.3} ${y + r * 0.3} L${x} ${y + r} L${x - r * 0.3} ${y + r * 0.3} L${x - r} ${y} L${x - r * 0.3} ${y - r * 0.3}Z`} fill={i % 2 ? '#fff' : accent} opacity={o * 0.9} />;
+      })}
+    </svg>
+  );
+};
+const MONEY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'card', 'bars3d', 'percent', 'bank', 'receipts']);
+
 /** Callout label: pill with a leader line that draws to the hero. */
-const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right'}> = ({text, t, at, x, y, tx, ty, size, accent, align}) => {
+const calloutWidth = (text: string, size: number, maxW: number) => Math.min(size * 0.6 * text.length + size * 1.8, maxW);
+const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right'; maxW: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW}) => {
   const e = easeOut((t - at) / 0.35);
   if (e <= 0) return null;
-  const wpx = Math.min(size * 0.62 * text.length + size * 1.6, size * 14), ax = align === 'left' ? x + wpx : x;
+  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : x;
   return (
     <>
       <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
@@ -100,49 +128,60 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const tall = h > w;
   const shots = planShots(scene as any, words, dur, {seed: index, skip: prevKind});
   const active = Math.max(0, shots.reduce((a, s, i) => (t >= s.at ? i : a), 0));
-  const theme = THEMES[(OBJ_THEME[shots[0].kind] ?? [0])[index % (OBJ_THEME[shots[0].kind]?.length ?? 1)] ?? 0];
+  const kindAt = (tt: number) => shots[Math.max(0, shots.reduce((a, s, i) => (tt >= s.at ? i : a), 0))].kind;
+  const theme = THEMES[(OBJ_THEME[shots[0].kind] ?? [0, 1, 2, 3, 4, 5])[index % (OBJ_THEME[shots[0].kind]?.length ?? 6)] ?? 0];
 
   // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage
   const mv = (index + (scene.type === 'big_number' ? 1 : 0)) % 4;
   const push = 1.02 + 0.2 * p, panX = mv === 1 ? (p - 0.5) * -0.12 * w : mv === 2 ? (p - 0.5) * 0.12 * w : Math.sin(t * 0.7) * 0.012 * w;
   const rot = mv === 3 ? (p - 0.5) * 3.6 : Math.sin(t * 0.5) * 0.5, tiltY = mv === 0 ? (0.5 - p) * 0.03 * h : Math.cos(t * 0.6) * 0.008 * h;
-  const stage = `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${mv === 3 ? 1.08 + 0.1 * p : push})`;
+  const sc = mv === 3 ? 1.08 + 0.1 * p : push;
+  const stage = `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})`;
 
-  const ctxText = calloutTexts(scene), hasCallouts = ctxText.length > 0;
-  const overlay = scene.type === 'compare' || scene.type === 'before_after' || scene.type === 'big_number' || scene.type === 'title';
-  const heroSize = (tall ? w * 0.98 : h * 0.86) * (hasCallouts ? 0.82 : scene.type === 'title' ? 0.66 : overlay ? 0.78 : 1), cx = w / 2, cy = tall ? h * (hasCallouts ? 0.31 : scene.type === 'title' ? 0.53 : overlay ? 0.43 : 0.385) : h * (scene.type === 'title' ? 0.58 : 0.47);
+  const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
+  const versus = scene.type === 'compare' || scene.type === 'before_after';
+  const base = tall ? w * 0.98 : h * 0.86;
+  const heroSize = base * (hasCallouts ? 0.82 : versus ? 0.56 : scene.type === 'title' ? 0.66 : scene.type === 'big_number' ? 0.74 : 1) * (versus && !tall ? 1.1 : 1);
+  const cx = w / 2, cy = tall ? h * (hasCallouts ? 0.31 : versus ? 0.52 : scene.type === 'title' ? 0.53 : scene.type === 'big_number' ? 0.45 : 0.385) : h * (versus ? 0.55 : scene.type === 'title' ? 0.58 : 0.47);
   const hs = hasCallouts && !tall ? h * 0.72 : heroSize;
   const hx = hasCallouts && !tall ? w * 0.68 : cx;
-    return (
+  const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
+  return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.06 + 0.1 * p}) translateX(${panX * 0.5}px)`, transformOrigin: '50% 60%'}}>
         <Backdrop w={w} h={h} theme={theme} cx={panX} t={t} seed={index} />
       </div>
-      <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 55%'}}>
+      <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: `50% ${55}%`}}>
         {shots.map((s, i) => {
           const Obj = OBJECTS[s.kind], local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
           if (local < 0 || out >= 1 || !Obj) return null;
-          const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * heroSize * 0.008;
+          const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * heroSize * 0.008, over = 0.8 + 0.2 * pop(local, 0, 0.5);
           const isChart = scene.type === 'chart' && i === 0;
           return (
-            <svg key={i} viewBox="0 0 400 400" width={hs} height={hs} style={{position: 'absolute', left: hx - hs / 2, top: cy - hs / 2 + bob, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5), transform: `scale(${(0.9 + 0.1 * inE) * (1 + 0.12 * easeInOut(out))}) translateX(${out * -w * 0.06}px)`, filter: 'drop-shadow(0 18px 24px rgba(0,0,0,0.35))'}}>
-              {isChart && scene.type === 'chart' ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={local} /> : <Obj t={local} accent={accent} value={scene.type === 'big_number' && i === 0 ? scene.value : undefined} />}
-            </svg>
+            <React.Fragment key={i}>
+              <svg viewBox="0 0 400 400" width={hs} height={hs} style={{position: 'absolute', left: hx - hs / 2, top: cy - hs / 2 + bob, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5), transform: `scale(${over * (1 + 0.12 * easeInOut(out))}) rotate(${Math.sin(t * 0.9 + i) * 1.2}deg) translateX(${out * -w * 0.06}px)`, filter: 'drop-shadow(0 18px 24px rgba(0,0,0,0.35))'}}>
+                {isChart && scene.type === 'chart' ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={local} /> : <Obj t={local} accent={accent} value={scene.type === 'big_number' && i === 0 ? scene.value : undefined} />}
+              </svg>
+              <div style={{position: 'absolute', inset: 0, opacity: 1 - out}}><Particles t={local} w={w} h={h} cx={hx} cy={cy} money={MONEY.has(s.kind)} accent={accent} seed={index * 7 + i} /></div>
+            </React.Fragment>
           );
         })}
       </div>
+      <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} />}
-      {(scene.type === 'compare' || scene.type === 'before_after') && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.12 : h * 0.5} accent={accent} />}
-      {hasCallouts && ctxText.slice(0, 5).map((txt, i) => {
-        const size = tall ? 54 : 40, left = i % 2 === 0, wp = Math.min(size * 0.62 * txt.length + size * 1.6, size * 14);
-        const y = tall ? h * 0.47 + i * (size * 2.5) : h * 0.16 + i * (size * 2.5);
+      {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
+      {hasCallouts && ctxText.map((txt, i) => {
+        const size = tall ? 48 : 44, left = i % 2 === 0, maxW = tall ? w * 0.82 : w * 0.4, wp = calloutWidth(txt, size, maxW);
+        const y = tall ? h * 0.455 + i * (size * 3.1) : h * 0.14 + i * (size * 3.3);
         const x = tall ? (left ? w * 0.05 : w * 0.95 - wp) : w * 0.04;
-        return <Callout key={i} text={txt} t={t} at={0.5 + (i * Math.max(0.8, (dur - 1) / ctxText.length))} x={x} y={y} tx={hx + (left ? -hs * 0.12 : hs * 0.12)} ty={cy + hs * 0.05} size={size} accent={accent} align={left || !tall ? 'left' : 'right'} />;
+        const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
+        const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move
+        return <Callout key={i} text={txt} t={t} at={at} x={x} y={y} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.55 + (py - h * 0.55) * sc + tiltY} size={size} accent={accent} align={left || !tall ? 'left' : 'right'} maxW={maxW} />;
       })}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
-      {active >= 0 && null}
+      {active < 0 && null}
     </div>
   );
 };

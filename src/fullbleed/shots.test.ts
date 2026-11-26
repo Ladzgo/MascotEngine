@@ -25,3 +25,10 @@ test('punch captions: at most three words, punch word only on every 4th number-i
   assert.ok(ph.every(p => p.words.length <= 3));
   assert.equal(punchWord(ph[0], 1), undefined);
 });
+
+import {candidatesFor} from './shots.js';
+test('word -> object relevance: minimums are bills, not clocks; money words offer several objects', () => {
+  assert.equal(candidatesFor('minimums')[0], 'receipts');
+  assert.ok(candidatesFor('money').length >= 2);
+  assert.deepEqual(candidatesFor('the'), []);
+});

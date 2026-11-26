@@ -96,8 +96,8 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
       {!fullbleed && <Paper variant={decisions.background} />}
       {decisions.scenes.map((d, i) => (
         <Sequence key={i} from={L.froms[i]} durationInFrames={Math.max(1, L.ends[i] - L.froms[i])} layout="none">
-          <SceneSeq paper={fullbleed ? <div style={{position: 'absolute', inset: 0, background: '#12142a'}} /> : <Paper variant={decisions.background} />} i={i} T={L.ts[i]} start={L.starts[i]} prevLast={i > 0 ? L.froms[i] - L.starts[i - 1] - 1 : 0}
-            kind={d.transition} accent={accent} view={view} />
+          <SceneSeq paper={fullbleed ? <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, #1d2b5e, #6a4c93 60%, #241a3d)'}} /> : <Paper variant={decisions.background} />} i={i} T={L.ts[i]} start={L.starts[i]} prevLast={i > 0 ? L.froms[i] - L.starts[i - 1] - 1 : 0}
+            kind={fullbleed ? ({whip: 'cam_pan', slide: 'cam_pan', zoom_through: 'cam_push', circle_reveal: 'cam_push'} as Record<string, string>)[d.transition] ?? d.transition : d.transition} accent={accent} view={view} />
         </Sequence>
       ))}
       {!fullbleed && <Vignette />}
