@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {spawn, type ChildProcess} from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 
 // Starts the real Studio server on a spare port (no Ollama auto-start) and checks guard, queue, readiness and clip endpoints.
 const PORT = 4197, BASE = `http://localhost:${PORT}`;
 const ROOT = new URL('../', import.meta.url).pathname;
 let child: ChildProcess;
-const JOBS_TMP = `/private/tmp/studio-test-jobs-${process.pid}.json`;
+const JOBS_TMP = `${os.tmpdir()}/studio-test-jobs-${process.pid}.json`;
 const J = {'Content-Type': 'application/json'};
 
 before(async () => {
@@ -135,7 +136,7 @@ test('queue: 20 active runs max (429), identical queued run is 409, cancel frees
 });
 
 test('interrupted job: after a restart a running run is an error with Retry text, queued runs resume', async () => {
-  const file = `/private/tmp/studio-test-jobs-restart-${process.pid}.json`, port = 4198;
+  const file = `${os.tmpdir()}/studio-test-jobs-restart-${process.pid}.json`, port = 4198;
   const base = {stages: ['preview'], current: 'preview', done: [], log: [], engine: 'auto', progress: 0.4};
   fs.writeFileSync(file, JSON.stringify([{...base, id: 'j-run', episode: 'zz-x', status: 'running', createdAt: 1}, {...base, id: 'j-wait', episode: 'zz-y', status: 'queued', current: null, createdAt: 2}]));
   const c = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(port), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: file}, stdio: 'ignore'});
