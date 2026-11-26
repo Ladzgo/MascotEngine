@@ -64,7 +64,9 @@ export function renderSpeech(engine: NeuralName, text: string, lang: string, out
   fs.mkdirSync(tmp, {recursive: true});
   const ext = engine === 'edge' ? 'mp3' : 'wav';
   const job = {engine, voice: neuralVoice(engine, lang), lang, models: modelsDir(), segments: segs.map((s, i) => ({text: s.text, speed: s.speed, out: `${tmp}/${i}.${ext}`}))};
-  const r = spawnSync(py(), [path.join(ROOT, 'scripts/tts/bridge.py')], {input: JSON.stringify(job), encoding: 'utf8', timeout: 600000, maxBuffer: 1 << 24});
+  const run = () => spawnSync(py(), [path.join(ROOT, 'scripts/tts/bridge.py')], {input: JSON.stringify(job), encoding: 'utf8', timeout: 600000, maxBuffer: 1 << 24});
+  let r = run();
+  if (r.status !== 0 && /LibsndfileError|System error/.test(r.stderr ?? '')) { fs.mkdirSync(tmp, {recursive: true}); r = run(); } // a transient write error seen once on ep011; a second try passes
   if (r.status !== 0) throw new Error(`${engine} failed: ${(r.stderr || r.error?.message || '').split('\n').filter(Boolean).slice(-2).join(' ').slice(0, 300)}${engine === 'edge' ? ' (edge-tts needs an internet connection)' : ''}`);
   const parts = segs.map((s, i) => ({a: f32(`${tmp}/${i}.${ext}`), gap: Math.round(s.pauseMs * 44.1)}));
   const out = new Float32Array(parts.reduce((n, p) => n + p.a.length + p.gap, 0));
