@@ -1,4 +1,4 @@
-import React, {useId} from 'react';
+import React, {createContext, useContext, useId} from 'react';
 import {Img, staticFile} from 'remotion';
 import {INK, backOut} from '../theme';
 import {BOIL_STYLE} from '../fx/boil';
@@ -263,32 +263,64 @@ const Penny: React.FC<{pose: string; talking: boolean; accent: string; blink: bo
 /** Deterministic pseudo-random in [0,1) from an integer: idle acting never uses Math.random. */
 const rnd = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
+/** Word timings (scene-local seconds, same clock as SceneView) and emphasis words: lets the mascot lip-sync and react without changing SceneView's props. */
+export type Acting = {words: {w: string; start: number; end: number}[]; emphasis: string[]; big: boolean; fps: number};
+export const ActingContext = createContext<Acting | null>(null);
+const norm = (w: string) => w.toLowerCase().replace(/[^a-z0-9%$áéíóöőúüű]/g, '');
+const syllables = (w: string) => Math.max(1, (norm(w).match(/[aeiouyáéíóöőúüű]+/g) ?? []).length);
+
+/** Mouth openness 0..1 from word timings: one open/close per syllable inside a word, shut in the gaps. */
+export function lipOpen(words: Acting['words'], t: number): number {
+  const w = words.find(x => t >= x.start && t <= x.end);
+  if (!w) return 0;
+  const u = (t - w.start) / Math.max(0.05, w.end - w.start);
+  const n = syllables(w.w);
+  const env = Math.abs(Math.sin(Math.PI * u * n)) * Math.sin(Math.PI * Math.min(1, u * 0.9 + 0.05));
+  return Math.max(0.12, Math.min(1, env * (0.65 + 0.35 * rnd(w.start * 97 + Math.floor(u * n)))));
+}
+
+/** 0..1 envelope for a hit on emphasis/number words (about 0.4 s decay), 0 before the first one. */
+export function hitEnv(a: Acting, t: number): number {
+  let best = 0;
+  for (const w of a.words) {
+    const key = norm(w.w);
+    if (!key) continue;
+    const hit = a.emphasis.some(e => e && norm(e).split(/\s+/).includes(key)) || (a.big && /[0-9%$]/.test(key));
+    if (!hit) continue;
+    const u = (t - w.start) / 0.4;
+    if (u >= 0 && u < 1) best = Math.max(best, Math.sin(Math.PI * Math.min(1, u * 2.2)) * (1 - u));
+  }
+  return best;
+}
+
 export const Mascot: React.FC<{
   pose: string; talking: boolean; accent: string; frame: number; height: number;
   assets: CharacterAssets; enter: number; flip?: boolean;
 }> = ({pose, talking, accent, frame, height, assets, enter, flip}) => {
   const width = height * 0.8;
   const e = backOut(enter);
+  const acting = useContext(ActingContext);
+  const t = frame / (acting?.fps ?? 30);
+  const hit = acting ? hitEnv(acting, t) * (acting.big ? 1.5 : 1) : 0;
   // idle acting: breathing, slow sway, irregular blinks, eye darts, nod while talking
   const breath = 1 + 0.012 * Math.sin(frame / 19);
   const sway = Math.sin(frame / 41) * 0.9 + Math.sin(frame / 17 + 1) * 0.35 + (talking ? Math.sin(frame / 5.5) * 0.7 : 0);
-  const bob = Math.sin(frame / 14) * 5 - (talking ? Math.abs(Math.sin(frame / 5.5)) * 6 : 0);
+  const bob = Math.sin(frame / 14) * 5 - (talking ? Math.abs(Math.sin(frame / 5.5)) * 6 : 0) - hit * 22;
   const blink = frame % 83 >= 80 || (frame % 197 >= 191 && frame % 197 < 194);
   const dart = Math.floor(frame / 34);
-  const look: [number, number] = rnd(dart) > 0.45 ? [Math.round((rnd(dart + 9) - 0.5) * 22), Math.round((rnd(dart + 19) - 0.5) * 10)] : [0, 0];
-  const open = talking ? [0.1, 0.55, 1, 0.7, 0.3, 0.85][Math.floor(rnd(Math.floor(frame / 3)) * 6)] : 0;
-  const flap = talking;
+  const look: [number, number] = hit > 0.2 ? [0, -4] : rnd(dart) > 0.45 ? [Math.round((rnd(dart + 9) - 0.5) * 22), Math.round((rnd(dart + 19) - 0.5) * 10)] : [0, 0];
+  const open = acting ? (talking ? lipOpen(acting.words, t) : 0) : talking ? [0.1, 0.55, 1, 0.7, 0.3, 0.85][Math.floor(rnd(Math.floor(frame / 3)) * 6)] : 0;
   const real = assets[pose];
-  const realOpen = talking && Math.floor(frame / 2) % 2 === 0;
+  const realOpen = acting ? open > 0.35 : talking && Math.floor(frame / 2) % 2 === 0;
   return (
     <div style={{
-      width, height, transform: `translateY(${bob}px) rotate(${sway}deg) scale(${1.14 - 0.14 * e}, ${(0.8 + 0.2 * e) * breath}) scaleX(${flip ? -1 : 1})`,
+      width, height, transform: `translateY(${bob}px) rotate(${sway - hit * 2}deg) scale(${(1.14 - 0.14 * e) * (1 + hit * 0.03)}, ${(0.8 + 0.2 * e) * breath * (1 + hit * 0.04)}) scaleX(${flip ? -1 : 1})`,
       transformOrigin: '50% 100%', opacity: Math.min(1, enter * 4),
     }}>
       {real ? (
         <Img src={staticFile(realOpen && real.talk ? real.talk : real.file)} style={{width: '100%', height: '100%', objectFit: 'contain'}} />
       ) : (
-        <Penny pose={pose} talking={flap} accent={accent} blink={blink} open={open} look={look} />
+        <Penny pose={pose} talking={talking} accent={accent} blink={blink && hit < 0.1} open={open} look={look} />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import React from 'react';
 import {BOIL_STYLE} from './boil';
-import {INK, W, H, clamp} from '../theme';
+import {INK, clamp} from '../theme';
 
 const rnd = (n: number) => { const x = Math.sin(n * 91.7 + 17.3) * 43758.5453; return x - Math.floor(x); };
 
@@ -9,17 +9,17 @@ export const Camera: React.FC<{frame: number; seed: number; children: React.Reac
   const f = Math.max(0, frame);
   const dir = seed % 2 ? -1 : 1;
   const settle = 1 - Math.exp(-f / 220);
-  const z = 1 + 0.032 * settle + (seed === 0 ? 0.04 * Math.exp(-f / 12) : 0);
-  const tx = dir * 16 * settle + Math.sin(f / 31) * 2 + Math.sin(f / 13 + 2) * 0.8;
-  const ty = -8 * settle + Math.sin(f / 37 + 1) * 1.6 + Math.sin(f / 11) * 0.6;
+  // no zoom here: SceneView owns the director's push/pull/punch-ins; this layer only adds drift and handheld life
+  const tx = dir * 8 * settle + Math.sin(f / 31) * 2 + Math.sin(f / 13 + 2) * 0.8;
+  const ty = -5 * settle + Math.sin(f / 37 + 1) * 1.6 + Math.sin(f / 11) * 0.6;
   const rot = Math.sin(f / 53 + seed) * 0.14 + Math.sin(f / 19) * 0.04;
-  return <div style={{position: 'absolute', inset: 0, transform: `translate(${tx}px, ${ty}px) rotate(${rot}deg) scale(${z})`, transformOrigin: '50% 48%'}}>{children}</div>;
+  return <div style={{position: 'absolute', inset: 0, transform: `translate(${tx}px, ${ty}px) rotate(${rot}deg) `, transformOrigin: '50% 48%'}}>{children}</div>;
 };
 
 const SHAPES = ['ring', 'plus', 'squiggle', 'tri', 'dots'] as const;
 
 /** Living background behind a scene: soft colour blocks and faint floating marks that drift against the camera (parallax), so no frame is ever flat. */
-export const Living: React.FC<{frame: number; seed: number; accent: string}> = ({frame, seed, accent}) => {
+export const Living: React.FC<{frame: number; seed: number; accent: string; w?: number; h?: number}> = ({frame, seed, accent, w: W = 1920, h: H = 1080}) => {
   const f = Math.max(0, frame);
   const dir = seed % 2 ? 1 : -1;
   const tint = accent === INK ? '#e8c25a' : accent;
@@ -57,3 +57,20 @@ export const Living: React.FC<{frame: number; seed: number; accent: string}> = (
 export const Vignette: React.FC = () => (
   <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(70,45,15,0.16) 100%)'}} />
 );
+
+/** Segmented progress bar along the top edge: one equal segment per scene, finished ones solid, the current one filling. Depends only on scene index/count and chunk-local progress, so chunks stay cacheable as long as those are part of the chunk key. */
+export const ProgressBar: React.FC<{index: number; count: number; p: number; accent: string; w?: number}> = ({index, count, p, accent, w = 1920}) => {
+  const gap = 6, seg = (w - gap * (count + 1)) / count;
+  return (
+    <div style={{position: 'absolute', left: 0, top: 0, width: w, height: 10, pointerEvents: 'none'}}>
+      {Array.from({length: count}, (_, i) => {
+        const fill = i < index ? 1 : i === index ? clamp(p) : 0;
+        return (
+          <div key={i} style={{position: 'absolute', left: gap + i * (seg + gap), top: 0, width: seg, height: 8, borderRadius: '0 0 4px 4px', background: 'rgba(27,27,31,0.12)', overflow: 'hidden'}}>
+            <div style={{width: `${fill * 100}%`, height: '100%', background: accent === INK ? '#e8c25a' : accent}} />
+          </div>
+        );
+      })}
+    </div>
+  );
+};

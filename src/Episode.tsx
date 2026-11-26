@@ -3,14 +3,14 @@ import {AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig} from 'remotion'
 import type {Episode as EpisodeT} from './schema';
 import type {EpisodeDecisions} from './director/types';
 import type {Timings} from './pipeline/tts';
-import type {CharacterAssets} from './character/Mascot';
+import {ActingContext, type CharacterAssets} from './character/Mascot';
 import {BoilDefs} from './fx/boil';
 import {Paper} from './fx/paper';
 import {Captions, buildPhrases, captionLayout, type CaptionWord} from './fx/captions';
 import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
 import {SourceCard} from './fx/overlays';
-import {Camera, Living, Vignette} from './fx/life';
+import {Camera, Living, ProgressBar, Vignette} from './fx/life';
 import {DISPLAY, INK, SANS, loadFonts, easeOut, spring, clamp} from './theme';
 
 export type EpisodeProps = {
@@ -40,6 +40,9 @@ export function chunkBase(L: {froms: number[]; ends: number[]}, g: number): numb
   return b;
 }
 
+/** Index of the scene whose chunk frame g belongs to. */
+const sceneAt = (L: {froms: number[]}, g: number) => { let k = 0; L.froms.forEach((f, i) => { if (f <= g) k = i; }); return k; };
+
 export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decisions, assets}) => {
   loadFonts();
   const g = useCurrentFrame();
@@ -67,8 +70,10 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     <Living frame={frame + preroll} seed={i} accent={acc(i)} />
     <Camera frame={frame + preroll} seed={i}>
       {host0 && ['big_number', 'chart'].includes(episode.scenes[i].type) && <SourceCard host={host0} t={(frame + preroll) / fps} accent={acc(i)} />}
-      <SceneView scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} preroll={preroll} fps={fps} accent={acc(i)}
-        assets={assets} words={sceneWordsRel[i]} intro={decisions.intro} episodeTitle={episode.title} />
+      <ActingContext.Provider value={{words: sceneWordsRel[i], emphasis: episode.scenes[i].emphasis, big: episode.scenes[i].type === 'big_number', fps}}>
+        <SceneView scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} preroll={preroll} fps={fps} accent={acc(i)}
+          assets={assets} words={sceneWordsRel[i]} intro={decisions.intro} episodeTitle={episode.title} />
+      </ActingContext.Provider>
     </Camera>
     </>
   );
@@ -89,6 +94,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
         </Sequence>
       ))}
       <Vignette />
+      {g < endStart && <ProgressBar index={sceneAt(L, g)} count={totalScenes} p={(g - base) / Math.max(1, L.ends[sceneAt(L, g)] - L.froms[sceneAt(L, g)])} accent={accent} />}
       <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />
       {episode.disclaimer && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
@@ -118,7 +124,7 @@ const Subscribe: React.FC<{f: number}> = ({f}) => {
   const cur = clamp((f - 12) / 22);
   return (
     <div style={{marginTop: 56, display: 'flex', alignItems: 'center', gap: 28, transform: `scale(${e * tap})`, position: 'relative'}}>
-      <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 46, padding: '18px 52px', borderRadius: 16, border: `5px solid ${INK}`, boxShadow: `6px 6px 0 ${INK}`, color: done ? INK : '#fff', background: done ? '#e4dfd0' : '#d9363e'}}>{done ? 'Subscribed' : 'Subscribe'}</div>
+      <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 46, padding: '18px 0', width: 400, textAlign: 'center', borderRadius: 16, border: `5px solid ${INK}`, boxShadow: `6px 6px 0 ${INK}`, color: done ? INK : '#fff', background: done ? '#e4dfd0' : '#d9363e'}}>{done ? 'Subscribed' : 'Subscribe'}</div>
       <svg width={70} height={70} viewBox="0 0 100 100" style={{transform: `rotate(${ring}deg)`, transformOrigin: '50% 10%'}} fill={done ? accentFill : 'none'} stroke={INK} strokeWidth={6} strokeLinejoin="round" strokeLinecap="round">
         <path d="M50 10c-18 0-28 14-28 32v16l-10 14h76l-10-14V42C78 24 68 10 50 10zM40 84a10 10 0 0 0 20 0" />
       </svg>

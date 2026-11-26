@@ -5,6 +5,8 @@ import {BoilDefs} from './fx/boil';
 import {Paper} from './fx/paper';
 import {Captions, buildPhrases, captionLayout} from './fx/captions';
 import {SceneView, type Place} from './scenes/SceneView';
+import {ActingContext} from './character/Mascot';
+import {Camera, Living, Vignette} from './fx/life';
 import {ACCENT_HEX} from './accents';
 import {CtaCard, Watermark, type Branding} from './Branding';
 import {H, INK, W, clamp, easeInOut, easeOut, loadFonts} from './theme';
@@ -36,9 +38,15 @@ const ShortScene: React.FC<ShortProps & {sceneIndex: number}> = ({episode, timin
   return (
     <AbsoluteFill>
       <div style={{position: 'absolute', left: 0, top: 0, width: VW, height: VH, transform: `scale(${K})`, transformOrigin: '0 0'}}>
-        <SceneView scene={scene} dec={d} frame={f} fps={fps} accent={decisions.accent === '' ? INK : accent} assets={assets} words={words}
-          intro={decisions.intro} episodeTitle={episode.title} place={PLACE} floor={FLOOR} />
+        <Living frame={f} seed={sceneIndex} accent={decisions.accent === '' ? INK : accent} w={VW} h={VH} />
+        <Camera frame={f} seed={sceneIndex}>
+          <ActingContext.Provider value={{words, emphasis: scene.emphasis, big: scene.type === 'big_number', fps}}>
+            <SceneView scene={scene} dec={d} frame={f} fps={fps} accent={decisions.accent === '' ? INK : accent} assets={assets} words={words}
+              intro={decisions.intro} episodeTitle={episode.title} place={PLACE} floor={FLOOR} />
+          </ActingContext.Provider>
+        </Camera>
       </div>
+      <Vignette />
       <Captions phrases={phrases} t={f / fps} accent={accent} style={decisions.captionStyle} size={cap.size} anchor={cap.anchor} bottom={cap.offset} maxWidth={cap.maxWidth} highlight={decisions.captions?.highlight} />
     </AbsoluteFill>
   );

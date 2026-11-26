@@ -41,7 +41,7 @@ export function captionLayout(prefs: CaptionPrefsT | undefined, target: 'wide' |
     const size = p.size ?? 58;
     return {size, maxWidth: W - 360, anchor: p.position, offset: p.position === 'bottom' ? 50 : 70};
   }
-  const size = Math.min(p.size ?? 76, 96); // above ~96 px a 6-word phrase no longer fits the safe width in two lines
+  const size = Math.min(p.size ?? 80, 96); // above ~96 px a 6-word phrase no longer fits the safe width in two lines
   return {size, maxWidth: 1080 - 2 * SHORTS_SAFE.side, anchor: p.position, offset: p.position === 'bottom' ? SHORTS_SAFE.bottom : p.position === 'top' ? SHORTS_SAFE.top : 0};
 }
 
@@ -52,9 +52,9 @@ export const Captions: React.FC<{phrases: Phrase[]; t: number; accent: string; s
   const inner = phrase.words.map((w, i) => {
     const active = highlight !== 'none' && t >= w.start && t < w.end + 0.02 && !isFunctionWord(w.w);
     const color = active && highlight === 'accent' ? accent : style === 'bar' ? PAPER : INK;
-    const pop = active ? 1 + 0.1 * spring(clamp((t - w.start) / 0.2)) : 1; // keyword pop, springs in when the word is spoken
+    const pop = active ? 1 + 0.07 * spring(clamp((t - w.start) / 0.2)) : 1; // keyword pop, springs in when the word is spoken
     const pending = t < w.start - 0.02 ? 0.62 : 1; // words not yet spoken are dimmed (karaoke feel)
-    return <span key={i} style={{display: 'inline-block', color, opacity: pending, transform: `scale(${pop})`, transformOrigin: '50% 80%', marginRight: i < phrase.words.length - 1 ? '0.3em' : 0, textDecoration: active && highlight === 'underline' ? `underline 6px ${accent}` : undefined, textUnderlineOffset: 8}}>{w.w}</span>;
+    return <span key={i} style={{display: 'inline-block', color, opacity: pending, transform: `scale(${pop})`, transformOrigin: '50% 80%', marginRight: i < phrase.words.length - 1 ? '0.36em' : 0, textDecoration: active && highlight === 'underline' ? `underline 6px ${accent}` : undefined, textUnderlineOffset: 8}}>{w.w}</span>;
   });
   const base: React.CSSProperties = {fontFamily: style === 'outline' ? DISPLAY : SANS, fontWeight: 700, fontSize: size, lineHeight: 1.15, textAlign: 'center', maxWidth, opacity: Math.min(1, enter * 1.6), transform: `translateY(${(1 - easeOut(enter)) * 18}px) scale(${0.96 + 0.04 * easeOut(enter)})`, textShadow: style === 'bar' ? '0 2px 0 rgba(0,0,0,0.35)' : undefined};
   const pos: React.CSSProperties = anchor === 'bottom' ? {bottom} : anchor === 'top' ? {top: bottom} : {top: '50%', transform: 'translateY(-50%)'};
