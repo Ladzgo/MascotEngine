@@ -25,7 +25,8 @@ export const Root: React.FC = () => (
       const p = props as EpisodeProps;
       const L = frameLayout(p.decisions, FPS);
       const body = L.ends[L.ends.length - 1];
-      return {durationInFrames: body + (p.episode.disclaimer ? ENDCARD_FRAMES : 0)};
+      const short = p.episode.format === 'short';
+      return {durationInFrames: body + (p.episode.disclaimer && !short ? ENDCARD_FRAMES : 0), ...(short ? {width: 1080, height: 1920} : {})};
     }}
   />
   <Composition

@@ -11,6 +11,9 @@ import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
 import {ChapterTag, SourceCard} from './fx/overlays';
 import {Camera, Living, ProgressBar, Vignette} from './fx/life';
+import {FullBleedScene} from './fullbleed/FullBleedScene';
+import {pickFbKind} from './fullbleed/shots';
+import {PunchCaptions, buildPunchPhrases} from './fx/punch';
 import {DISPLAY, INK, SANS, loadFonts, easeOut, spring, clamp} from './theme';
 
 export type EpisodeProps = {
@@ -46,7 +49,8 @@ const sceneAt = (L: {froms: number[]}, g: number) => { let k = 0; L.froms.forEac
 export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decisions, assets}) => {
   loadFonts();
   const g = useCurrentFrame();
-  const {fps} = useVideoConfig();
+  const {fps, width, height} = useVideoConfig();
+  const fullbleed = episode.look === 'fullbleed';
   const L = useMemo(() => frameLayout(decisions, fps), [decisions, fps]);
 
   const sceneWordsRel = useMemo(() => decisions.scenes.map((d, i) => {
@@ -54,9 +58,9 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     return tm.words.map(w => ({w: w.w, start: w.start - tm.start + d.speechStart, end: w.end - tm.start + d.speechStart}));
   }), [decisions, timings]);
 
-  const phrases = useMemo(() => buildPhrases(
+  const phrases = useMemo(() => (fullbleed ? buildPunchPhrases : buildPhrases)(
     decisions.scenes.map((d, i): CaptionWord[] => sceneWordsRel[i].map(w => ({w: w.w, start: d.startSec + w.start, end: d.startSec + w.end}))),
-  ), [decisions, sceneWordsRel]);
+  ), [decisions, sceneWordsRel, fullbleed]);
 
   // Everything that animates with time uses the frame relative to its chunk (scene), so a chunk looks the same wherever it sits in the video: the render cache survives edits that move later scenes.
   const base = chunkBase(L, g);
@@ -64,8 +68,10 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
   const phrasesLocal = useMemo(() => phrases.map(p => ({start: p.start - shift, end: p.end - shift, words: p.words.map(w => ({...w, start: w.start - shift, end: w.end - shift}))})), [phrases, shift]);
 
   const host0 = (() => { try { return new URL(episode.sources[0]).hostname.replace(/^www\./, ''); } catch { return ''; } })();
-  const acc = (i: number) => (decisions.accent === '' ? INK : accentHex(decisions.accent));
-  const view = (i: number, frame: number, preroll = 0) => (
+  const acc = (i: number) => (decisions.accent === '' ? (episode.look === 'fullbleed' ? '#ff5a36' : INK) : accentHex(decisions.accent));
+  const view = (i: number, frame: number, preroll = 0) => fullbleed ? (
+    <FullBleedScene scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} fps={fps} accent={acc(i)} w={width} h={height} words={sceneWordsRel[i]} index={i} episodeTitle={episode.title} prevKind={i > 0 ? pickFbKind(episode.scenes[i - 1], sceneWordsRel[i - 1], decisions.scenes[i - 1].durSec, i - 1) : undefined} preroll={preroll} />
+  ) : (
     <>
     <Living frame={frame + preroll} seed={i} accent={acc(i)} />
     <Camera frame={frame + preroll} seed={i}>
@@ -80,24 +86,24 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
   );
 
   const cap = captionLayout(decisions.captions, 'wide');
-  const accent = accentHex(decisions.accent);
+  const accent = decisions.accent === '' && fullbleed ? '#ff5a36' : accentHex(decisions.accent);
   const totalScenes = decisions.scenes.length;
   const endStart = L.ends[totalScenes - 1];
 
   return (
     <AbsoluteFill>
       <BoilDefs frame={g - base} />
-      <Paper variant={decisions.background} />
+      {!fullbleed && <Paper variant={decisions.background} />}
       {decisions.scenes.map((d, i) => (
         <Sequence key={i} from={L.froms[i]} durationInFrames={Math.max(1, L.ends[i] - L.froms[i])} layout="none">
-          <SceneSeq paper={<Paper variant={decisions.background} />} i={i} T={L.ts[i]} start={L.starts[i]} prevLast={i > 0 ? L.froms[i] - L.starts[i - 1] - 1 : 0}
+          <SceneSeq paper={fullbleed ? <div style={{position: 'absolute', inset: 0, background: '#12142a'}} /> : <Paper variant={decisions.background} />} i={i} T={L.ts[i]} start={L.starts[i]} prevLast={i > 0 ? L.froms[i] - L.starts[i - 1] - 1 : 0}
             kind={d.transition} accent={accent} view={view} />
         </Sequence>
       ))}
-      <Vignette />
-      {g < endStart && <ProgressBar index={sceneAt(L, g)} count={totalScenes} p={(g - base) / Math.max(1, L.ends[sceneAt(L, g)] - L.froms[sceneAt(L, g)])} accent={accent} />}
-      <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />
-      {episode.disclaimer && (
+      {!fullbleed && <Vignette />}
+      {!fullbleed && g < endStart && <ProgressBar index={sceneAt(L, g)} count={totalScenes} p={(g - base) / Math.max(1, L.ends[sceneAt(L, g)] - L.froms[sceneAt(L, g)])} accent={accent} />}
+      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={episode.scenes[sceneAt(L, g)].type !== 'big_number'} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
+      {episode.disclaimer && episode.format !== 'short' && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
           <EndCard episode={episode} accent={accent} />
         </Sequence>

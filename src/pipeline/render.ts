@@ -72,12 +72,13 @@ export async function render(idArg: string, mode: 'preview' | 'final') {
   const scale = mode === 'preview' ? 2 / 3 : 1; // 1280x720 preview, 1920x1080 final
   const L = frameLayout(decisions, fps);
   const bodyFrames = L.ends[L.ends.length - 1];
-  const totalFrames = bodyFrames + (ep.disclaimer ? ENDCARD_FRAMES : 0);
+  const endCard = ep.disclaimer && ep.format !== 'short';
+  const totalFrames = bodyFrames + (endCard ? ENDCARD_FRAMES : 0);
   const common = {
     composition: comp, serveUrl: bundled, codec: 'h264' as const, inputProps,
     scale, muted: true, crf: mode === 'final' ? 18 : 24, pixelFormat: 'yuv420p' as const, chromiumOptions: chromiumTuning(), ...(mode === 'preview' ? {x264Preset: 'veryfast' as const} : {}),
   };
-  const ranges = process.env.RENDER_CACHE === '0' ? null : chunkRanges(L, totalFrames, !!ep.disclaimer);
+  const ranges = process.env.RENDER_CACHE === '0' ? null : chunkRanges(L, totalFrames, !!endCard);
   if (!ranges) {
     let lastPct = -1;
     await renderMedia({...common, outputLocation: silent, onProgress: ({progress}) => {

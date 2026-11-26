@@ -1,0 +1,10 @@
+{"id":"fb-demo","title":"Your Car Loan Costs More","channel":"default","series":"money-myths","seed":3,"format":"short","look":"fullbleed","disclaimer":true,"sources":["https://www.federalreserve.gov/releases/g19/current/"],
+"scenes":[
+{"type":"title","emotion":"shocked","emphasis":["loan"],"narration":"Your car loan hides a second price tag."},
+{"type":"talk","emotion":"explaining","emphasis":["interest"],"narration":"A twenty thousand dollar car at seven percent interest costs far more than the sticker price.","visuals":[{"kind":"car"},{"kind":"percent","at":"seven"},{"kind":"coins","at":"costs"}]},
+{"type":"big_number","emotion":"shocked","value":3800,"prefix":"$","suffix":"","label":"extra interest over 60 months","decimals":0,"emphasis":["interest"],"narration":"Over sixty months that is about three thousand eight hundred dollars in interest."},
+{"type":"list","emotion":"thinking","items":["Shorter term","Bigger down payment","Shop the rate"],"emphasis":["term"],"narration":"Three levers matter. A shorter term, a bigger down payment, and shopping the rate."},
+{"type":"compare","emotion":"smug","left":{"title":"60 months","value":"$3,800"},"right":{"title":"36 months","value":"$2,200"},"emphasis":["months"],"narration":"Sixty months costs thirty eight hundred. Thirty six months costs about twenty two hundred."},
+{"type":"chart","emotion":"explaining","chart":{"kind":"bar","labels":["24","36","48","60","72"],"values":[1500,2200,3000,3800,4600],"yLabel":"interest"},"emphasis":["longer"],"narration":"The longer the loan, the more interest piles up, month after month."},
+{"type":"talk","emotion":"happy","emphasis":["follow"],"narration":"Check the term before you sign. Follow for more money maths.","visuals":[{"kind":"calendar"},{"kind":"shield","at":"sign"}]}
+]}

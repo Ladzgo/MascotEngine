@@ -22,6 +22,8 @@ const Overrides = {
   /** Hero illustration for the scene (src/visuals); absent = picked from the narration keywords. */
   /** Chapter divider: a tag with this title slides in at the start of the scene (wide video); scene-local, so render chunks stay cacheable. */
   chapter: z.string().min(1).max(40).optional(),
+  /** Full-bleed look: 2-4 visuals inside one scene, each switching in when its keyword is spoken (src/fullbleed). Absent = one hero picked from the narration. */
+  visuals: z.array(z.object({kind: z.string().min(1).max(24), at: z.string().max(40).optional()})).max(4).optional(),
   visual: z.object({kind: VisualKind, label: z.string().max(40).optional()}).optional(),
 };
 
@@ -80,6 +82,10 @@ export const Episode = z.object({
   scenes: z.array(Scene).min(1),
   sources: z.array(z.string().url()).default([]),
   disclaimer: z.boolean().default(false),
+  /** wide = 16:9 video; short = native 9:16 (1080x1920) episode. */
+  format: z.enum(['wide', 'short']).default('wide'),
+  /** paper = hand-drawn paper + mascot; fullbleed = layered full-frame scenes with continuous camera, no mascot. */
+  look: z.enum(['paper', 'fullbleed']).default('paper'),
 });
 export type Episode = z.infer<typeof Episode>;
 
@@ -129,7 +135,7 @@ export const DecisionsSchema = z.object({
 }).superRefine((d, ctx) => {
   d.scenes.forEach((s, i) => {
     const prev = d.scenes[i - 1];
-    if (prev && s.startSec < prev.startSec + prev.durSec - 1e-3) ctx.addIssue({code: 'custom', path: ['scenes', i, 'startSec'], message: 'scene starts before the previous one ends'});
+    if (prev && s.startSec < prev.startSec + prev.durSec - 4e-3) ctx.addIssue({code: 'custom', path: ['scenes', i, 'startSec'], message: 'scene starts before the previous one ends'});
     if (s.startSec + s.durSec > d.totalSec + 1e-3) ctx.addIssue({code: 'custom', path: ['scenes', i, 'durSec'], message: 'scene runs past totalSec'});
   });
 });

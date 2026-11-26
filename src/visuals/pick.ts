@@ -46,3 +46,8 @@ export function pickVisuals(scene: Pick<Scene, 'narration' | 'emphasis' | 'emoti
   const order = [...top.slice(r), ...top.slice(0, r)];
   return {hero: order[0], support: order.slice(1)};
 }
+
+/** The most specific illustration kind a single spoken word points at (generic `low` kinds only when asked), or undefined. */
+export function kindForWord(word: string, allowLow = false): VisualKind | undefined {
+  return RULES.find(r => (allowLow || !r.low) && r.re.test(word))?.kind;
+}
