@@ -180,12 +180,12 @@ export const Groceries: Obj = ({t}) => (
   </g>
 );
 
-export const Coffee: Obj = ({t}) => (
+export const Coffee: Obj = ({t, value}) => (
   <g transform={`scale(${Math.max(0.01, pop(t, 0, 0.5))})`} style={{transformOrigin: '200px 330px'}}>
     <Shadow rx={120} />
     {[150, 200, 250].map((x, i) => <path key={i} d={`M${x} 110 q-16 -22 0 -44 t0 -44`} stroke="#fff" strokeWidth={7} fill="none" strokeLinecap="round" opacity={0.45 + 0.4 * Math.sin(t * 2 + i)} transform={`translate(0 ${-((t * 18 + i * 9) % 30)})`} />)}
     <path d="M100 130 H300 L280 300 Q200 340 120 300Z" fill={url('wall', true)} /><rect x={100} y={130} width={200} height={20} rx={10} fill="#4a2a12" /><path d="M300 160 q56 0 56 50 t-62 50" fill="none" stroke={url('wall')} strokeWidth={14} strokeLinecap="round" />
-    <g transform={`rotate(10 200 230)`}><rect x={150} y={195} width={100} height={56} rx={10} fill="#fff" /><Txt x={200} y={236} size={40} fill={P('red', 1)}>$6</Txt></g>
+    {value !== undefined && <g transform={`rotate(10 200 230)`}><rect x={140} y={195} width={120} height={56} rx={10} fill="#fff" /><Txt x={200} y={236} size={40} fill={P('red', 1)}>{`$${value}`}</Txt></g>}
   </g>
 );
 

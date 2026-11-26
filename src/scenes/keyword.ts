@@ -1,5 +1,8 @@
 import {isFunctionWord} from '../fx/captions';
 
+// words that frame a sentence but say nothing about it ("The takeaway: ...", "Follow for more ..."): never the big on-screen word
+const GENERIC = new Set(['takeaway', 'takeaways', 'yourself', 'follow', 'insights', 'basically', 'actually', 'remember', 'something', 'everyone', 'people']);
+
 /** Callout text for a talk scene: the author's emphasis, else a number, else the whole sentence when it is short (a lone random word like "THROUGH" says nothing), else the longest content word. */
 export function pickKeyword(narration: string, emphasis: string[]): string {
   if (emphasis[0]) return emphasis[0];
@@ -7,6 +10,6 @@ export function pickKeyword(narration: string, emphasis: string[]): string {
   const num = ws.find(w => /\d/.test(w));
   if (num) return num;
   if (ws.length <= 5) return ws.join(' ');
-  const content = ws.filter(w => !isFunctionWord(w));
+  const content = ws.filter(w => !isFunctionWord(w) && !GENERIC.has(w.toLowerCase()));
   return [...(content.length ? content : ws)].sort((a, b) => b.length - a.length)[0] ?? '';
 }

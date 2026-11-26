@@ -134,7 +134,7 @@ export async function stockForEpisode(epDir: string, scenes: {stock?: {query: st
   return items;
 }
 
-const TOPIC_STOP = new Set('your this that with what when why how does from into will about tricking really actually truth secret'.split(' '));
+const TOPIC_STOP = new Set('your this that with what when why how does from into will about tricking really actually truth secret adds year years makes make costs cost every daily quietly'.split(' '));
 /** The episode title's content words ("Sleep & Memory" -> sleep, memory): every stock hit must carry one of them. */
 export function topicWords(epDir: string): string[] {
   let title = '';

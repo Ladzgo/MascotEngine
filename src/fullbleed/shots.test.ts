@@ -70,6 +70,8 @@ test('variety engine: no subject within 6 beats, no setting/camera/layout twice 
     p.shots.forEach(sh => { if (i !== 3) assert.ok(!prior.includes(sh.kind), `${sh.kind} repeats within 6 beats at ${i}`); });
   });
   assert.ok(new Set(plan.map(p => p.layout)).size >= 3);
+  // backdrops: none repeats within 8 drawn beats (ep011 showed the city three times)
+  plan.forEach((p, i) => { if (i !== 3) assert.ok(!plan.slice(Math.max(0, i - 7), i).some((q, k) => q.env === p.env && Math.max(0, i - 7) + k !== 3), `env ${p.env} repeats within 8 at ${i}`); });
 });
 
 import {median, reselect} from './reselect.js';

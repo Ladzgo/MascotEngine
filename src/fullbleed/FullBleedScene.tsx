@@ -131,10 +131,10 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
   const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : align === 'down' ? x + wpx / 2 : x, ay0 = align === 'down' ? y + size * 1.6 : y + size * 0.8;
   return (
     <>
-      <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
+      {align !== 'down' && <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
         {[['#0b0d1e', size * 0.2], ['#fff', size * 0.11]].map(([c, sw], k) => <line key={k} x1={ax} y1={ay0} x2={ax + (tx - ax) * e} y2={ay0 + (ty - ay0) * e} stroke={String(c)} strokeWidth={Number(sw)} strokeLinecap="round" />)}
         <circle cx={tx} cy={ty} r={size * 0.26 * e} fill={accent} stroke="#fff" strokeWidth={size * 0.09} /><circle cx={tx} cy={ty} r={size * 0.26 * e + size * 0.13} fill="none" stroke="#0b0d1e" strokeOpacity={0.5} strokeWidth={size * 0.05} />
-      </svg>
+      </svg>}
       <div style={{position: 'absolute', left: x, top: y, width: wpx, opacity: e, transform: `translateY(${(1 - e) * 30}px) scale(${0.9 + 0.1 * e})`, background: 'rgba(255,255,255,0.96)', color: '#16182a', fontFamily: SANS, fontWeight: 800, fontSize: size, lineHeight: 1.1, padding: `${size * 0.32}px ${size * 0.5}px`, borderRadius: size * 0.7, boxShadow: '0 10px 30px rgba(0,0,0,0.35)', borderLeft: `${size * 0.22}px solid ${accent}`, textAlign: 'left'}}>{text}</div>
     </>
   );
@@ -211,7 +211,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
-  const base = tall ? w * 1.4 : h * 1.05;
+  const base = tall ? w * 1.25 : h * 1.05; // wider objects (scale, bars) span the whole 400 box: above ~1.25 w they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
   const hs = base * scale, groundY = tall ? h * 0.75 : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
@@ -247,7 +247,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
                   const st: React.CSSProperties = {position: 'absolute', left: sx0 - size / 2 + cp.tx * size, top: sy0 - size / 2 + bob + cp.ty * size, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(Math.min(inE, easeOut(lt / 0.3)) * 1.5) * cp.op, transform: `scale(${over * (1 + 0.12 * easeInOut(out)) * cp.sc * (cp.sx ?? 1)}, ${over * (1 + 0.12 * easeInOut(out)) * cp.sc * (cp.scY ?? 1)}) rotate(${cp.rot + Math.sin(t * 0.9 + i) * 1.2}deg) translateX(${out * -w * 0.06}px)`, filter: 'drop-shadow(0 18px 24px rgba(0,0,0,0.35))', clipPath: cp.clip === 'left' ? 'inset(0 50% 0 0)' : cp.clip === 'right' ? 'inset(0 0 0 50%)' : undefined};
                   return (
                     <svg key={ci} viewBox="0 0 400 400" width={size} height={size} style={st}>
-                      {isChart && scene.type === 'chart' && sl.main ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={lt} /> : <O t={lt} accent={accent} value={scene.type === 'big_number' && i === 0 && sl.main ? scene.value : undefined} />}
+                      {isChart && scene.type === 'chart' && sl.main ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={lt} /> : <O t={lt} accent={accent} value={i === 0 && sl.main ? (scene.type === 'big_number' ? scene.value : typeof scene.shot?.number === 'number' ? scene.shot.number : undefined) : undefined} />}
                     </svg>
                   );
                 })}
@@ -268,11 +268,14 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
       {hasCallouts && (() => {
         const size = tall ? 48 : 44, maxW = tall ? w * 0.86 : w * 0.4;
-        let y = tall ? h * 0.075 : h * 0.14; // pills stack by their real (wrapped) height, so they never overlap each other
+        const cut = (raw: string) => (raw.length > 38 ? raw.slice(0, 36).replace(/[\s,;:]+\S*$/, '') + '…' : raw);
+        const hOf = (txt: string) => Math.max(1, Math.ceil((txt.length * size * 0.6) / Math.max(1, calloutWidth(txt, size, maxW) - size * 1.8))) * size * 1.12 + size * 1.29;
+        // tall: no leader lines (they read as debug pins), so the stack sits just above the object it labels; pills stack by their real wrapped height
+        const total = ctxText.reduce((a, r) => a + hOf(cut(r)), 0), objTop = h * 0.62 + (cy - 0.41 * hs - h * 0.62) * sc;
+        let y = tall ? Math.max(h * 0.075, objTop - total - size * 0.4) : h * 0.14;
         return ctxText.map((raw, i) => {
-          const txt = raw.length > 38 ? raw.slice(0, 36).replace(/[\s,;:]+\S*$/, '') + '…' : raw, wp = calloutWidth(txt, size, maxW);
-          const lines = Math.max(1, Math.ceil((txt.length * size * 0.6) / Math.max(1, wp - size * 1.8))), hgt = lines * size * 1.12 + size * 0.64 + size * 0.3, yy = y;
-          y += hgt + size * 0.35;
+          const txt = cut(raw), wp = calloutWidth(txt, size, maxW), yy = y;
+          y += hOf(txt);
           const x = tall ? (w - wp) / 2 : w * 0.04;
           const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
           const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move

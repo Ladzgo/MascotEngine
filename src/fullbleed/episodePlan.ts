@@ -38,7 +38,8 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
   const perScene: string[][] = [], out: ScenePlan[] = [];
   // the topic's own groups (what the storyboard's subjects belong to) are tried first when a picture must change: a running video never falls back to coins
   const home = [...new Set(scenes.map(s => s.shot?.subject).filter((x): x is string => typeof x === 'string').map(groupOf))];
-  const lastSix = () => perScene.slice(-6).flat(); // variety window = the last 6 beats (scenes), not 6 shots
+  const lastSix = () => perScene.slice(-8).flat(); // variety window = the last 8 beats (scenes), not 8 shots
+  const envHist: Setting[] = []; // backdrops of drawn beats only (stock beats show footage)
   let prevEnv: Setting | undefined, prevLayout: Layout | undefined, prevCam = -1, talkN = 0;
   scenes.forEach((s, i) => {
     const sh = s.shot ?? {}, words = wordsPer[i] ?? [], dur = durs[i] ?? 4;
@@ -58,8 +59,12 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     }
     perScene.push(shots.map(x => x.kind));
     const g = groupOf(shots[0].kind), envs = ENV_BY_GROUP[g] ?? ['abstract'];
-    let env: Setting = validSetting(sh.setting) ? sh.setting : envs[i % envs.length];
-    if (env === prevEnv) env = envs.find(e => e !== prevEnv) ?? (SETTINGS.find(e => e !== prevEnv) as Setting);
+    // backdrop: the explicit/group choice unless it was seen in the last 8 drawn beats, then the least recently used one (group settings first)
+    const recent = envHist.slice(-8), age = (e: Setting) => { const k = recent.lastIndexOf(e); return k < 0 ? Infinity : recent.length - k; };
+    const pref = [...(validSetting(sh.setting) ? [sh.setting] : []), ...envs.slice(i % envs.length), ...envs, ...SETTINGS] as Setting[];
+    let env: Setting = pref.find(e => age(e) === Infinity) ?? [...pref].sort((a, b) => age(b) - age(a))[0];
+    if (env === prevEnv) env = pref.find(e => e !== prevEnv) ?? env;
+    if (!s.stockFile) envHist.push(env);
     let camera = typeof sh.camera === 'string' && CAMERAS.includes(sh.camera as any) ? CAMERAS.indexOf(sh.camera as any) % 4 : (prevCam + 1 + (i % 2)) % 4;
     if (camera === prevCam) camera = (camera + 1) % 4;
     // layout: content decides first, talk beats rotate through the composed layouts
