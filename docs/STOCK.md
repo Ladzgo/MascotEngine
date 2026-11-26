@@ -44,3 +44,18 @@ For A2:
 - The CTA says "Follow Money Myths" on a health video. The series/channel name comes from the default channel; the outro should use the channel name or none.
 - An orange-robed monk stock photo for "around 7,500 steps": an off-topic person. Prefer a walking/feet/sneakers query.
 - Change rate: most talk beats show a single shot.
+
+## Measurements (2026-11-26, EN, qwen2.5vl:7b semantic QA; the 7B scorer is coarse and noisy: the same picture moved 7 -> 5 between runs)
+| episode | stock | semantic median | mean | picture-change gap (ffmpeg scene > 0.06) |
+|---|---|---|---|---|
+| ep011 coffee, before (old queries, no topic gate) | 6/12, mostly off-topic (calendar, cuckoo clock, family TV, clothing tag) | 5 | 5.7 | mean 4.25 s, max 11.7 s |
+| ep011-v2 coffee, after (topic in storyboard prompt, topic gate, dedupe, sub-shots) | 6/12, all coffee photos | 6 | 6.1-6.3 | mean 1.97 s, max 4.73 s |
+| en-sleep, baseline (keyless) | 6/13 | 5 | 4.0 | - |
+| en-sleep-v3 (Pixabay, old queries) | 6/13, hands/dictionary/rocket | 5 | 4.23 | - |
+| en-sleep-v4 (topic gate, sleep b-roll) | 7/13 sleep photos | 5 | 4.0-4.8 | - |
+Abstract science sentences ("slow-wave sleep cements facts") score 0 with any drawn object; on-topic footage scores 5-8. Target median >= 7 is not reached yet.
+
+## Episode-mode stock rules (src/stock/index.ts)
+Every hit must carry a title word of the episode (topic gate); text/logo/fashion hits and animals/babies (unless asked) are dropped; the match must come
+from the query's non-topic words; tries narrow: full query -> woman/man for "person" -> topic + 2 words -> topic + last word -> topic + woman/man -> topic alone
+(topic must lead the tags); one picture once per video; keyless archives are skipped when Pixabay is keyed.
