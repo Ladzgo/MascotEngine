@@ -9,8 +9,8 @@ export const NO_PROVIDER = 'The free local AI (Ollama) is not available. Install
 export const ANTHROPIC_MODEL = 'claude-sonnet-5-5';
 
 const ollamaHost = (env: NodeJS.ProcessEnv) => (env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '').replace(/^(?!https?:\/\/)/, 'http://');
-/** Preferred small instruct models, best first. Already-installed ones are used before anything is downloaded. */
-const PREFERRED = ['qwen2.5:14b', 'qwen2.5:7b', 'llama3.1:8b', 'qwen3:8b', 'gemma2:9b', 'mistral', 'llama3.2', 'qwen2.5:3b', 'phi3', 'qwen2.5:1.5b'];
+/** Preferred small instruct models, best first (7B first: the 14B needs about 10 GB and stalls a 16 GB Mac). Already-installed ones are used before anything is downloaded. */
+const PREFERRED = ['qwen2.5:7b', 'qwen2.5:14b', 'llama3.1:8b', 'qwen3:8b', 'gemma2:9b', 'mistral', 'llama3.2', 'qwen2.5:3b', 'phi3', 'qwen2.5:1.5b'];
 export const DEFAULT_PULL = 'llama3.1:8b';
 /** Per-request limit for local models: bigger models are slower per token. LLM_TIMEOUT_MS overrides. */
 export function ollamaTimeoutMs(model: string, env: NodeJS.ProcessEnv = process.env): number {

@@ -278,6 +278,7 @@ const runDraft = (topic: string, id: string, angle: string, channel: string, sho
 type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; warning?: string; jobId?: string; startedAt: number; topic: string; retry?: DraftOpts};
 type DraftOpts = {device?: string; topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}};
 const drafts = new Map<string, DraftJob>();
+let ideasPid = 0, ideasCancelled = false;
 const draftPid = new Map<string, number>(), draftCancelled = new Set<string>();
 const DRAFTS_FILE = process.env.STUDIO_DRAFTS_FILE ?? `${ROOT}data/drafts.json`;
 const persistDrafts = () => { try { fs.mkdirSync(path.dirname(DRAFTS_FILE), {recursive: true}); fs.writeFileSync(DRAFTS_FILE, JSON.stringify([...drafts.values()].slice(-30))); } catch { /* best effort */ } };
@@ -299,7 +300,7 @@ function startDraft(o: DraftOpts) {
   if (fs.existsSync(epDir(id)) || drafts.get(id)?.state === 'running') throw new HttpError(409, `Episode ${id} already exists.`);
   const release = lockAi();
   const job: DraftJob = {id, state: 'running', progress: {done: 0, total: 0, label: 'Planning the outline'}, startedAt: Date.now(), topic: o.topic, retry: o};
-  const gb = os.totalmem() / 2 ** 30, big = Number(/(\d+)b\b/i.exec(o.model || process.env.OLLAMA_MODEL || 'qwen2.5:14b')?.[1] ?? 0), local = (process.env.LLM_PROVIDER || 'ollama') === 'ollama';
+  const gb = os.totalmem() / 2 ** 30, big = Number(/(\d+)b\b/i.exec(o.model || process.env.OLLAMA_MODEL || 'qwen2.5:7b')?.[1] ?? 0), local = (process.env.LLM_PROVIDER || 'ollama') === 'ollama';
   if (local && big >= 12 && gb <= 18) job.warning = `This Mac has ${Math.round(gb)} GB of memory and a ${big}B model needs about 10 GB: the draft will be slow and the browser may stall. A 7B model or a cloud provider (Settings) is lighter.`;
   drafts.set(id, job); persistDrafts();
   void (async () => {
@@ -688,7 +689,10 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
       needAi('ideas');
       const release = lockAi();
       try {
-        const {code, out} = await runNpm(['ideas', '--', '--channel', id, '--count', String(count), '--scout', ...(focus ? ['--focus', focus] : [])]);
+        ideasCancelled = false;
+        const {code, out} = await runNpm(['ideas', '--', '--channel', id, '--count', String(count), '--scout', ...(focus ? ['--focus', focus] : [])], undefined, {}, pid => { ideasPid = pid; });
+        ideasPid = 0;
+        if (ideasCancelled) return json(res, 422, {error: 'Cancelled. No ideas were added.'});
         if (code === 0 && out.some(l => l.startsWith('IDEAS_OK'))) return json(res, 200, {...readIdeas(id), installed: true});
         return json(res, 422, {error: cliMessage(out, code), log: out.slice(-40)});
       } finally { release(); }
@@ -903,6 +907,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return void res.end(toCsv(await scheduleRows(ROOT)));
     }
     if (p[0] === 'analytics' && m === 'GET') return json(res, 200, summarize(ROOT));
+    if (p[0] === 'ideas' && p[1] === 'cancel' && m === 'POST') { if (ideasPid) { ideasCancelled = true; killGroup(ideasPid); } return json(res, 200, {ok: !!ideasPid}); }
     if (p[0] === 'drafts' && p[1] && p[2] === 'cancel' && m === 'POST') return json(res, 200, {ok: cancelDraft(p[1])});
     if (p[0] === 'drafts' && p[1] && p[2] === 'retry' && m === 'POST') {
       const old = drafts.get(p[1]); if (!old?.retry) throw new HttpError(404, 'Nothing to retry for this run. Start a new video instead.');
@@ -937,7 +942,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       }
       if (m === 'GET' && p[1] && /^preview-[a-z-]+-[a-z]{2}\.mp3$/.test(p[1])) return sendFile(req, res, `${ROOT}data/voice-preview/${p[1]}`);
     }
-    if (p[0] === 'jobs' && !p[1]) { const running = [...jobs.values()].find(j => j.status === 'running'); return json(res, 200, {running: running?.id ?? null}); }
+    if (p[0] === 'jobs' && !p[1]) { const running = [...jobs.values()].find(j => j.status === 'running'); return json(res, 200, {running: running?.id ?? null, drafting: [...drafts.values()].filter(d => d.state === 'running').map(d => ({id: d.id, topic: d.topic, done: d.progress.done, total: d.progress.total}))}); }
     if (p[0] === 'llm' && (p[1] === 'providers' || p[1] === 'test') && !p[2]) { // optional cloud AI: keys go to .env and are never echoed back
       const KEY: Record<string, [string, string]> = {gemini: ['GEMINI_API_KEY', 'GEMINI_MODEL'], groq: ['GROQ_API_KEY', 'GROQ_MODEL'], openrouter: ['OPENROUTER_API_KEY', 'OPENROUTER_MODEL'], anthropic: ['ANTHROPIC_API_KEY', 'DRAFT_MODEL']};
       const cur = () => ({...process.env, ...readEnv()});

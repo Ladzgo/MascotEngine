@@ -96,7 +96,7 @@ export function AiPanel() {
     tick(); return () => { live = false; clearTimeout(t); };
   }, []);
   if (!st) return null;
-  const GEMMA = 'gemma3:12b', options = st.models.includes(GEMMA) ? st.models : [...st.models, GEMMA];
+  const REC = 'qwen2.5:7b', options = st.models.includes(REC) ? st.models : [...st.models, REC];
   const busy = st.phase === 'starting' || st.phase === 'pulling', ready = st.reachable && !!st.chosen && !busy;
   return (
     <div className="ready" aria-label="Local AI">
@@ -108,7 +108,7 @@ export function AiPanel() {
         <select value={st.chosen ?? ''} onChange={e => void api.saveSettings({llmModel: e.target.value}).then(() => api.llm().then(setSt))}>
           {options.map(m => <option key={m} value={m}>{m}{st.models.includes(m) ? '' : ' (not installed)'}</option>)}
         </select>
-        <small className="hint">gemma3:12b writes noticeably better scripts than the 7B models but is slow: expect 3 to 6 minutes per draft (Shorts less) and about 9 GB of memory. Install once with `ollama pull gemma3:12b`.</small>
+        <small className="hint">qwen2.5:7b is the recommended model: about 5 GB of memory, 1 to 3 minutes per Short. 12B to 14B models write a little better but need 9 to 10 GB, which stalls a 16 GB Mac. For the best quality without the memory, add a free Groq key below.</small>
       </label>
       {st.phase === 'pulling' && <progress max={100} value={st.pct ?? 0} aria-label="Model download" />}
       {!ready && !busy && <button type="button" className="btn" onClick={() => void api.llmSetup().then(setSt)}>Start local AI</button>}

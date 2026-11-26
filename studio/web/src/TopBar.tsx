@@ -4,7 +4,8 @@ import {PAGE_LABEL, STEP_LABEL, hashFor, setRoute, type Route} from './router';
 import {t} from './i18n';
 
 // ---- jobs ----
-export type Jobs = {running: JobState | null; queue: QueueItem[]; hasQueue: boolean; finished: {episode: string; status: string} | null; clear: () => void};
+export type Draft = {id: string; topic: string; done: number; total: number};
+export type Jobs = {drafting: Draft | null; running: JobState | null; queue: QueueItem[]; hasQueue: boolean; finished: {episode: string; status: string} | null; clear: () => void};
 const normQueue = (q: unknown): QueueItem[] => {
   const o = q as {queue?: unknown[]; jobs?: unknown[]} | null;
   const a = Array.isArray(q) ? q : o?.queue ?? o?.jobs ?? [];
@@ -15,17 +16,17 @@ export function useJobs(): Jobs {
   const [id, setId] = useState<string | null>(null);
   const [job, setJob] = useState<JobState | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [hasQueue, setHasQueue] = useState(false);
+  const [hasQueue, setHasQueue] = useState(false), [drafting, setDrafting] = useState<Draft | null>(null);
   const [finished, setFinished] = useState<Jobs['finished']>(null);
   const prev = useRef<JobState | null>(null);
   useEffect(() => {
     let on = true, queueOk = true;
     const tick = async () => {
       if (document.hidden) return;
-      api.running().then(x => on && setId(x.running)).catch(() => {});
+      api.running().then(x => { if (on) { setId(x.running); setDrafting(x.drafting?.[0] ?? null); } }).catch(() => {});
       if (queueOk) { const q = await api.queue(); if (!on) return; if (q === null) { queueOk = false; setHasQueue(false); } else { setHasQueue(true); setQueue(normQueue(q)); } }
     };
-    void tick(); const t = setInterval(tick, 4000);
+    void tick(); const t = setInterval(tick, 2500);
     return () => { on = false; clearInterval(t); };
   }, []);
   useEffect(() => {
@@ -44,21 +45,21 @@ export function useJobs(): Jobs {
   }, [job]);
   useEffect(() => { const f = () => setFinished(null); window.addEventListener('focus', f); return () => window.removeEventListener('focus', f); }, []);
   const running = job?.status === 'running' ? job : id && !job ? ({id, episode: '', status: 'running', current: null, done: [], stages: [], progress: 0, log: []} as JobState) : null;
-  return {running, queue, hasQueue, finished, clear: useCallback(() => setFinished(null), [])};
+  return {drafting, running, queue, hasQueue, finished, clear: useCallback(() => setFinished(null), [])};
 }
 
 function JobsChip({jobs}: {jobs: Jobs}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
-  const {running, queue, hasQueue, finished} = jobs;
+  const {running, queue, hasQueue, finished, drafting} = jobs;
   const close = useCallback(() => setOpen(false), []);
   useModalLite(pop, open, close, ref);
   const pct = running ? Math.round(running.progress * 100) : 0;
-  const label = running ? `Running ${pct}%` : queue.length ? `${queue.length} queued` : finished ? (finished.status === 'done' ? 'Finished' : 'Failed') : 'Idle';
+  const label = running ? `Running ${pct}%` : drafting ? `Writing script${drafting.total ? ` ${Math.min(drafting.done + 1, drafting.total)}/${drafting.total}` : ''}` : queue.length ? `${queue.length} queued` : finished ? (finished.status === 'done' ? 'Finished' : 'Failed') : 'Idle';
   return (
     <div className="jobs" ref={ref}>
-      <button type="button" className={`chip jobs-chip ${running ? 'busy' : finished?.status === 'error' ? 'bad' : ''}`} aria-expanded={open} aria-haspopup="true" onClick={() => { setOpen(o => !o); jobs.clear(); }}>
+      <button type="button" className={`chip jobs-chip ${running || drafting ? 'busy' : finished?.status === 'error' ? 'bad' : ''}`} aria-expanded={open} aria-haspopup="true" onClick={() => { setOpen(o => !o); jobs.clear(); }}>
         <span className="dot" aria-hidden="true" />Jobs <b className="num">{label}</b>{running && queue.length > 0 && <span className="num"> +{queue.length}</span>}
       </button>
       {open && (
@@ -68,7 +69,8 @@ function JobsChip({jobs}: {jobs: Jobs}) {
               <span className="small muted">{running.current ? `Stage: ${running.current}` : 'Starting…'} · {pct}%</span>
               <progress max={100} value={pct} aria-label="Progress" />
               <button className="btn sm" onClick={() => api.cancel(running.id)}>Cancel run</button></div>
-          ) : <p className="small muted">{finished ? `${finished.episode} ${finished.status === 'done' ? 'finished.' : `ended: ${finished.status}.`}` : 'Nothing running.'}</p>}
+          ) : drafting ? <div className="job"><b><a className="link" href={hashFor({page: 'new', ep: drafting.id})}>{drafting.topic}</a></b><span className="small muted">Writing the script{drafting.total ? ` · part ${Math.min(drafting.done + 1, drafting.total)} of ${drafting.total}` : ''}</span></div>
+          : <p className="small muted">{finished ? `${finished.episode} ${finished.status === 'done' ? 'finished.' : `ended: ${finished.status}.`}` : 'Nothing running.'}</p>}
           {queue.length > 0 && <ul className="jobq">{queue.map(j => <li key={j.id}><span>{j.episode ?? j.id}</span><span className="muted small">{j.status ?? 'queued'}</span></li>)}</ul>}
           <div className="row">
             {hasQueue && <a className="btn sm" href="#/queue">Open queue</a>}

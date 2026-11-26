@@ -51,7 +51,7 @@ function Form({ch, chans}: {ch: string; chans: ChannelRow[]}) {
         <label className="field"><span className="sr">{t('Topic')}</span>
           <input className="nv-topic" value={topic} onChange={e => { setTopic(e.target.value); setPick(''); }} placeholder={t('e.g. why paying the minimum on a credit card costs thousands')} maxLength={200} autoFocus /></label>
         <div className="row">
-          <button type="button" className="btn" onClick={() => void suggest()} disabled={thinking}><Bulb size={15} />{thinking ? t('Thinking of ideas… about a minute') : t('Suggest ideas')}</button>
+          <button type="button" className="btn" onClick={() => void suggest()} disabled={thinking}><Bulb size={15} />{thinking ? t('Thinking of ideas… about a minute') : t('Suggest ideas')}</button>{thinking && <button type="button" className="btn sm" onClick={() => void api.ideasCancel()}>{t('Cancel')}</button>}
           <span className="small muted">{t('or pick one below')}</span>
         </div>
         {ideas.length > 0 && <ul className="nv-ideas" role="radiogroup" aria-label={t('Ideas')}>{ideas.map(i => (
