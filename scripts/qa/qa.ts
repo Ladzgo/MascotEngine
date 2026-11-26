@@ -9,7 +9,7 @@ export const LIMITS = {
   lufs: [-16, -12.5], truePeak: -1.0, lra: 14,
   maxPause: 1.5, pauseShare: 0.25, // voice track: longest silence, silence / total
   blankStd: 4, marginEdge: 0.12, captionEdge: 0.02, captionCover: 0.9,
-  minSec: 45, maxSec: 20 * 60,
+  minSec: 45, maxSec: 20 * 60, shortSec: [15, 62], shortWpm: [150, 175], shortChange: 3, wideChange: 6, // Shorts: duration, speaking pace, seconds per visual change
   preRoll: [0.15, 1.0], outro: 0.5, sceneSpreadDb: 4, // voice: first word start (s), silence after the last word (s), max level gap between scenes (dB)
 };
 export type Check = {name: string; ok: boolean; value: string; limit?: string};
@@ -105,7 +105,9 @@ export function qa(id: string, fileArg?: string) {
   const dec = JSON.parse(fs.readFileSync(`${b}decisions.json`, 'utf8')), tim = JSON.parse(fs.readFileSync(`${b}timings.json`, 'utf8'));
 
   const dur = +run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).out.toString().trim();
-  add('duration', dur >= LIMITS.minSec && dur <= LIMITS.maxSec, `${dur.toFixed(1)} s`, `${LIMITS.minSec}-${LIMITS.maxSec} s`);
+  const short = ep.format === 'short'; // vertical Shorts have their own limits (docs/REFERENCE-ANALYSIS.md)
+  const [dMin, dMax] = short ? LIMITS.shortSec : [LIMITS.minSec, LIMITS.maxSec];
+  add('duration', dur >= dMin && dur <= dMax, `${dur.toFixed(1)} s`, `${dMin}-${dMax} s`);
   const hasAudio = run('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file]).out.length > 0;
   add('audio stream', hasAudio, hasAudio ? 'yes' : 'missing');
 
@@ -127,9 +129,14 @@ export function qa(id: string, fileArg?: string) {
   // reference targets (docs/REFERENCE-ANALYSIS.md): 140-180 words per minute of speech, a new visual idea every <= 6 s on average
   const nWords = dec.scenes.reduce((a: number, _: any, i: number) => a + tim.scenes[i].words.length, 0);
   const wpm = nWords / Math.max(1, vdur * (1 - P.share)) * 60;
-  add('speaking pace', wpm >= 140 && wpm <= 180, `${wpm.toFixed(0)} wpm`, '140..180 wpm');
-  const perChange = dur / Math.max(1, dec.scenes.length);
-  add('visual change rate', perChange <= 6, `a new scene every ${perChange.toFixed(1)} s`, '<= 6 s (Shorts reference: 2-3 s)');
+  const [wLo, wHi] = short ? LIMITS.shortWpm : [140, 180];
+  add('speaking pace', wpm >= wLo && wpm <= wHi, `${wpm.toFixed(0)} wpm`, `${wLo}..${wHi} wpm`);
+  // a visual change = a scene start, or an in-scene visual (full-bleed `visuals` sequence entry after the first)
+  const changes = ep.scenes.reduce((a, sc) => a + Math.max(1, (sc as {visuals?: unknown[]}).visuals?.length ?? 1), 0);
+  const perChange = dur / Math.max(1, changes), cap = short ? LIMITS.shortChange : LIMITS.wideChange;
+  add('visual change rate', perChange <= cap, `a new visual every ${perChange.toFixed(1)} s (${changes} changes)`, `<= ${cap} s`);
+  const longest = Math.max(...dec.scenes.map((d: any) => d.durSec)), longCap = short ? 5 : 12;
+  add('longest scene', longest <= longCap, `${longest.toFixed(1)} s`, `<= ${longCap} s`);
   const edge = edgeSilence((run('ffmpeg', ['-hide_banner', '-nostats', '-i', voice, '-vn', '-af', 'silencedetect=n=-38dB:d=0.1', '-f', 'null', '-']).err), vdur);
   add('pre-roll', edge.lead >= LIMITS.preRoll[0] && edge.lead <= LIMITS.preRoll[1], `${edge.lead.toFixed(2)} s before the first word`, `${LIMITS.preRoll[0]}..${LIMITS.preRoll[1]} s`);
   add('outro silence', voice === file || edge.tail >= LIMITS.outro, // with no voice.wav the music bed fills the tail: not measurable
@@ -145,7 +152,7 @@ export function qa(id: string, fileArg?: string) {
   const cov = captionCoverage(words, buildPhrases(sceneWords));
   add('caption coverage', cov >= LIMITS.captionCover, `${(cov * 100).toFixed(1)}% of speech`, `>= ${LIMITS.captionCover * 100}%`);
 
-  const W = 320, H = 180, probe = run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', file]).out.toString().trim().split(',').map(Number);
+  const W = short ? 180 : 320, H = short ? 320 : 180, probe = run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', file]).out.toString().trim().split(',').map(Number);
   const marginBand = [{x0: 0, x1: 0.02, y0: 0, y1: 1}, {x0: 0.98, x1: 1, y0: 0, y1: 1}];
   const probes = [0.1, 0.3, 0.5, 0.7, 0.9].map(p => {
     const target = dur * p, w = words.reduce((a: any, x: any) => (Math.abs((x.start + x.end) / 2 - target) < Math.abs((a.start + a.end) / 2 - target) ? x : a), words[0]);
@@ -155,12 +162,12 @@ export function qa(id: string, fileArg?: string) {
   probes.forEach(t => {
     const g = gray(file, t, W, H);
     if (stdDev(g) < LIMITS.blankStd) bad.push(`${t.toFixed(1)}s blank`);
-    const m = Math.max(...marginBand.map(r => edgeDensity(g, W, H, r)));
+    const m = short ? 0 : Math.max(...marginBand.map(r => edgeDensity(g, W, H, r))); // full-bleed Shorts touch the edges by design
     if (m > LIMITS.marginEdge) bad.push(`${t.toFixed(1)}s content touches the side margin (${(m * 100).toFixed(0)}%)`);
-    const c = edgeDensity(g, W, H, {x0: 0.1, x1: 0.9, y0: 0.86, y1: 0.99});
+    const c = edgeDensity(g, W, H, short ? {x0: 0.05, x1: 0.95, y0: 0.62, y1: 0.86} : {x0: 0.1, x1: 0.9, y0: 0.86, y1: 0.99});
     if (c < LIMITS.captionEdge) bad.push(`${t.toFixed(1)}s caption zone empty during speech`);
   });
-  add('frames @10/30/50/70/90%', !bad.length, bad.length ? bad.join('; ') : 'not blank, margins clear, captions visible', `size ${probe.join('x')}`);
+  add('frames @10/30/50/70/90%', !bad.length, bad.length ? bad.join('; ') : short ? 'not blank, captions visible (Shorts lower third)' : 'not blank, margins clear, captions visible', `size ${probe.join('x')}`);
 
   const ok = checks.every(c => c.ok);
   const report = {id: ep.id, file, at: new Date().toISOString(), ok, checks, loudness: L, pauses: P};
