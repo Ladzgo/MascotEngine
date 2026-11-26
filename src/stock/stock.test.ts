@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {creditLines, fetchStock, rank, stockForEpisode} from './index.js';
+import {chooseStock, creditLines, fetchStock, rank, searchStock, stockForEpisode} from './index.js';
 import type {StockHit} from './providers.js';
 
 const png = Buffer.from('89504e470d0a1a0a', 'hex');
@@ -83,4 +83,14 @@ test('Pixabay rate gate waits instead of exceeding 100 requests per minute; key 
   assert.equal((await testPixabayKey('k', f(200))).ok, true);
   assert.match((await testPixabayKey('k', f(400))).message, /rejected/);
   assert.match((await testPixabayKey('k', f(429))).message, /Rate limit/);
+});
+
+test('Swap image: searchStock lists ranked candidates, chooseStock rewrites that beat and survives a re-run', async () => {
+  const n = net({'commons.wikimedia.org': wiki, 'api.openverse.org': {results: []}}), dir = tmp(), ep = tmp();
+  const hits = await searchStock({query: 'coins', kind: 'photo', format: 'short', env: {}, fetcher: n.fetcher, cacheDir: dir});
+  assert.ok(hits.length >= 1);
+  const rec = await chooseStock(ep, 2, {query: 'coins', kind: 'photo'}, hits[hits.length - 1], 'short', {fetcher: n.fetcher, cacheDir: dir});
+  assert.equal(rec?.scene, 2); assert.equal(JSON.parse(fs.readFileSync(path.join(ep, 'stock.json'), 'utf8')).items[0].file, rec!.file);
+  const again = await stockForEpisode(ep, [{}, {}, {stock: {query: 'coins', kind: 'photo'}}], 'short', {env: {}, fetcher: async () => { throw new Error('offline'); }, cacheDir: dir});
+  assert.equal(again[0].file, rec!.file);
 });

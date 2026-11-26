@@ -45,6 +45,44 @@ export function prepVideo(raw: string, format: Format, dir: string): string {
 }
 
 export type Fetched = {file: string; hit: StockHit};
+/** Download one hit into the cache (once) and prepare video for the frame; null when the download fails. */
+export async function downloadHit(hit: StockHit, f: Fetcher, dir: string, format: Format): Promise<string | null> {
+  const ext = (/\.(jpe?g|png|webp|mp4)(\?|$)/i.exec(hit.url)?.[1] ?? (hit.kind === 'video' ? 'mp4' : 'jpg')).toLowerCase().replace('jpeg', 'jpg');
+  const file = path.join(dir, `${crypto.createHash('sha1').update(hit.url).digest('hex').slice(0, 20)}.${ext}`);
+  if (!fs.existsSync(file)) {
+    try {
+      const r = await f(hit.url, {signal: AbortSignal.timeout(60000)});
+      if (!r.ok) return null;
+      fs.mkdirSync(dir, {recursive: true});
+      fs.writeFileSync(`${file}.part`, Buffer.from(await r.arrayBuffer()));
+      fs.renameSync(`${file}.part`, file);
+    } catch { return null; }
+  }
+  return hit.kind === 'video' ? prepVideo(file, format, dir) : file;
+}
+
+/** Ranked candidates for the Studio's "Swap image" grid: the first provider that has results, best first. */
+export async function searchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; limit?: number; env?: Env; fetcher?: Fetcher; cacheDir?: string}): Promise<StockHit[]> {
+  const f = o.fetcher ?? fetch, env = o.env ?? process.env;
+  setApiCacheDir(path.join(o.cacheDir ?? CACHE_DIR, 'api'));
+  const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
+  for (const p of PROVIDERS) {
+    if (p.needsKey && !env[p.needsKey]) continue;
+    try { const r = rank(await p.search(f, a, env), a, o.format); if (r.length) return r.slice(0, o.limit ?? 12); } catch { /* next provider */ }
+  }
+  return [];
+}
+
+/** Use `hit` for scene `scene`: downloads it and rewrites that beat's record in stock.json (kept on later runs because the query is unchanged). */
+export async function chooseStock(epDir: string, scene: number, stock: {query: string; kind: 'photo' | 'video'}, hit: StockHit, format: Format, o: {fetcher?: Fetcher; cacheDir?: string} = {}): Promise<StockRecord | null> {
+  const file = await downloadHit(hit, o.fetcher ?? fetch, o.cacheDir ?? CACHE_DIR, format);
+  if (!file) return null;
+  const prev = readStock(epDir).items.filter(x => x.scene !== scene);
+  const rec: StockRecord = {scene, query: stock.query, file: `stock-cache/${path.basename(file)}`, provider: hit.provider, pageUrl: hit.pageUrl, author: hit.author, license: hit.license, title: hit.title, kind: hit.kind};
+  const items = [...prev, rec].sort((x, y) => x.scene - y.scene);
+  fs.writeFileSync(path.join(epDir, 'stock.json'), JSON.stringify({items, credits: creditLines(items)}, null, 2));
+  return rec;
+}
 /** Best licensed match for one query. Provider order: Pexels, Pixabay (when keyed), then Openverse, Wikimedia Commons. Downloads once into assets/stock-cache/<sha1>.<ext>. */
 export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string}): Promise<Fetched | null> {
   const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR;
@@ -57,18 +95,8 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
       let hits: StockHit[] = [];
       try { hits = await t(); } catch { continue; } // a provider being down is never an error
       for (const hit of rank(hits, kinds, o.format).slice(0, 3)) {
-        const ext = (/\.(jpe?g|png|webp|mp4)(\?|$)/i.exec(hit.url)?.[1] ?? (hit.kind === 'video' ? 'mp4' : 'jpg')).toLowerCase().replace('jpeg', 'jpg');
-        const file = path.join(dir, `${crypto.createHash('sha1').update(hit.url).digest('hex').slice(0, 20)}.${ext}`);
-        if (!fs.existsSync(file)) {
-          try {
-            const r = await f(hit.url, {signal: AbortSignal.timeout(60000)});
-            if (!r.ok) continue;
-            fs.mkdirSync(dir, {recursive: true});
-            fs.writeFileSync(`${file}.part`, Buffer.from(await r.arrayBuffer()));
-            fs.renameSync(`${file}.part`, file);
-          } catch { continue; }
-        }
-        return {file: hit.kind === 'video' ? prepVideo(file, o.format, dir) : file, hit};
+        const file = await downloadHit(hit, f, dir, o.format);
+        if (file) return {file, hit};
       }
     }
   }
