@@ -9,11 +9,12 @@ export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.Rea
   const cur = <>{paper}{cur0}</>;
   const fill: React.CSSProperties = {position: 'absolute', inset: 0};
   const e = easeInOut(p);
+  const mb = Math.sin(Math.PI * p) ** 1.5; // motion-blur strength: peaks mid-move
   switch (kind) {
     case 'slide':
       return <>
-        <div style={{...fill, transform: `translateX(${-e * W * 0.35}px)`, opacity: 1 - e * 0.6}}>{prev}</div>
-        <div style={{...fill, transform: `translateX(${(1 - easeOut(p)) * W}px)`}}>{cur}</div>
+        <div style={{...fill, transform: `translateX(${-e * W * 0.35}px) scale(${1 - e * 0.04})`, opacity: 1 - e * 0.6, filter: `blur(${mb * 10}px)`}}>{prev}</div>
+        <div style={{...fill, transform: `translateX(${(1 - easeOut(p)) * W}px) skewX(${-(1 - easeOut(p)) * 6}deg)`, filter: `blur(${(1 - easeOut(p)) * 12}px)`}}>{cur}</div>
       </>;
     case 'wipe_ink':
       return <>
@@ -30,8 +31,8 @@ export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.Rea
       </>;
     case 'zoom_through':
       return <>
-        <div style={{...fill, transform: `scale(${1 + e * 2.2})`, opacity: 1 - clamp(p * 1.6)}}>{prev}</div>
-        <div style={{...fill, transform: `scale(${0.6 + 0.4 * e})`, opacity: clamp((p - 0.25) * 1.6)}}>{cur}</div>
+        <div style={{...fill, transform: `scale(${1 + e * 2.2})`, opacity: 1 - clamp(p * 1.6), filter: `blur(${mb * 14}px)`}}>{prev}</div>
+        <div style={{...fill, transform: `scale(${0.6 + 0.4 * e})`, opacity: clamp((p - 0.25) * 1.6), filter: `blur(${(1 - e) * 10}px)`}}>{cur}</div>
       </>;
     case 'paper_flip': {
       const first = p < 0.5;

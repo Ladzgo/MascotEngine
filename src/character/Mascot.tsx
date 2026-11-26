@@ -115,14 +115,14 @@ const Limb: React.FC<{side: 'L' | 'R'; arm: Arm}> = ({side, arm}) => {
   );
 };
 
-const EyeView: React.FC<{id: string; cx: number; side: 'L' | 'R'; e: Eye; blink: boolean; gaze?: [number, number]}> = ({id, cx, side, e, blink, gaze}) => {
+const EyeView: React.FC<{id: string; cx: number; side: 'L' | 'R'; e: Eye; blink: boolean; gaze?: [number, number]; look?: [number, number]}> = ({id, cx, side, e, blink, gaze, look = [0, 0]}) => {
   if (e.arc) return <path d={`M${cx - 62} 582 Q${cx} 506 ${cx + 62} 582`} fill="none" {...ink} />;
   if (blink) return <path d={`M${cx - 68} 592 Q${cx} 608 ${cx + 68} 592`} fill="none" {...ink} />;
   const yl = side === 'L' ? e.lo : e.li, yr = side === 'L' ? e.li : e.lo;
   const k = (yr - yl) / (2 * EYE_RX);
   const y0 = yl - k * 18, y1 = yr + k * 18;
   const [dx, dy, r] = e.p;
-  const px = cx + (gaze ? gaze[0] : dx), py = EYE_Y + (gaze ? gaze[1] : dy);
+  const px = cx + (gaze ? gaze[0] : dx) + look[0], py = EYE_Y + (gaze ? gaze[1] : dy) + look[1];
   return (
     <g>
       <clipPath id={`${id}-lid${side}`}><polygon points={`${cx - 90},${y0} ${cx + 90},${y1} ${cx + 90},900 ${cx - 90},900`} /></clipPath>
@@ -231,12 +231,13 @@ const Props: React.FC<{pose: string}> = ({pose}) => {
   }
 };
 
-const Penny: React.FC<{pose: string; talking: boolean; accent: string; blink: boolean}> = ({pose, talking, accent, blink}) => {
+const Penny: React.FC<{pose: string; talking: boolean; accent: string; blink: boolean; open: number; look: [number, number]}> = ({pose, talking, accent, blink, open, look}) => {
   const id = 'pn' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const spec = POSES[pose] ?? POSES.neutral;
   const face = FACES[spec.face];
   const talkOpen = talking && spec.face !== 'shocked';
-  const mouth = talkOpen ? 'M556 782 a46 28 0 1 0 92 0 a46 28 0 1 0 -92 0' : face.mouth;
+  const rx = 34 + 14 * open, ry = 8 + 24 * open;
+  const mouth = talkOpen ? `M${600 - rx} 782 a${rx} ${ry} 0 1 0 ${2 * rx} 0 a${rx} ${ry} 0 1 0 ${-2 * rx} 0` : face.mouth;
   const filled = talkOpen || face.fill;
   const arms = (['L', 'R'] as const).map(s => [s, spec[s]] as const);
   return (
@@ -247,7 +248,7 @@ const Penny: React.FC<{pose: string; talking: boolean; accent: string; blink: bo
         <circle cx={600} cy={640} r={440} fill={BODY} {...ink} />
         <circle cx={600} cy={640} r={378} fill="none" {...ink} strokeWidth={6} strokeDasharray="2 26" />
         <path d={TIE} fill={accent} {...ink} />
-        {EYE_X.map((cx, i) => <EyeView key={i} id={id} cx={cx} side={i === 0 ? 'L' : 'R'} e={face.eyes[i]} blink={blink} gaze={spec.gaze} />)}
+        {EYE_X.map((cx, i) => <EyeView key={i} id={id} cx={cx} side={i === 0 ? 'L' : 'R'} e={face.eyes[i]} blink={blink} gaze={spec.gaze} look={look} />)}
         <BrowView b={face.brows[0]} side="L" />
         <BrowView b={face.brows[1]} side="R" />
         <path d={mouth} fill={filled ? MOUTH_DARK : 'none'} {...ink} />
@@ -259,27 +260,35 @@ const Penny: React.FC<{pose: string; talking: boolean; accent: string; blink: bo
   );
 };
 
+/** Deterministic pseudo-random in [0,1) from an integer: idle acting never uses Math.random. */
+const rnd = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
 export const Mascot: React.FC<{
   pose: string; talking: boolean; accent: string; frame: number; height: number;
   assets: CharacterAssets; enter: number; flip?: boolean;
 }> = ({pose, talking, accent, frame, height, assets, enter, flip}) => {
   const width = height * 0.8;
-  const bob = Math.sin(frame / 14) * 6;
   const e = backOut(enter);
-  const blinkCycle = frame % 96;
-  const blink = blinkCycle >= 90;
-  // mouth flap: ~9 Hz while talking
-  const flap = talking && Math.floor(frame / 2) % 2 === 0;
+  // idle acting: breathing, slow sway, irregular blinks, eye darts, nod while talking
+  const breath = 1 + 0.012 * Math.sin(frame / 19);
+  const sway = Math.sin(frame / 41) * 0.9 + Math.sin(frame / 17 + 1) * 0.35 + (talking ? Math.sin(frame / 5.5) * 0.7 : 0);
+  const bob = Math.sin(frame / 14) * 5 - (talking ? Math.abs(Math.sin(frame / 5.5)) * 6 : 0);
+  const blink = frame % 83 >= 80 || (frame % 197 >= 191 && frame % 197 < 194);
+  const dart = Math.floor(frame / 34);
+  const look: [number, number] = rnd(dart) > 0.45 ? [Math.round((rnd(dart + 9) - 0.5) * 22), Math.round((rnd(dart + 19) - 0.5) * 10)] : [0, 0];
+  const open = talking ? [0.1, 0.55, 1, 0.7, 0.3, 0.85][Math.floor(rnd(Math.floor(frame / 3)) * 6)] : 0;
+  const flap = talking;
   const real = assets[pose];
+  const realOpen = talking && Math.floor(frame / 2) % 2 === 0;
   return (
     <div style={{
-      width, height, transform: `translateY(${bob}px) scale(${1.14 - 0.14 * e}, ${0.8 + 0.2 * e}) scaleX(${flip ? -1 : 1})`,
+      width, height, transform: `translateY(${bob}px) rotate(${sway}deg) scale(${1.14 - 0.14 * e}, ${(0.8 + 0.2 * e) * breath}) scaleX(${flip ? -1 : 1})`,
       transformOrigin: '50% 100%', opacity: Math.min(1, enter * 4),
     }}>
       {real ? (
-        <Img src={staticFile(flap && real.talk ? real.talk : real.file)} style={{width: '100%', height: '100%', objectFit: 'contain'}} />
+        <Img src={staticFile(realOpen && real.talk ? real.talk : real.file)} style={{width: '100%', height: '100%', objectFit: 'contain'}} />
       ) : (
-        <Penny pose={pose} talking={flap} accent={accent} blink={blink} />
+        <Penny pose={pose} talking={flap} accent={accent} blink={blink} open={open} look={look} />
       )}
     </div>
   );

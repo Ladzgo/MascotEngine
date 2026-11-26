@@ -1,9 +1,10 @@
 import React from 'react';
-import {DISPLAY, INK, PAPER, SANS, W} from '../theme';
+import {DISPLAY, INK, PAPER, SANS, W, clamp, easeOut, spring} from '../theme';
 
-const FUNCTION_WORDS = new Set('a an the of to in on at for and or but is are was were be it its this that with as by from you your they them their we our so if than then there here do does did will would can could'.split(' '));
+const HU_FUNCTION = 'a az és de hogy nem is egy meg még már ez ezt azt mint vagy volt ha mert csak ami aki el fel le be ki alatt után előtt között által'.split(' ');
+const FUNCTION_WORDS = new Set([...HU_FUNCTION, ...'a an the of to in on at for and or but is are was were be it its this that with as by from you your they them their we our so if than then there here do does did will would can could'.split(' ')]);
 /** Function words (to, the, a, of...) are never highlighted; only content words get the accent colour. */
-export const isFunctionWord = (w: string) => FUNCTION_WORDS.has(w.toLowerCase().replace(/[^a-z']/g, ''));
+export const isFunctionWord = (w: string) => FUNCTION_WORDS.has(w.toLowerCase().replace(/[^a-záéíóöőúüű']/g, ''));
 
 export type CaptionWord = {w: string; start: number; end: number}; // absolute seconds
 export type Phrase = {start: number; end: number; words: CaptionWord[]};
@@ -47,15 +48,18 @@ export function captionLayout(prefs: CaptionPrefsT | undefined, target: 'wide' |
 export const Captions: React.FC<{phrases: Phrase[]; t: number; accent: string; style: string; size?: number; bottom?: number; maxWidth?: number; anchor?: 'bottom' | 'middle' | 'top'; highlight?: 'accent' | 'underline' | 'none'}> = ({phrases, t, accent, style, size = 58, bottom = 50, maxWidth = W - 360, anchor = 'bottom', highlight = 'accent'}) => {
   const phrase = phrases.filter(p => t >= p.start - 0.05 && t <= p.end + 0.35).pop();
   if (!phrase) return null;
+  const enter = clamp((t - (phrase.start - 0.05)) / 0.18);
   const inner = phrase.words.map((w, i) => {
     const active = highlight !== 'none' && t >= w.start && t < w.end + 0.02 && !isFunctionWord(w.w);
     const color = active && highlight === 'accent' ? accent : style === 'bar' ? PAPER : INK;
-    return <span key={i} style={{color, textDecoration: active && highlight === 'underline' ? `underline 6px ${accent}` : undefined, textUnderlineOffset: 8}}>{w.w}{i < phrase.words.length - 1 ? ' ' : ''}</span>;
+    const pop = active ? 1 + 0.1 * spring(clamp((t - w.start) / 0.2)) : 1; // keyword pop, springs in when the word is spoken
+    const pending = t < w.start - 0.02 ? 0.62 : 1; // words not yet spoken are dimmed (karaoke feel)
+    return <span key={i} style={{display: 'inline-block', color, opacity: pending, transform: `scale(${pop})`, transformOrigin: '50% 80%', marginRight: i < phrase.words.length - 1 ? '0.3em' : 0, textDecoration: active && highlight === 'underline' ? `underline 6px ${accent}` : undefined, textUnderlineOffset: 8}}>{w.w}</span>;
   });
-  const base: React.CSSProperties = {fontFamily: style === 'outline' ? DISPLAY : SANS, fontWeight: 700, fontSize: size, lineHeight: 1.15, textAlign: 'center', maxWidth, textShadow: style === 'bar' ? '0 2px 0 rgba(0,0,0,0.35)' : undefined};
+  const base: React.CSSProperties = {fontFamily: style === 'outline' ? DISPLAY : SANS, fontWeight: 700, fontSize: size, lineHeight: 1.15, textAlign: 'center', maxWidth, opacity: Math.min(1, enter * 1.6), transform: `translateY(${(1 - easeOut(enter)) * 18}px) scale(${0.96 + 0.04 * easeOut(enter)})`, textShadow: style === 'bar' ? '0 2px 0 rgba(0,0,0,0.35)' : undefined};
   const pos: React.CSSProperties = anchor === 'bottom' ? {bottom} : anchor === 'top' ? {top: bottom} : {top: '50%', transform: 'translateY(-50%)'};
   return (
-    <div style={{position: 'absolute', left: 0, right: 0, display: 'flex', justifyContent: 'center', ...pos}}>
+    <div style={{position: 'absolute', left: 0, right: 0, display: 'flex', justifyContent: 'center', flexWrap: 'wrap', ...pos}}>
       {style === 'bar' && <div style={{...base, background: 'rgba(27,27,31,0.88)', padding: '14px 44px', borderRadius: 14}}>{inner}</div>}
       {style === 'pill' && <div style={{...base, background: PAPER, border: `6px solid ${INK}`, padding: '10px 48px', borderRadius: 60}}>{inner}</div>}
       {style === 'outline' && <div style={{...base, fontSize: size + 6, WebkitTextStroke: `10px ${PAPER}`, paintOrder: 'stroke fill', textShadow: `0 0 2px ${PAPER}`}}>{inner}</div>}

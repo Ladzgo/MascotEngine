@@ -10,7 +10,8 @@ import {Captions, buildPhrases, captionLayout, type CaptionWord} from './fx/capt
 import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
 import {SourceCard} from './fx/overlays';
-import {DISPLAY, INK, SANS, loadFonts, easeOut} from './theme';
+import {Camera, Living, Vignette} from './fx/life';
+import {DISPLAY, INK, SANS, loadFonts, easeOut, spring, clamp} from './theme';
 
 export type EpisodeProps = {
   episode: EpisodeT;
@@ -60,11 +61,15 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
   const phrasesLocal = useMemo(() => phrases.map(p => ({start: p.start - shift, end: p.end - shift, words: p.words.map(w => ({...w, start: w.start - shift, end: w.end - shift}))})), [phrases, shift]);
 
   const host0 = (() => { try { return new URL(episode.sources[0]).hostname.replace(/^www\./, ''); } catch { return ''; } })();
+  const acc = (i: number) => (decisions.accent === '' ? INK : accentHex(decisions.accent));
   const view = (i: number, frame: number, preroll = 0) => (
     <>
-    {host0 && ['big_number', 'chart'].includes(episode.scenes[i].type) && <SourceCard host={host0} t={(frame + preroll) / fps} accent={decisions.accent === '' ? INK : accentHex(decisions.accent)} />}
-    <SceneView scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} preroll={preroll} fps={fps} accent={decisions.accent === '' ? INK : accentHex(decisions.accent)}
-      assets={assets} words={sceneWordsRel[i]} intro={decisions.intro} episodeTitle={episode.title} />
+    <Living frame={frame + preroll} seed={i} accent={acc(i)} />
+    <Camera frame={frame + preroll} seed={i}>
+      {host0 && ['big_number', 'chart'].includes(episode.scenes[i].type) && <SourceCard host={host0} t={(frame + preroll) / fps} accent={acc(i)} />}
+      <SceneView scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} preroll={preroll} fps={fps} accent={acc(i)}
+        assets={assets} words={sceneWordsRel[i]} intro={decisions.intro} episodeTitle={episode.title} />
+    </Camera>
     </>
   );
 
@@ -83,6 +88,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
             kind={d.transition} accent={accent} view={view} />
         </Sequence>
       ))}
+      <Vignette />
       <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />
       {episode.disclaimer && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
@@ -102,6 +108,26 @@ const SceneSeq: React.FC<{paper: React.ReactNode; i: number; T: number; start: n
   return <>{view(i, own, T)}</>;
 };
 
+/** Subscribe button: pops in, a cursor taps it, it flips to "Subscribed" and the bell rings. */
+const Subscribe: React.FC<{f: number}> = ({f}) => {
+  const e = spring(f / 14);
+  if (f <= 0) return null;
+  const done = f > 40;
+  const tap = f > 34 && f < 42 ? 0.94 : 1;
+  const ring = done ? Math.sin((f - 40) * 1.1) * 18 * Math.exp(-(f - 40) / 18) : 0;
+  const cur = clamp((f - 12) / 22);
+  return (
+    <div style={{marginTop: 56, display: 'flex', alignItems: 'center', gap: 28, transform: `scale(${e * tap})`, position: 'relative'}}>
+      <div style={{fontFamily: SANS, fontWeight: 700, fontSize: 46, padding: '18px 52px', borderRadius: 16, border: `5px solid ${INK}`, boxShadow: `6px 6px 0 ${INK}`, color: done ? INK : '#fff', background: done ? '#e4dfd0' : '#d9363e'}}>{done ? 'Subscribed' : 'Subscribe'}</div>
+      <svg width={70} height={70} viewBox="0 0 100 100" style={{transform: `rotate(${ring}deg)`, transformOrigin: '50% 10%'}} fill={done ? accentFill : 'none'} stroke={INK} strokeWidth={6} strokeLinejoin="round" strokeLinecap="round">
+        <path d="M50 10c-18 0-28 14-28 32v16l-10 14h76l-10-14V42C78 24 68 10 50 10zM40 84a10 10 0 0 0 20 0" />
+      </svg>
+      <svg width={54} height={54} viewBox="0 0 100 100" style={{position: 'absolute', left: 150 + (1 - easeOut(cur)) * 140, top: 30 + (1 - easeOut(cur)) * 100, opacity: f < 50 ? 1 : 0}}><path d="M20 10 20 80 40 64 54 92 68 86 54 58 80 56Z" fill="#fff" stroke={INK} strokeWidth={6} strokeLinejoin="round" /></svg>
+    </div>
+  );
+};
+const accentFill = '#e8c25a';
+
 const EndCard: React.FC<{episode: EpisodeT; accent: string}> = ({episode, accent}) => {
   const f = useCurrentFrame();
   const o = easeOut(f / 15);
@@ -111,6 +137,7 @@ const EndCard: React.FC<{episode: EpisodeT; accent: string}> = ({episode, accent
       <div style={{fontFamily: DISPLAY, fontSize: 84, color: INK, lineHeight: 1.1}}>Educational content.<br />Not financial advice.</div>
       <div style={{width: 520, height: 12, background: accent, borderRadius: 6, margin: '44px 0'}} />
       {hosts.length > 0 && <div style={{fontFamily: SANS, fontWeight: 500, fontSize: 38, color: INK, opacity: 0.8}}>Sources: {hosts.join(' · ')}</div>}
+      <Subscribe f={f - 22} />
     </AbsoluteFill>
   );
 };
