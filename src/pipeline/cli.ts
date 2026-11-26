@@ -1,7 +1,7 @@
 try { process.loadEnvFile(); } catch { /* .env optional */ }
 import fs from 'node:fs';
 import {episodeDir, loadEpisode} from '../schema.js';
-import {getEngine, writeTimings} from './tts.js';
+import {episodeLang, getEngine, writeTimings} from './tts.js';
 
 const [cmd, id, ...rest] = process.argv.slice(2);
 const flag = (n: string) => {
@@ -49,7 +49,7 @@ async function main() {
     }
     case 'tts': {
       const ep = loadEpisode(id);
-      const engine = getEngine(String(flag('engine') ?? 'auto'));
+      const engine = getEngine(String(flag('engine') ?? 'auto'), episodeLang(ep));
       const timings = await engine.synthesize(ep, episodeDir(ep.id));
       writeTimings(episodeDir(ep.id), timings);
       console.log(`${ep.id}: ${timings.scenes.length} scenes, ${timings.total.toFixed(1)}s (${engine.name})`);

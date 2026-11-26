@@ -6,6 +6,7 @@ import {langCode, langInfo} from '../channel/lang.js';
 import {whisperModel} from './align.js';
 import {whisperLang} from '../clipper/lang.js';
 import type {Episode} from '../schema.js';
+import {NeuralTTS, bestNeural, neuralReady} from './neural.js';
 import {detectAligner, mapToNarration, probeDuration, proportionalWords, runAligner, type AlignerName, type RelWord} from './align.js';
 
 export type WordTiming = {w: string; start: number; end: number};
@@ -25,11 +26,11 @@ export interface TTSAdapter {
 }
 
 const WPS = 2.6; // words per second for estimates
-const LEAD_IN = 0.4;
-const SCENE_GAP = 0.5;
-const MIN_SCENE = 1.2;
+export const LEAD_IN = 0.4;
+export const SCENE_GAP = 0.5;
+export const MIN_SCENE = 1.2;
 /** Cut leading/trailing silence of synthesized speech (keeps pauses between sentences short). */
-const TRIM_AF = 'silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.03,areverse,silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.05,areverse';
+export const TRIM_AF = 'silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.03,areverse,silenceremove=start_periods=1:start_threshold=-48dB:start_silence=0.05,areverse';
 export const FPS = 30;
 
 export function tokenize(text: string): string[] {
@@ -65,11 +66,11 @@ export class SilentTTS implements TTSAdapter {
 /** Per-scene audio cache: `scene-N.mp3.cache.json` holds a hash of everything that shapes the audio (engine, voice, language, text, aligner) plus the measured duration and word times. TTS_NOCACHE=1 disables. */
 type Cached = {key: string; dur: number; rel: RelWord[]};
 export const audioKey = (...parts: (string | undefined)[]) => crypto.createHash('sha1').update(parts.map(p => p ?? '').join('\u0001')).digest('hex').slice(0, 16);
-function cacheGet(file: string, key: string): Cached | null {
+export function cacheGet(file: string, key: string): Cached | null {
   if (process.env.TTS_NOCACHE || !fs.existsSync(file)) return null;
   try { const c = JSON.parse(fs.readFileSync(`${file}.cache.json`, 'utf8')) as Cached; return c.key === key ? c : null; } catch { return null; }
 }
-const cachePut = (file: string, c: Cached) => fs.writeFileSync(`${file}.cache.json`, JSON.stringify(c));
+export const cachePut = (file: string, c: Cached) => fs.writeFileSync(`${file}.cache.json`, JSON.stringify(c));
 
 /** The episode's channel language code (en when the channel is unknown). */
 export function episodeLang(ep: Episode): string {
@@ -277,21 +278,25 @@ export class CliTTS implements TTSAdapter {
 }
 
 /** Default engine: say on macOS, piper/espeak-ng on Linux, else silent. */
-export function autoEngineName(): string {
+export function autoEngineName(lang = 'en'): string {
+  const n = bestNeural(lang);
+  if (n) return n;
   if (process.platform === 'darwin' && hasBin('say')) return 'say';
   if (piperAvailable()) return 'piper';
   if (hasBin('espeak-ng')) return 'espeak-ng';
   return hasBin('say') ? 'say' : 'silent';
 }
 
-export function getEngine(name: string): TTSAdapter {
+export function getEngine(name: string, lang = 'en'): TTSAdapter {
   switch (name) {
-    case 'auto': return getEngine(autoEngineName());
+    case 'auto': return getEngine(autoEngineName(lang));
     case 'silent': return new SilentTTS();
     case 'eleven': return new ElevenLabsTTS();
     case 'local': return new LocalRecordingTTS();
     case 'say': return new SayTTS();
-    case 'espeak-ng': case 'piper': return new CliTTS(name);
+    case 'kokoro': case 'edge': return new NeuralTTS(name);
+    case 'piper': return neuralReady('piper') ? new NeuralTTS('piper') : new CliTTS('piper');
+    case 'espeak-ng': return new CliTTS(name);
     default: throw new Error(`Unknown TTS engine: ${name}`);
   }
 }

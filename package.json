@@ -33,7 +33,9 @@
     "bundle": "bash scripts/bundle-offline.sh",
     "e2e": "tsx scripts/e2e.ts",
     "smoke:ui": "tsx scripts/smoke-ui.ts",
-    "support-bundle": "tsx src/support/cli.ts"
+    "support-bundle": "tsx src/support/cli.ts",
+    "voice-test": "tsx scripts/tts/voiceTest.ts",
+    "setup:voice": "bash scripts/tts/setup.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",

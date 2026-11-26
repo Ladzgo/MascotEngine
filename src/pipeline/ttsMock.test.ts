@@ -1,3 +1,4 @@
+process.env.TTS_NEURAL = "0"; // mocked-platform tests must not pick up a real neural install
 // CliTTS branches (espeak-ng, piper) against mock CLIs: runs everywhere, no installs. The mocks write a sine "voice" whose length follows the text.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
