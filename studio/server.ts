@@ -236,6 +236,8 @@ const nextId = (topic: string) => {
 const PID_FILE = process.env.STUDIO_PID_FILE || `${ROOT}data/draft-pids.json`;
 const kids = new Set<number>();
 const savePids = () => { try { fs.mkdirSync(path.dirname(PID_FILE), {recursive: true}); fs.writeFileSync(PID_FILE, JSON.stringify([...kids])); } catch { /* best effort */ } };
+/** Running publish-pack per episode (-1 = cancelled by the user). */
+const packKids = new Map<string, number>();
 const killGroup = (pid: number) => { try { process.kill(-pid, 'SIGTERM'); } catch { try { process.kill(pid, 'SIGTERM'); } catch { /* gone */ } } };
 /** At start: kill draft processes a previous Studio left behind (only ones whose command line still says draft). */
 function reapOrphans(): number {
@@ -847,13 +849,15 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
           needAi('publish-pack');
           const release = lockAi();
           try {
-            const {code, out} = await runNpm(['publish-pack', '--', id]);
+            const {code, out} = await runNpm(['publish-pack', '--', id], undefined, {}, pid => packKids.set(id, pid));
+            if (packKids.get(id) === -1) return json(res, 409, {error: 'Cancelled. The previous pack (if any) is unchanged.'});
             const ok = out.filter(l => l.startsWith('PACK_OK')).pop();
             const pack = readPack(d);
             if (code === 0 && ok && pack) return json(res, 200, {pack});
             return json(res, 422, {error: cliMessage(out, code)});
-          } finally { release(); }
+          } finally { packKids.delete(id); release(); }
         }
+        if (m === 'DELETE') { const pid = packKids.get(id); if (pid && pid > 0) { killGroup(pid); packKids.set(id, -1); } return json(res, 200, {ok: true}); }
       }
       if (p[2] === 'thumbnail' && p.length === 3 && m === 'POST') {
         const b = await body(req, ThumbBody);

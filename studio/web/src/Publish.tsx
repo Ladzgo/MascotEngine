@@ -47,6 +47,7 @@ export function Publish({epId, cfg, hasVideo, onStatus}: {epId: string; cfg: Set
       <p className="muted small">{tr('Titles, description, tags, chapters and thumbnail text for YouTube. Review before you paste.')}</p>
       <div className="row">
         <button className="btn primary sm" onClick={make} disabled={busy || !!block || !loaded}><Send size={15} />{busy ? tr('Generating…') : pack ? tr('Regenerate pack') : tr('Generate publish pack')}</button>
+        {busy && <button type="button" className="btn sm" onClick={() => void api.cancelPack(epId)}>{tr('Cancel')}</button>}
         {pack && <span className={`pill ${pack.source === 'ai' ? 'ok' : 'bad'}`}>{pack.source === 'ai' ? tr('AI-generated') : tr('Fallback (no AI)')}</span>}
       </div>
       {busy && <p className="small muted" role="status">{Math.round((Date.now() - t0) / 1000)} s · usually about a minute. You can leave this page.</p>}

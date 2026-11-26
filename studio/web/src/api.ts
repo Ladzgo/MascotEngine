@@ -91,6 +91,7 @@ export const api = {
   job: (id: string) => call<JobState>(`/api/jobs/${id}`),
   pack: (id: string) => call<{pack: PublishPack | null}>(`/api/episodes/${id}/publish`),
   makePack: (id: string) => call<{pack: PublishPack}>(`/api/episodes/${id}/publish`, {method: 'POST'}),
+  cancelPack: (id: string) => call<{ok: boolean}>(`/api/episodes/${id}/publish`, {method: 'DELETE'}),
   cancel: (jobId: string) => call<{ok: boolean}>(`/api/jobs/${jobId}/cancel`, {method: 'POST'}),
   running: () => call<{running: string | null; drafting?: {id: string; topic: string; done: number; total: number}[]}>('/api/jobs'),
   stockStatus: () => call<{pixabay: boolean}>('/api/stock/status'),
