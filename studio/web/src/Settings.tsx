@@ -118,6 +118,7 @@ export function AiPanel() {
 
 const CLOUD: {id: string; name: string; hint: string; placeholder: string}[] = [
   {id: 'groq', name: 'Groq (free tier, fast)', hint: 'Key from console.groq.com/keys (starts with gsk_).', placeholder: 'gsk_…'},
+  {id: 'cerebras', name: 'Cerebras (free tier, fast)', hint: 'Key from cloud.cerebras.ai (starts with csk-). The model is chosen automatically.', placeholder: 'csk-…'},
   {id: 'openrouter', name: 'OpenRouter (free models available)', hint: 'Key from openrouter.ai/keys.', placeholder: 'sk-or-…'},
   {id: 'gemini', name: 'Google Gemini', hint: 'Key from aistudio.google.com/apikey (starts with AIza). Keys starting with AQ. do not work. The model is chosen automatically.', placeholder: 'AIza…'},
   {id: 'anthropic', name: 'Claude (paid, needs credit)', hint: 'Only if you want it: needs an Anthropic API key with credit.', placeholder: 'sk-ant-…'},

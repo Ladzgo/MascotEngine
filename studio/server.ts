@@ -983,7 +983,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     }
     if (p[0] === 'jobs' && !p[1]) { const running = [...jobs.values()].find(j => j.status === 'running'); return json(res, 200, {running: running?.id ?? null, drafting: [...drafts.values()].filter(d => d.state === 'running').map(d => ({id: d.id, topic: d.topic, done: d.progress.done, total: d.progress.total}))}); }
     if (p[0] === 'llm' && (p[1] === 'providers' || p[1] === 'test') && !p[2]) { // optional cloud AI: keys go to .env and are never echoed back
-      const KEY: Record<string, [string, string]> = {gemini: ['GEMINI_API_KEY', 'GEMINI_MODEL'], groq: ['GROQ_API_KEY', 'GROQ_MODEL'], openrouter: ['OPENROUTER_API_KEY', 'OPENROUTER_MODEL'], anthropic: ['ANTHROPIC_API_KEY', 'DRAFT_MODEL']};
+      const KEY: Record<string, [string, string]> = {gemini: ['GEMINI_API_KEY', 'GEMINI_MODEL'], groq: ['GROQ_API_KEY', 'GROQ_MODEL'], cerebras: ['CEREBRAS_API_KEY', 'CEREBRAS_MODEL'], openrouter: ['OPENROUTER_API_KEY', 'OPENROUTER_MODEL'], anthropic: ['ANTHROPIC_API_KEY', 'DRAFT_MODEL']};
       const cur = () => ({...process.env, ...readEnv()});
       if (p[1] === 'providers' && m === 'GET') { const e = cur(); return json(res, 200, {active: (e.LLM_PROVIDER || 'ollama').toLowerCase(), providers: Object.entries(KEY).map(([id, [k, mk]]) => ({id, keySet: !!e[k], model: e[mk] ?? ''}))}); }
       const b = await body(req, LlmProviderBody), id = b.provider;

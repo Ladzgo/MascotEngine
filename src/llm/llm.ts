@@ -2,8 +2,8 @@ import {spawn} from 'node:child_process';
 import {extractJson} from './json.js';
 export {extractJson};
 
-export type Provider = 'anthropic' | 'gemini' | 'ollama' | 'groq' | 'openrouter';
-export const PROVIDERS: Provider[] = ['ollama', 'gemini', 'groq', 'openrouter', 'anthropic'];
+export type Provider = 'anthropic' | 'gemini' | 'ollama' | 'groq' | 'openrouter' | 'cerebras';
+export const PROVIDERS: Provider[] = ['ollama', 'gemini', 'groq', 'cerebras', 'openrouter', 'anthropic'];
 export type ChatMsg = {role: 'user' | 'assistant'; content: string};
 export const NO_PROVIDER = 'The free local AI (Ollama) is not available. Install it from ollama.com; the Studio starts it and downloads a model for you.';
 export const ANTHROPIC_MODEL = 'claude-sonnet-5-5';
@@ -155,12 +155,13 @@ async function viaGemini(system: string, messages: ChatMsg[], json: boolean, env
 
 const OPENAI_COMPAT = {
   groq: {url: 'https://api.groq.com/openai/v1/chat/completions', key: 'GROQ_API_KEY', model: 'GROQ_MODEL', def: 'openai/gpt-oss-120b', name: 'Groq'},
+  cerebras: {url: 'https://api.cerebras.ai/v1/chat/completions', key: 'CEREBRAS_API_KEY', model: 'CEREBRAS_MODEL', def: 'gpt-oss-120b', name: 'Cerebras'},
   openrouter: {url: 'https://openrouter.ai/api/v1/chat/completions', key: 'OPENROUTER_API_KEY', model: 'OPENROUTER_MODEL', def: 'meta-llama/llama-3.3-70b-instruct:free', name: 'OpenRouter'},
 } as const;
 /** Models come and go on free tiers, and Groq counts the daily quota per model: rank the usable ones (cached per process). */
 const ranked = new Map<string, string[]>();
 async function rankOpenAiModels(p: keyof typeof OPENAI_COMPAT, key: string): Promise<string[]> {
-  if (p !== 'groq') return []; // OpenRouter ids are stable enough; shortcut: extend when a :free id breaks
+  if (p === 'openrouter') return []; // OpenRouter ids are stable enough; shortcut: extend when a :free id breaks
   const ck = p + key;
   if (ranked.has(ck)) return ranked.get(ck)!;
   let out: string[] = [];
@@ -172,7 +173,7 @@ async function rankOpenAiModels(p: keyof typeof OPENAI_COMPAT, key: string): Pro
   ranked.set(ck, out);
   return out;
 }
-/** Groq (gsk_ keys, free tier) and OpenRouter speak the OpenAI chat format. */
+/** Groq (gsk_ keys, free tier), Cerebras (csk- keys, free tier) and OpenRouter speak the OpenAI chat format. */
 async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
   const c = OPENAI_COMPAT[p], key = env[c.key]?.trim();
   if (!key) throw new Error(`${c.key} is missing (only needed when LLM_PROVIDER=${p}).`);
@@ -241,7 +242,7 @@ export async function chat(o: {system: string; messages: ChatMsg[]; json?: boole
   const env = o.env ?? process.env;
   const p = await resolveProvider(env);
   if (p === 'gemini') return viaGemini(o.system, o.messages, !!o.json, env);
-  if (p === 'groq' || p === 'openrouter') return viaOpenAi(p, o.system, o.messages, !!o.json, env);
+  if (p === 'groq' || p === 'openrouter' || p === 'cerebras') return viaOpenAi(p, o.system, o.messages, !!o.json, env);
   if (p === 'ollama') return viaOllama(o.system, o.messages, !!o.json, env);
   return viaAnthropic(o.system, o.messages, env);
 }

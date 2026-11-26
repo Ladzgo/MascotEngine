@@ -100,3 +100,12 @@ test('groq: a 429 on one model (per-model daily quota) falls through to the next
     assert.deepEqual([...new Set(used)], ['openai/gpt-oss-120b', 'qwen/qwen3-32b']);
   } finally { restore(); }
 });
+
+test('cerebras: OpenAI format at api.cerebras.ai, model ranked from its own /models list', async () => {
+  let seen: any;
+  mockFetch((u, init) => u.endsWith('/models') ? j({data: [{id: 'llama3.1-8b'}, {id: 'llama-3.3-70b'}]}) : (seen = {u, model: JSON.parse(init.body).model}, j({choices: [{message: {content: 'OK'}}]})));
+  try {
+    assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'cerebras', CEREBRAS_API_KEY: 'csk-1'}}), 'OK');
+    assert.match(seen.u, /api\.cerebras\.ai/); assert.equal(seen.model, 'llama-3.3-70b');
+  } finally { restore(); }
+});
