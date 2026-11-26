@@ -1,0 +1,50 @@
+{
+ "curious-1.mp3": {
+  "mood": "curious",
+  "bpm": 104
+ },
+ "curious-2.mp3": {
+  "mood": "curious",
+  "bpm": 112
+ },
+ "tense-1.mp3": {
+  "mood": "tense",
+  "bpm": 100
+ },
+ "tense-2.mp3": {
+  "mood": "tense",
+  "bpm": 108
+ },
+ "upbeat-1.mp3": {
+  "mood": "upbeat",
+  "bpm": 118
+ },
+ "upbeat-2.mp3": {
+  "mood": "upbeat",
+  "bpm": 120
+ },
+ "warm-1.mp3": {
+  "mood": "warm",
+  "bpm": 100
+ },
+ "warm-2.mp3": {
+  "mood": "warm",
+  "bpm": 106
+ },
+ "serious-1.mp3": {
+  "mood": "serious",
+  "bpm": 100
+ },
+ "serious-2.mp3": {
+  "mood": "serious",
+  "bpm": 110
+ },
+ "calm-1.mp3": {
+  "mood": "calm",
+  "bpm": 100
+ },
+ "calm-2.mp3": {
+  "mood": "calm",
+  "bpm": 104
+ }
+}

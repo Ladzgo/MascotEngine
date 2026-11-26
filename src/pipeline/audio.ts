@@ -131,7 +131,7 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
     }
     if (takes[i]) { hasVoice = true; add(voice, takes[i]!, d.startSec + d.speechStart, gains[i]); }
   });
-  void timings; void ep;
+  void timings;
 
   fs.mkdirSync(`${dir}build`, {recursive: true});
   const sfxWav = `${dir}build/sfx.wav`, voiceWav = `${dir}build/voice.wav`, mixed = `${dir}build/mix-raw.wav`, out = `${dir}build/mix.wav`;
@@ -147,11 +147,14 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   const sfxDuck = 'sidechaincompress=threshold=0.03:ratio=4:attack=5:release=200';
   let filter: string;
   if (track) {
+    // per-episode variation: the bed starts at a seed-chosen bar (beds are loop-safe, so any bar works)
+    const bpm = (() => { try { return JSON.parse(fs.readFileSync(`${musicDir}index.json`, 'utf8'))[track]?.bpm as number | undefined; } catch { return undefined; } })();
+    const bar = [...(ep.id ?? '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 16, (ep.seed ?? 0) % 16), offset = bpm ? bar * 240 / bpm : 0;
     args.push('-stream_loop', '-1', '-i', `${musicDir}${track}`);
     const swell = swellExpr(dec, totalSec);
     // music at -22 dB, sidechain-ducked by the voice, then summed with voice + ducked sfx
     filter = '[0:a]' + VOICE_FX + 'asplit=3[v][k1][k2];[1:a][k1]' + sfxDuck + '[sfxd];' +
-      '[3:a]volume=0.12,volume=\'' + swell + '\':eval=frame,atrim=0:' + totalSec.toFixed(3) + '[m];[m][k2]sidechaincompress=threshold=0.02:ratio=2.6:attack=20:release=400:makeup=1[duck];' +
+      '[3:a]' + (offset ? `atrim=start=${offset.toFixed(3)},asetpts=PTS-STARTPTS,` : '') + 'volume=0.12,volume=\'' + swell + '\':eval=frame,atrim=0:' + totalSec.toFixed(3) + '[m];[m][k2]sidechaincompress=threshold=0.02:ratio=2.6:attack=20:release=400:makeup=1[duck];' +
       '[v][sfxd][duck][2:a]amix=inputs=4:normalize=0[o]';
   } else {
     filter = '[0:a]' + VOICE_FX + 'asplit=2[v][k1];[1:a][k1]' + sfxDuck + '[sfxd];[v][sfxd][2:a]amix=inputs=3:normalize=0[o]';

@@ -10,7 +10,7 @@ export {ACCENTS};
 const BACKGROUNDS = ['plain', 'grid', 'dots', 'vignette'] as const;
 const CAPTIONS = ['bar', 'pill', 'outline'] as const;
 const INTROS = ['ink_draw', 'pop', 'slide'] as const;
-const MOODS = ['calm', 'curious', 'tense', 'upbeat'] as const;
+const MOODS = ['calm', 'curious', 'tense', 'upbeat', 'warm', 'serious'] as const;
 const CAMERAS = ['static', 'slow_push', 'slow_pull', 'pan_left', 'pan_right', 'drift'];
 /** shorts-pro profile (docs/REFERENCE-ANALYSIS.md): full-bleed look or native Shorts get camera-move transitions, minimal tails (no pause above ~0.4 s) and a hook inside 1.5 s. */
 const PRO_TRANSITIONS = ['slide', 'zoom_through', 'whip', 'circle_reveal'];
@@ -77,7 +77,13 @@ const surprising = (s: Scene) =>
 
 const musicDir = new URL('../../assets/music/', import.meta.url).pathname;
 /** Bed file for a mood (calm = the original pad), null when that file is not installed. */
-const moodTrack = (mood: string) => { const f = mood === 'calm' ? 'ambient-pad.mp3' : `ambient-${mood}.mp3`; return fs.existsSync(musicDir + f) ? f : null; };
+/** Procedural beds (scripts/music/gen.ts) are `<mood>-<n>.mp3`; the seed picks one, the old ambient beds are the fallback. */
+const moodTrack = (mood: string, r: () => number = () => 0) => {
+  const beds = fs.existsSync(musicDir) ? fs.readdirSync(musicDir).filter(f => f.startsWith(`${mood}-`) && f.endsWith('.mp3')).sort() : [];
+  if (beds.length) return beds[Math.floor(r() * beds.length)];
+  const f = mood === 'calm' ? 'ambient-pad.mp3' : `ambient-${mood}.mp3`;
+  return fs.existsSync(musicDir + f) ? f : null;
+};
 
 function fitLayout(layout: string, s: Scene): number {
   if (s.type === 'big_number' && s.emotion === 'shocked' && layout === 'center') return 1.6;
@@ -208,7 +214,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
   const upbeat = arc(['happy', 'excited', 'smug']);
   const curious = arc(['thinking', 'confused', 'explaining']);
   const mood = pick([...MOODS], m => {
-    const fit = m === 'tense' ? 1 + tense : m === 'upbeat' ? 1 + upbeat : m === 'curious' ? 1 + curious * 0.6 : 1.5;
+    const fit = m === 'tense' ? 1 + tense : m === 'upbeat' ? 1 + upbeat : m === 'curious' ? 1 + curious * 0.6 : m === 'serious' ? 0.8 + tense * 0.5 : m === 'warm' ? 1 + upbeat * 0.3 : 1.5;
     return fit * freqPenalty(m, 'music', recent) * noise(rand);
   }, rand);
 
@@ -393,7 +399,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
 
   const out: EpisodeDecisions = {
     episodeId: ep.id, seed: ep.seed, accent, background, captionStyle, intro,
-    music: {mood, track: moodTrack(mood)}, totalSec: round(cursor), scenes: decided, ...(capPrefs ? {captions: capPrefs} : {}),
+    music: {mood, track: moodTrack(mood, rand)}, totalSec: round(cursor), scenes: decided, ...(capPrefs ? {captions: capPrefs} : {}),
     ...(decided[0]?.hook ? {hook: decided[0].hook} : {}),
   };
   fs.writeFileSync(`${dir}build/decisions.json`, JSON.stringify(out, null, 2));
