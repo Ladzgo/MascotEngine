@@ -132,7 +132,7 @@ export const SceneDecisionSchema = z.object({
   index: z.number().int().min(0), type: z.string(), layout: z.string(), charSide: z.enum(['left', 'right', 'center']), pose: z.string(), camera: z.string(), transition: z.string(),
   startSec: sec.min(0), durSec: sec.positive(), speechStart: sec, speechEnd: sec,
   punchIns: z.array(z.object({t: sec, scale: sec.positive(), dur: sec.positive()})),
-  sfx: z.array(z.object({t: sec, kind: z.enum(['pop', 'whoosh', 'tick', 'ding', 'chime']), variant: z.number().int().min(0)})),
+  sfx: z.array(z.object({t: sec, kind: z.enum(['pop', 'whoosh', 'tick', 'ding', 'chime', 'coin', 'click', 'thud']), variant: z.number().int().min(0)})),
   hook: Hook.optional(), elements: z.array(sec),
 });
 export const DecisionsSchema = z.object({

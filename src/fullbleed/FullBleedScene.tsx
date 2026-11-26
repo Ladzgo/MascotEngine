@@ -213,7 +213,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   // hero stands on the ground plane (y = 68% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.3 : h * 1.05;
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' ? 0.5 : lay === 'broll' ? 0.85 : 1;
-  const hs = base * scale, groundY = tall ? h * 0.62 : h * 0.8, cy = groundY - 0.325 * hs;
+  const hs = base * scale, groundY = tall ? h * 0.67 : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (
