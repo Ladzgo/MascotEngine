@@ -1,0 +1,15 @@
+{
+  "id": "hu-futas",
+  "name": "Futás Okosan",
+  "description": "Rövid, tényekre épülő magyarázók a futásról és a sportsérülések megelőzéséről.",
+  "niche": "futás és szabadtéri mozgás",
+  "audience": "Kezdő és hobbi futók, akik sérülés nélkül, okosan szeretnének haladni",
+  "tone": "Közvetlen, barátságos, tegező, rövid mondatok, konkrét számok és példák. Nincs orvosi diagnózis, nincs gyógyszerajánlás; fájdalom esetén orvoshoz irányít.",
+  "language": "hu",
+  "accent": "green",
+  "branding": {"cta": "Iratkozz fel a következő tippért", "outroSec": 2, "watermark": true},
+  "voiceStyle": "energikus, barátságos, közepes tempó",
+  "bannedTopics": ["csodadiéta", "gyógyszer", "orvosi diagnózis"],
+  "postingPerWeek": 2,
+  "createdAt": "2026-11-26T20:00:00.000Z"
+}
