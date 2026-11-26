@@ -6,6 +6,8 @@ import {extractJson, type Client} from '../llm/llm.js';
 import {MODEL} from './draft.js';
 import {isHu, LANG_RULES} from './lang.js';
 import {slopHits} from './critic.js';
+import {spokenNumbers} from './lint.js';
+import type {Episode} from '../schema.js';
 
 export type Device = {
   id: string; name: string;
@@ -75,33 +77,104 @@ export const fullName = (h: string) => /\b[A-Z][a-z]+ [A-Z][a-z]{2,}\b/.test(h);
 
 const NUMW = /\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand|million|billion|half|double|egy|kettő|két|három|négy|öt|hat|hét|nyolc|kilenc|tíz|száz|ezer|millió)\b/i;
 const wcount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
-/** Deterministic part of the hook rubric (0-10): length, a number, no stock phrases, no throat-clearing opener, a person or a stake. */
+const SETUP = /^(did you know|have you ever|hey|hi|welcome|in this video|today|let'?s talk|let me|here'?s (a|the) (thing|story)|so |well |imagine|ever wonder)/i;
+/** Deterministic part of the hook rubric (0-10): under 12 words, a number, no stock phrases or setup opener, a person or a stake. */
 export function hookHeuristic(h: string): number {
   let s = 0;
-  if (wcount(h) <= 12) s += 3; else if (wcount(h) <= 15) s += 1;
+  if (wcount(h) < 12) s += 3; else if (wcount(h) <= 14) s += 1;
   if (NUMW.test(h)) s += 3;
-  if (!slopHits(h).length && !/^(did you know|have you ever|welcome|in this video|today|so |well )/i.test(h.trim())) s += 2;
+  if (!slopHits(h).length && !SETUP.test(h.trim())) s += 2;
   if (/[$€£]|\b[A-Z][a-z]+,? \d{2}\b|\b(you|your|te|neked)\b/i.test(h)) s += 2;
   return s;
 }
 
-/** 5 hook candidates, rubric-judged by the model (specificity, curiosity gap, stakes, number, <= 12 words), blended with the heuristic. Numbers must be in `allowed`. */
-export async function pickHook(o: {client: Client; topic: string; outlineHook: string; stakes: string; device?: Device; lang?: string; model?: string; allowedOk: (h: string) => boolean; log?: (m: string) => void}): Promise<string> {
-  const text = (r: {content: Array<{type: string; text?: string}>}) => r.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
-  const sys = `You write opening lines for short explainer videos.${isHu(o.lang) ? `\n${LANG_RULES.hu}` : ''} The first spoken sentence must stop a scroll: specific, concrete, one number or an everyday first-name person (never a real celebrity or public figure), 12 words or fewer, plain spoken, no hype words, no "Did you know". Use only numbers that appear in the given facts. Output ONLY JSON: {"hooks": [5 different strings, each built differently: a number first, a person first, a contradiction, a question that implies a number, a flat claim]}`;
-  let cands: string[] = [];
-  try { const j = extractJson(text(await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 600, system: sys, messages: [{role: 'user', content: `Topic: ${o.topic}\nDevice: ${o.device?.name ?? 'any'}\nCurrent hook: ${o.outlineHook}\nStakes: ${o.stakes}`}]}))) as {hooks?: unknown}; cands = (Array.isArray(j.hooks) ? j.hooks : []).map(x => String(x).trim()).filter(Boolean); } catch (e) { o.log?.(`hook candidates failed (${(e as Error).message.slice(0, 60)}); keeping the outline hook`); return o.outlineHook; }
-  cands = [...new Set([o.outlineHook, ...cands])].filter(h => wcount(h) <= 15 && o.allowedOk(h) && !fullName(h));
-  if (cands.length < 2) return cands[0] ?? o.outlineHook;
-  let judged: number[] = cands.map(() => 5);
+/** The six short-form hook formulas (video-hook-writer skill); every candidate uses a different one. */
+export const HOOK_FORMULAS = {
+  callout: 'addresses the viewer directly: "If you do X, stop."',
+  curiosity_gap: '"The reason X happens is not what you think" (best on Shorts)',
+  transformation: 'a result with a number and a timeframe: "X became Y in Z"',
+  controversy: 'a genuinely contested take, said flatly',
+  list_tease: '"Three things ..." with the count',
+  visual_first: 'names a result the picture already shows, e.g. "This $5 cup costs $1,825."',
+} as const;
+export type HookPick = {hook: string; score: number; formula?: string; overlay?: string; tried: number};
+// shortcut: the outline (other agent's lane) only takes the hook string; the CLI reads the score from here. Pass a callback if this goes concurrent.
+export let lastHookPick: HookPick | undefined;
+export const HOOK_TARGET = 75;
+
+const text = (r: {content: Array<{type: string; text?: string}>}) => r.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
+type Cand = {h: string; formula?: string; overlay?: string};
+/** Judge 0-100 per line (specific claim 25, open question 25, stakes 15, signal first 15, under 12 words 10, number or name 10), blended 60/40 with the heuristic (x10). */
+export async function judgeHooks(client: Client, lines: string[], model?: string): Promise<number[]> {
+  let judged = lines.map(() => 50);
   try {
-    const j = extractJson(text(await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 500, system: 'You are a strict editor. Score each opening line 1-10 on: specificity (a concrete thing, not a topic), curiosity gap (makes you need the next sentence), stakes (what it costs or gains the viewer), a number, brevity (12 words or fewer). Output ONLY JSON: {"scores": [one number per line, same order]}', messages: [{role: 'user', content: cands.map((h, i) => `${i + 1}. ${h}`).join('\n')}]}))) as {scores?: unknown};
-    if (Array.isArray(j.scores) && j.scores.length === cands.length) judged = j.scores.map(x => Math.max(1, Math.min(10, Number(x) || 5)));
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: 'You are a strict short-form video editor. Score each spoken opening line 0-100: specific claim, not a vague one (25); opens a question the viewer needs answered (25); stakes for the viewer (15); signal first, no setup, greeting or backstory before the point (15); under 12 words (10, zero if 12 or more); a concrete number or name (10). Hollow shock ("you won\'t believe") scores under 40. Output ONLY JSON: {"scores": [one number per line, same order]}', messages: [{role: 'user', content: lines.map((h, i) => `${i + 1}. ${h}`).join('\n')}]}))) as {scores?: unknown};
+    if (Array.isArray(j.scores) && j.scores.length === lines.length) judged = j.scores.map(x => Math.max(0, Math.min(100, Number(x) || 50)));
   } catch { /* heuristic only */ }
-  const total = cands.map((h, i) => ({h, s: judged[i] * 0.6 + hookHeuristic(h) * 0.4}));
-  total.sort((a, b) => b.s - a.s);
-  o.log?.(`hook chosen from ${cands.length}: "${total[0].h}"`);
-  return total[0].h;
+  return lines.map((h, i) => Math.round(judged[i] * 0.6 + hookHeuristic(h) * 10 * 0.4));
+}
+
+/** 5 hook candidates, one per formula, judged; below HOOK_TARGET one more round gets the judge's best as the bar to beat. Numbers must pass `allowedOk`. */
+export async function pickHook(o: {client: Client; topic: string; outlineHook: string; stakes: string; device?: Device; lang?: string; model?: string; allowedOk: (h: string) => boolean; log?: (m: string) => void}): Promise<string> {
+  const formulas = Object.entries(HOOK_FORMULAS).map(([k, v]) => `${k}: ${v}`).join('\n');
+  const sys = `You write the first spoken line of a vertical Short.${isHu(o.lang) ? `\n${LANG_RULES.hu}` : ''} It must stop a scroll in 3 seconds: under 12 words, a specific claim (a number or an everyday first-name person; never a real celebrity or public figure), opens a question the video answers, signal first: no greeting, no "in this video", no "did you know", no backstory, no hollow shock. Use only numbers that appear in the given facts. Write 5 lines, each from a DIFFERENT formula:\n${formulas}\nAlso give a 5-7 word on-screen overlay per line that says the same promise in different words. Output ONLY JSON: {"hooks": [{"formula": "curiosity_gap", "line": "...", "overlay": "..."}, ... 5 items]}`;
+  let pool: (Cand & {s: number})[] = [], tried = 0, bar = '';
+  for (let round = 0; round < 2; round++) {
+    let cands: Cand[] = [];
+    try {
+      const j = extractJson(text(await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: sys, messages: [{role: 'user', content: `Topic: ${o.topic}\nDevice: ${o.device?.name ?? 'any'}\nCurrent hook: ${o.outlineHook}\nStakes: ${o.stakes}${bar}`}]}))) as {hooks?: unknown};
+      cands = (Array.isArray(j.hooks) ? j.hooks : []).map(x => typeof x === 'string' ? {h: x} : {h: String((x as {line?: unknown}).line ?? ''), formula: String((x as {formula?: unknown}).formula ?? '') || undefined, overlay: String((x as {overlay?: unknown}).overlay ?? '') || undefined}).map(c => ({...c, h: c.h.trim()})).filter(c => c.h);
+    } catch (e) { o.log?.(`hook candidates failed (${(e as Error).message.slice(0, 60)})`); }
+    if (round === 0) cands.unshift({h: o.outlineHook});
+    cands = cands.filter((c, i, a) => wcount(c.h) <= 14 && o.allowedOk(c.h) && !fullName(c.h) && !pool.some(p => p.h === c.h) && a.findIndex(x => x.h === c.h) === i);
+    tried += cands.length;
+    if (cands.length) { const s = await judgeHooks(o.client, cands.map(c => c.h), o.model); pool.push(...cands.map((c, i) => ({...c, s: s[i]}))); }
+    pool.sort((a, b) => b.s - a.s);
+    if (pool[0] && pool[0].s >= HOOK_TARGET) break;
+    if (pool[0]) bar = `\nThe best line so far scored ${pool[0].s}/100: "${pool[0].h}". Write 5 sharper lines that beat it: more specific, shorter, a clearer open question.`;
+  }
+  const best = pool[0] ?? {h: o.outlineHook, s: 0};
+  lastHookPick = {hook: best.h, score: best.s, formula: best.formula, overlay: best.overlay, tried};
+  o.log?.(`hook chosen from ${tried} (${best.formula ?? 'outline'}, ${best.s}/100${best.s < HOOK_TARGET ? `, under ${HOOK_TARGET}` : ''}): "${best.h}"`);
+  return best.h;
+}
+
+// first names the concreteness check accepts at a sentence start (elsewhere any capitalised word counts as a name)
+const FIRST_NAMES = new Set('anna alex ben clara david emma finn grace hugo ivy jack kate leo mia noah olivia paul quinn rosa sam sarah tara tom uma victor wendy zoe adam bella carl diana eric fiona george hana ian julia kevin lena mark maria nina oscar lisa john mike jane amy chris dan josh laura lucy max nick ryan sophie'.split(' '));
+const SENT_START = /(^|[.!?]\s+)$/;
+/** A number (digits or number words) or a name (a capitalised word mid-sentence, or a known first name). */
+export function concrete(t: string): boolean {
+  if (NUMW.test(t)) return true;
+  for (const m of t.matchAll(/\b[A-Z][a-z]{2,}\b/g)) { if (!SENT_START.test(t.slice(0, m.index)) || FIRST_NAMES.has(m[0].toLowerCase())) return true; }
+  return false;
+}
+/** Beat pairs (i, i+1) from beat 1 on where neither beat carries a number or a name: "a number or a name in every 2nd beat". Returns i. */
+export function concreteGaps(narr: string[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i + 1 < narr.length; i += 2) if (!concrete(narr[i]) && !concrete(narr[i + 1])) out.push(i);
+  return out;
+}
+
+/** Rewrites one talk beat per gap so it carries a number the script already says or an example person's first name; kept per line only when valid. */
+export async function fillConcrete(client: Client, ep: Episode, o: {model?: string; name?: string; maxWords?: number; log?: (m: string) => void}): Promise<Episode> {
+  const narr = ep.scenes.map(s => s.narration), gaps = concreteGaps(narr);
+  const targets = gaps.map(i => [i + 1, i].find(k => k < narr.length - 1 && ep.scenes[k].type === 'talk')).filter((k): k is number => k !== undefined);
+  if (!targets.length) return ep;
+  const heard = [...new Set(narr.flatMap(spokenNumbers))], name = o.name ?? 'Sam', max = o.maxWords ?? 14;
+  try {
+    const r = await client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: `You edit lines of a spoken explainer script. Rewrite each numbered line so it carries something concrete: either one of these numbers already used in the script (${heard.join(', ') || 'none'}) or the example person ${name} by first name. Keep the meaning and the flow, plain spoken, contractions are fine, ${max} words or fewer. Never add any other number. Output ONLY JSON: {"rewrites": [{"i": number, "narration": string}]}`, messages: [{role: 'user', content: targets.map(i => `${i}: ${narr[i]}\n(before: ${narr[i - 1]})`).join('\n')}]});
+    const j = extractJson(text(r)) as {rewrites?: {i: number; narration: string}[]};
+    const scenes = ep.scenes.map(s => ({...s}));
+    let n = 0;
+    for (const w of j.rewrites ?? []) {
+      if (!targets.includes(w.i) || typeof w.narration !== 'string') continue;
+      const t = w.narration.trim();
+      if (wcount(t) > max || !concrete(t) || !spokenNumbers(t).every(x => heard.includes(x)) || slopHits(t).length) continue;
+      scenes[w.i].narration = t; n++;
+    }
+    o.log?.(`concrete: ${gaps.length} beat pairs without a number or name, ${n} lines rewritten`);
+    return {...ep, scenes: scenes as Episode['scenes']};
+  } catch (e) { o.log?.(`concrete pass skipped (${(e as Error).message.slice(0, 60)})`); return ep; }
 }
 
 const keyWords = (t: string) => t.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^(that|this|with|your|from|they|have|what|when|will|about|than|then|into|were|been|does|more|most|every|there|their|which|would|could|should)$/.test(w));

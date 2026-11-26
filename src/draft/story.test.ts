@@ -55,3 +55,21 @@ test('score: too few short sentences marks plain mid beats for a punchy rewrite'
   const s = scoreScript(mk(['Hook with 5 dollars here.', 'This sentence runs on for quite a few words in a row.', 'Another sentence that also runs on for many plain words.', 'Yet another long plain sentence with a lot of words in it.', 'One more long sentence here with plenty of words in it too.', 'So next time remember the hook.']));
   assert.ok(s.weak.some(w => /rhythm/.test(w.why)));
 });
+
+test('concreteGaps: a number or a name in every second beat', async () => {
+  const {concrete, concreteGaps} = await import('./story.js');
+  assert.ok(concrete('It costs $5.') && concrete('That is three cups.') && concrete('Sarah pays more.') && concrete('Most people in Ohio pay it.'));
+  assert.ok(!concrete('It adds up quietly.') && !concrete('Batteries hate the cold.'));
+  assert.deepEqual(concreteGaps(['Hook 5', 'It adds up.', 'Nobody notices.', 'Then $40 a month.', 'Plain line.', 'Another plain line.']), [1]);
+});
+test('pickHook: five formula candidates, judge blend, second round only under the target', async () => {
+  const {pickHook} = await import('./story.js');
+  let calls = 0;
+  const client = {messages: {create: async (r: {system: string}) => { calls++; return {content: [{type: 'text', text: /strict short-form/.test(r.system)
+    ? JSON.stringify({scores: [30, 90, 40, 30, 20, 10]})
+    : JSON.stringify({hooks: [{formula: 'curiosity_gap', line: 'Your $5 coffee costs $1,825 a year.', overlay: 'the $1,825 cup'}, {formula: 'callout', line: 'Stop buying coffee'}, {formula: 'list_tease', line: 'Three coffee facts'}, {formula: 'controversy', line: 'Coffee is fine'}, {formula: 'transformation', line: 'From 5 to 1825'}]})}]}; }}} as any;
+  const h = await pickHook({client, topic: 'coffee', outlineHook: 'Coffee adds up.', stakes: '', allowedOk: () => true});
+  const {lastHookPick} = await import('./story.js');
+  assert.equal(h, 'Your $5 coffee costs $1,825 a year.'); // outline hook is candidate 1; the numeric line wins the blend
+  assert.ok(lastHookPick!.score >= 75 && calls === 2, `score ${lastHookPick!.score}, calls ${calls}`);
+});
