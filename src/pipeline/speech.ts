@@ -73,9 +73,12 @@ export function segmentize(text: string, o: {lang?: string; seed?: number; empha
       let speed = 0.95 + 0.1 * jit(seed, si * 7 + pi);
       if (o.emphasis?.some(e => e && p.toLowerCase().includes(e.toLowerCase()))) speed -= 0.03; // linger on the stressed phrase
       if (last && end === '?') speed += 0.02;
+      // spelled-out amounts are many short words that the voice rushes ("one thousand eight hundred twenty five"): a narrator slows down on numbers
+      const numeric = (p.match(/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b/gi) ?? []).length >= 3;
+      if (numeric) speed = Math.min(speed, 0.95) - 0.12;
       const base = last ? (si === sents.length - 1 ? 0 : (PAUSE[end] ?? 280)) : (PAUSE[end] ?? 120);
       const pauseMs = base ? Math.max(40, Math.round(base + (jit(seed, si * 13 + pi + 50) * 2 - 1) * 60)) : 0;
-      out.push({text: p.replace(/[—–]/g, ',').trim(), speed: Math.round(Math.min(1.05, Math.max(0.93, speed)) * 1000) / 1000, pauseMs});
+      out.push({text: p.replace(/[—–]/g, ',').trim(), speed: Math.round(Math.min(1.05, Math.max(numeric ? 0.82 : 0.93, speed)) * 1000) / 1000, pauseMs});
     });
   });
   return out;

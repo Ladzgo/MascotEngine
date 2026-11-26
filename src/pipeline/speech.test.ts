@@ -20,3 +20,8 @@ test('segmentize: clauses, speeds in range, pauses jittered, none after the last
   assert.ok(s.slice(0, -1).every(x => x.pauseMs >= 40));
   assert.deepEqual(segmentize('One. Two.', {seed: 3}), segmentize('One. Two.', {seed: 3}));
 });
+
+test('segmentize: a clause full of spelled-out numbers is read slower than plain talk', () => {
+  const [n] = segmentize(spoken('You could spend $1,825 a year.'), {seed: 2}), [t] = segmentize('You could spend all of it this year.', {seed: 2});
+  assert.ok(n.speed <= 0.84 && n.speed >= 0.82 && t.speed >= 0.93, `${n.speed} vs ${t.speed}`);
+});

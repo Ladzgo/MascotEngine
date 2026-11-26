@@ -6,6 +6,7 @@ import {SCORE_FAIL_BELOW, scoreScript} from '../../src/draft/score.js';
 import {planShots} from '../../src/fullbleed/shots.js';
 import {buildPhrases} from '../../src/fx/captions.js';
 import {activeRmsDb} from '../../src/pipeline/audio.js';
+import {spoken} from '../../src/pipeline/speech.js';
 
 /** Thresholds (documented in docs/QA.md). */
 export const LIMITS = {
@@ -130,7 +131,8 @@ export function qa(id: string, fileArg?: string) {
   add('pause share', P.share <= LIMITS.pauseShare, `${(P.share * 100).toFixed(1)}%`, `<= ${LIMITS.pauseShare * 100}%`);
 
   // reference targets (docs/REFERENCE-ANALYSIS.md): 140-180 words per minute of speech, a new visual idea every <= 6 s on average
-  const nWords = dec.scenes.reduce((a: number, _: any, i: number) => a + tim.scenes[i].words.length, 0);
+  // spoken words: "$1,825" is one caption token but six words of speech
+  const nWords = dec.scenes.reduce((a: number, _: any, i: number) => a + tim.scenes[i].words.reduce((n: number, w: any) => n + spoken(w.w).split(/\s+/).filter(Boolean).length, 0), 0);
   const wpm = nWords / Math.max(1, vdur * (1 - P.share)) * 60;
   const [wLo, wHi] = short ? LIMITS.shortWpm : [140, 180];
   add('speaking pace', wpm >= wLo && wpm <= wHi, `${wpm.toFixed(0)} wpm`, `${wLo}..${wHi} wpm`);
