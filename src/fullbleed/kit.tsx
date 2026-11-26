@@ -22,7 +22,7 @@ export const GradDefs: React.FC<{accent: string}> = ({accent}) => (
     ))}
     <linearGradient id="fb-accent" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={accent} stopOpacity="0.75" /><stop offset="1" stopColor={accent} /></linearGradient>
     <radialGradient id="fb-shadow"><stop offset="0" stopColor="#000" stopOpacity="0.38" /><stop offset="1" stopColor="#000" stopOpacity="0" /></radialGradient>
-    <linearGradient id="fb-groundfade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#000" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity="0.55" /></linearGradient>
+    <linearGradient id="fb-groundfade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#000" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity="0.3" /></linearGradient>
     <radialGradient id="fb-glow"><stop offset="0" stopColor="#fff" stopOpacity="0.55" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></radialGradient>
   </defs>
 );

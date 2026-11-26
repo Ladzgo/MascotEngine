@@ -48,6 +48,8 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: `linear-gradient(180deg, ${pal[0]}, ${pal[1]} ${Math.round((hz / h) * 100)}%, ${pal[2]})`}}>
       <svg width={w} height={h} style={{position: 'absolute', inset: 0}}>
+        <defs><clipPath id={`fb-floor${seed}`}><rect x={0} y={hz} width={w} height={h - hz} /></clipPath></defs>
+        <g id={`fb-up${seed}`}>
         <ellipse cx={w / 2 - cx * 0.3} cy={hz - h * 0.12} rx={w * 0.6} ry={h * 0.22} fill="url(#fb-glow)" opacity={0.35} />
         {Array.from({length: 18}, (_, i) => { const r = 6 + rnd(i) * 22, x = ((rnd(i + 40) * w * 1.4 - cx * 0.15 - t * (5 + r * 0.5)) % (w * 1.4) + w * 1.4) % (w * 1.4) - w * 0.2; return <circle key={i} cx={x} cy={rnd(i + 80) * hz * 0.9} r={r} fill="#fff" opacity={0.04 + rnd(i + 5) * 0.1} />; })}
         {(env === 'city' || env === 'street') && <>{bld(1, 12, 0.2, h * 0.08, h * 0.26, '#000', 0.22, false)}{bld(2, 8, 0.5, h * 0.1, h * 0.36, pal[2], 0.55, true)}{bld(3, env === 'street' ? 3 : 4, 0.9, h * 0.18, h * (env === 'street' ? 0.62 : 0.5), '#000', 0.4, true)}</>}
@@ -69,10 +71,14 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
           <polygon points={`${w * 0.3},0 ${w * 0.7},0 ${w * 0.95},${hz} ${w * 0.05},${hz}`} fill="#fff" opacity={0.07} />
         </>}
         {env === 'abstract' && <>{Array.from({length: 7}, (_, i) => <circle key={i} cx={rnd(i + 90) * w - cx * 0.3} cy={hz * (0.15 + rnd(i + 99) * 0.6)} r={h * (0.05 + rnd(i) * 0.12)} fill="#fff" opacity={0.05 + rnd(i + 7) * 0.05} />)}{Array.from({length: 12}, (_, i) => <line key={i} x1={i * w / 11 - cx * 0.4} y1={0} x2={i * w / 11 - cx * 0.4 - 80} y2={hz} stroke="#fff" strokeOpacity={0.05} strokeWidth={3} />)}</>}
+        </g>
         <rect x={0} y={hz} width={w} height={h - hz} fill={env === 'room' ? '#5a3a24' : pal[2]} opacity={env === 'room' ? 0.9 : 0.92} />
+        {/* glossy floor: the scene above mirrored into it, so the lower frame carries picture instead of an empty dark band */}
+        <use href={`#fb-up${seed}`} transform={`translate(0 ${2 * hz}) scale(1 -1)`} clipPath={`url(#fb-floor${seed})`} opacity={0.28} />
         <rect x={0} y={hz} width={w} height={h * 0.012} fill={pal[3]} opacity={0.25} />
-        {env === 'room' || env === 'office' || env === 'kitchen' ? Array.from({length: 9}, (_, i) => { const y = hz + (h - hz) * Math.pow(i / 9, 1.6); return <line key={i} x1={0} y1={y} x2={w} y2={y} stroke="#000" strokeOpacity={0.22} strokeWidth={3} />; })
-          : Array.from({length: 11}, (_, i) => <line key={i} x1={w / 2 + (i - 5) * w * 0.04} y1={hz} x2={w / 2 + (i - 5) * w * 0.5 - cx * 1.2} y2={h} stroke="#fff" strokeOpacity={0.09} strokeWidth={3} />)}
+        <ellipse cx={w / 2 - cx * 0.2} cy={hz + (h - hz) * 0.32} rx={w * 0.55} ry={(h - hz) * 0.3} fill="url(#fb-glow)" opacity={0.3} />
+        {env === 'room' || env === 'office' || env === 'kitchen' ? Array.from({length: 9}, (_, i) => { const y = hz + (h - hz) * Math.pow(i / 9, 1.6); return <line key={i} x1={0} y1={y} x2={w} y2={y} stroke="#000" strokeOpacity={0.1} strokeWidth={3} />; })
+          : Array.from({length: 11}, (_, i) => <line key={i} x1={w / 2 + (i - 5) * w * 0.04} y1={hz} x2={w / 2 + (i - 5) * w * 0.5 - cx * 1.2} y2={h} stroke="#fff" strokeOpacity={0.04} strokeWidth={3} />)}
         {(env === 'city' || env === 'street') && Array.from({length: 4}, (_, i) => { const u = ((t * 0.4 + i / 4) % 1); return <rect key={i} x={w / 2 - 14 * (0.3 + u) - cx * 0.4} y={hz + (h - hz) * u * u} width={28 * (0.3 + u * 2)} height={6 + u * 18} fill="#fff" opacity={0.25} />; })}
         <rect x={0} y={hz} width={w} height={h - hz} fill="url(#fb-groundfade)" />
       </svg>
@@ -141,7 +147,7 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
 };
 
 /** Sub-shot framings [zoom, x shift (share of width), y shift (share of height)]: tight punch-in, wide pull-back, off-centre left/right. */
-export const SUB_FRAMES: [number, number, number][] = [[1.22, 0, 0.05], [0.9, 0, -0.02], [1.12, 0.07, 0.02], [1.12, -0.07, 0.02]];
+export const SUB_FRAMES: [number, number, number][] = [[1.1, 0, 0.03], [0.88, 0, -0.02], [0.96, 0.06, 0.01], [0.96, -0.06, 0.01]]; // gentle: a bigger punch-in cut the hero off
 /** How many 2-3 s sub-shots a beat of `dur` seconds gets (one per started 2.8 s). */
 export const subShots = (dur: number) => Math.max(1, Math.ceil(dur / 2.8));
 const CHARTY = new Set(['line_chart', 'bars3d', 'bars_arrow', 'chart', 'pie', 'gauge']);
@@ -221,7 +227,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const fixedStage = hasCallouts || versus;
   const stage = fixedStage ? `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})` : `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
   // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
-  const base = tall ? w * 1.25 : h * 1.05; // wider objects (scale, bars) span the whole 400 box: above ~1.25 w they get cut at the frame edge
+  const base = tall ? w * 1.15 : h * 1.05; // wider objects (scale, bars, calendar) span the whole 400 box: bigger and they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
@@ -252,7 +258,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           return slots.map((sl, si) => {
             const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
             if (lt < 0) return null;
-            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), sx0 = Math.min(w - size * 0.4, Math.max(size * 0.4, sl.x)), sy0 = sl.feet - 0.325 * size;
+            // reach: how far off-centre the object may sit and still be whole at the end of the camera push (~1.24 + close) and a 1.1 sub-shot
+            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), reach = lay === 'split' || lay === 'grid' ? w / 2 - size * 0.4 : Math.max(0, w / 2 / (1.24 + close) / 1.1 - size * 0.47), sx0 = w / 2 + Math.max(-reach, Math.min(reach, sl.x - w / 2)), sy0 = sl.feet - 0.325 * size;
             const ac = actionCopies(sl.main ? s.action : 'pop_in', lt);
             return (
               <React.Fragment key={`${i}-${si}`}>
