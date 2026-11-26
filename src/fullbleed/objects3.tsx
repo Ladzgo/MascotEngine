@@ -89,7 +89,7 @@ export const DebtCounter: Obj = ({t, value}) => {
 };
 
 /** Interest-rate dial: needle swings into the red. */
-export const Gauge: Obj = ({t}) => {
+export const Gauge: Obj = ({t, value}) => {
   const k = seg(t, 0.2, 1.6) + Math.sin(t * 9) * 0.015 * clamp((t - 1.6) * 3), ang = -90 + 180 * clamp(k * 0.82);
   const arc = (a0: number, a1: number, c: string) => { const p = (a: number) => [200 + Math.cos((a - 180) * Math.PI / 180) * 130, 250 + Math.sin((a - 180) * Math.PI / 180) * 130]; const [x0, y0] = p(a0), [x1, y1] = p(a1); return <path d={`M${x0} ${y0} A130 130 0 0 1 ${x1} ${y1}`} stroke={c} strokeWidth={34} fill="none" />; };
   return (
@@ -98,7 +98,7 @@ export const Gauge: Obj = ({t}) => {
       <circle cx={200} cy={250} r={166} fill={url('navy')} opacity={0.0} />
       {arc(0, 60, PALETTES.green[1])}{arc(60, 120, PALETTES.gold[1])}{arc(120, 180, PALETTES.red[1])}
       <g transform={`rotate(${ang} 200 250)`}><polygon points="194,250 206,250 200,134" fill="#fff" /></g><circle cx={200} cy={250} r={20} fill={url('gold')} />
-      <Txt x={200} y={236} size={44} fill="#fff" stroke="#12142a">{`${(4 + k * 21).toFixed(1)}%`}</Txt>
+      {typeof value === 'number' && <Txt x={200} y={236} size={44} fill="#fff" stroke="#12142a">{`${+(value * clamp(k)).toFixed(1)}%`}</Txt>}
     </g>
   );
 };
@@ -117,15 +117,16 @@ export const PriceUp: Obj = ({t}) => {
 };
 
 /** Pie: the interest slice sweeps open. */
-export const Pie: Obj = ({t}) => {
-  const k = seg(t, 0.3, 2.0) * 0.62, a = k * Math.PI * 2, R = 140, ex = 200 + Math.sin(a) * R, ey = 190 - Math.cos(a) * R;
+export const Pie: Obj = ({t, value}) => {
+  const pct = typeof value === 'number' && value > 0 && value <= 100 ? value / 100 : undefined; // only a share the beat says; else no figure
+  const k = seg(t, 0.3, 2.0) * (pct ?? 0.62), a = k * Math.PI * 2, R = 140, ex = 200 + Math.sin(a) * R, ey = 190 - Math.cos(a) * R;
   return (
     <g transform={`scale(${Math.max(0.01, pop(t, 0, 0.5))})`} style={{transformOrigin: '200px 190px'}}>
       <Shadow cy={338} rx={150} />
       <circle cx={200} cy={190} r={R} fill={url('blue')} />
       <path d={`M200 190 L200 ${190 - R} A${R} ${R} 0 ${a > Math.PI ? 1 : 0} 1 ${ex} ${ey}Z`} fill={url('red')} transform={`translate(${Math.sin(a / 2) * 8} ${-Math.cos(a / 2) * 8})`} />
       <circle cx={200} cy={190} r={50} fill="#12142a" opacity={0.0} />
-      <Txt x={200} y={206} size={54} fill="#fff" stroke="#12142a">{`${Math.round(k * 100)}%`}</Txt>
+      {pct !== undefined && <Txt x={200} y={206} size={54} fill="#fff" stroke="#12142a">{`${Math.round(k * 100)}%`}</Txt>}
     </g>
   );
 };

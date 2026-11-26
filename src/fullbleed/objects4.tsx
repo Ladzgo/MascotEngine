@@ -294,11 +294,11 @@ export const StackedBars: Obj = ({t}) => (
 );
 
 export const Calculator: Obj = ({t, value}) => {
-  const v = (value ?? 0) * seg(t, 0.2, 2); // only the beat's own number; no number = the display counts nothing
+  const v = (value ?? 0) * seg(t, 0.2, 2); // only the beat's own number; no number = blank display
   return (
     <g transform={`rotate(-5 200 200) scale(${Math.max(0.01, pop(t, 0, 0.5))})`} style={{transformOrigin: '200px 200px'}}>
       <Shadow rx={110} />
-      <rect x={100} y={30} width={200} height={300} rx={22} fill={url('navy')} /><rect x={116} y={50} width={168} height={64} rx={8} fill="#cfeedd" /><Txt x={274} y={98} size={40} anchor="end" fill="#16382a">{money(v)}</Txt>
+      <rect x={100} y={30} width={200} height={300} rx={22} fill={url('navy')} /><rect x={116} y={50} width={168} height={64} rx={8} fill="#cfeedd" />{value !== undefined && <Txt x={274} y={98} size={40} anchor="end" fill="#16382a">{money(v)}</Txt>}
       {Array.from({length: 12}, (_, i) => <rect key={i} x={118 + (i % 4) * 42} y={138 + Math.floor(i / 4) * 62} width={34} height={46} rx={8} fill={i === 11 ? url('red') : i % 4 === 3 ? url('gold') : '#aab1c0'} opacity={0.5 + 0.5 * (tick(t, 12, 0.18) === i ? 1 : 0.6)} />)}
     </g>
   );

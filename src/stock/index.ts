@@ -31,7 +31,9 @@ export function rank(hits: StockHit[], a: Query, format: Format, topic: string[]
   // with a topic, the match must come from the non-topic words: "sleep couch" -> a sailboat tagged "sleep" is not a couch
   // (prefix match both ways, 3+ letters: "bedroom" ~ "bed", "night" ~ "nightstand")
   const subj = words.filter(x => !tw.includes(x)), subjOv = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).filter(x => x.length >= 3).map(stem); return subj.filter(x => t.some(y => y.startsWith(x) || x.startsWith(y))).length; };
-  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => onTopic(x.h) && (tw.length && subj.length ? subjOv(x.h) >= (subj.length >= 3 ? 2 : 1) : x.ov >= need || !words.length));
+  // plain topic b-roll ("sleep"): the topic must be among the photo's first 3 tags (Pixabay orders tags by weight; a sailboat tagged "..., sleep" 5th is not sleep)
+  const lead = (h: StockHit) => (h.tags ?? h.title).toLowerCase().split(',').slice(0, 3).some(x => tw.some(w => x.trim().split(/\s+/).map(stem).includes(w)));
+  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => onTopic(x.h) && (tw.length && subj.length ? subjOv(x.h) >= (subj.length >= 3 ? 2 : 1) : (x.ov >= need || !words.length) && (!tw.length || lead(x.h))));
   return relevant.sort((x, y) => y.s - x.s).map(x => x.h);
 }
 
@@ -102,7 +104,8 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
   // later tries narrow toward the topic: "person taking nap couch" -> "woman nap couch" -> "sleep nap couch" -> "sleep couch" (Pixabay ANDs words;
   // its people photos are tagged woman/man, not person; helper verbs like "taking"/"using" only shrink the result)
   const who = o.query.length % 2 ? 'woman' : 'man', core = o.query.split(' ').filter(w => w && !VAGUE.has(w) && !topic.includes(w) && !/^(taking|using|doing|having|getting|making|holding)$/.test(w));
-  const qs = topic[0] ? [o.query, ...(/\b(person|people|someone)\b/.test(o.query) ? [`${who} ${core.join(' ')}`] : []), `${topic[0]} ${core.slice(0, 2).join(' ')}`, `${topic[0]} ${core.at(-1) ?? ''}`] : [o.query];
+  const qs = topic[0] ? [o.query, ...(/\b(person|people|someone)\b/.test(o.query) ? [`${who} ${core.join(' ')}`] : []), `${topic[0]} ${core.slice(0, 2).join(' ')}`, `${topic[0]} ${core.at(-1) ?? ''}`, `${topic[0]} ${who}`, topic[0]] : [o.query];
+  // the last two are plain topic b-roll ("sleep"): semantic QA scores an on-topic picture far above a drawn shield on an abstract sentence
   const tries = [...new Set(qs.map(x => x.trim()))].map(query => ({...a, query})).flatMap(x => (o.kind === 'video' ? [x, {...x, kind: 'photo' as const}] : [x])); // a video query falls back to a photo
   const keyed = PROVIDERS.some(p => p.needsKey && env[p.needsKey]);
   for (const kinds of tries) {
