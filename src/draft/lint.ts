@@ -21,7 +21,7 @@ export function lintEpisode(ep: Episode): string[] {
       if (re.test(s.narration)) errs.push(`Scene ${i + 1} uses banned advice/guarantee wording (${re}).`);
     }
   });
-  if (talkRuns(ep.scenes).length) errs.push('4 or more short talk scenes in a row; merge or vary them.');
+  if (talkRuns(ep.scenes).length) errs.push('7 or more short talk scenes in a row; merge or vary them.');
   if (closingContradiction(ep.scenes.at(-1)?.narration ?? '')) errs.push('The closing scene contradicts the video (reversal wording).');
   if (similes(ep.scenes.map(s => s.narration)) > MAX_SIMILES) errs.push(`More than ${MAX_SIMILES} "like a X" similes; keep the best ones.`);
   if (!ep.disclaimer) errs.push('"disclaimer" must be true for finance content.');
@@ -45,19 +45,19 @@ export function autoFixEpisode(ep: Episode): Episode {
   return groundCharts(groundNumbers(limitSimiles(fixClosing(mergeTalkRuns({...ep, scenes, disclaimer: true})))));
 }
 
-const SHORT_TALK = 30;
+const SHORT_TALK = 30, RUN = 7; // beat-split scripts have many short talk scenes (each with its own illustration), so only a run of 7 is a problem
 const isShortTalk = (s: Episode['scenes'][number]) => s.type === 'talk' && s.narration.trim().split(/\s+/).length < SHORT_TALK;
 /** Start indexes of runs of 4+ consecutive short talk scenes (the hook, scene 1, is never part of a run). */
 export function talkRuns(scenes: Episode['scenes']): number[] {
   const out: number[] = []; let run = 0;
-  scenes.forEach((s, i) => { run = i > 0 && isShortTalk(s) ? run + 1 : 0; if (run === 4) out.push(i - 3); });
+  scenes.forEach((s, i) => { run = i > 0 && isShortTalk(s) ? run + 1 : 0; if (run === RUN) out.push(i - RUN + 1); });
   return out;
 }
 /** Merge neighbouring short talk scenes (text joined, never rewritten) until no run of 4 remains. */
 export function mergeTalkRuns(ep: Episode): Episode {
   const scenes = [...ep.scenes];
   for (let at = talkRuns(scenes)[0]; at !== undefined; at = talkRuns(scenes)[0]) {
-    const [a, b] = [scenes[at + 1], scenes[at + 2]]; // merge the middle pair so the run becomes 3
+    const [a, b] = [scenes[at + 1], scenes[at + 2]]; // merge the middle pair so the run shrinks
     scenes.splice(at + 1, 2, {...a, narration: `${a.narration.trim()} ${b.narration.trim()}`, emphasis: [...((a as any).emphasis ?? []), ...((b as any).emphasis ?? [])]} as Episode['scenes'][number]);
   }
   return {...ep, scenes: scenes as Episode['scenes']};
@@ -168,6 +168,10 @@ export function spokenNumbers(text: string): number[] {
 /** A big_number scene must show the number the narration actually says; an invented one (small models do this) is turned into a plain talk scene. */
 export function groundNumbers(ep: Episode): Episode {
   const scenes = ep.scenes.map(s => {
+    if (s.type === 'stats') {
+      const said = spokenNumbers(s.narration);
+      return s.stats.every(x => said.some(n => Math.abs(n - x.value) <= 1e-9 * Math.max(1, Math.abs(x.value)))) ? s : {type: 'talk' as const, narration: s.narration, emotion: s.emotion, emphasis: s.emphasis};
+    }
     if (s.type !== 'big_number') return s;
     const heard = spokenNumbers(s.narration);
     const ok = heard.some(n => Math.abs(n - s.value) <= 1e-9 * Math.max(1, Math.abs(s.value)));

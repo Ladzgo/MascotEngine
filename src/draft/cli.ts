@@ -3,6 +3,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
+import {splitBeats} from './beats.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
@@ -47,7 +48,7 @@ try {
     const r = await editPass(client, ep3, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
     ep4 = r.ep; console.log(`DRAFT_NOTE editor pass: ${r.changed}/${r.tried} scenes rewritten`);
   }
-  const ep = ensurePayoff(fixEpisode(ep4, lang), lang);
+  const ep = splitBeats(ensurePayoff(fixEpisode(ep4, lang), lang)); // beats last: the fixers above merge short talk runs
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);

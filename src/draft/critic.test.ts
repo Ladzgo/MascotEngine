@@ -30,3 +30,15 @@ test('Hungarian payoff: inflected and imperative closings are not flagged', () =
   for (const t of ['A tanulsága egyszerű.', 'Érdemes összehasonlítani.', 'Kezdj a díjaknál.', 'Számolj utána!']) assert.ok(!arcGaps(ep(t)).includes('The last scene does not land a takeaway.'), t);
   assert.ok(arcGaps(ep('Ennyi volt a hitel.')).includes('The last scene does not land a takeaway.'));
 });
+
+test('splitBeats cuts long talk at sentence ends; styleGaps flags all-talk scripts', async () => {
+  const {splitBeats} = await import('./beats.js');
+  const {styleGaps} = await import('./critic.js');
+  const t = (n: string): any => ({type: 'talk', narration: n, emotion: 'neutral', emphasis: []});
+  const long = 'Loans cost money over time. A seventy two month loan at seven percent adds thousands. The monthly payment hides that fact. Dealers know it well.';
+  const ep: any = {scenes: [t('Hook here.'), t(long), t('End.')]};
+  const out = splitBeats(ep);
+  assert.ok(out.scenes.length >= 4);
+  assert.equal(out.scenes.slice(1, -1).map((s: any) => s.narration).join(' '), long);
+  assert.ok(styleGaps({scenes: Array.from({length: 12}, () => t('Plain talk here.'))} as any).some(x => /plain talk/.test(x)));
+});

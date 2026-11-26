@@ -1,5 +1,6 @@
 import type {Episode} from '../schema.js';
 import {extractJson, type Client} from '../llm/llm.js';
+import {varietyStats} from './beats.js';
 import {CLOSERS, HU_NUMBERISH, HU_PAYOFF, HU_SLOP, HU_TENSION, isHu} from './lang.js';
 
 type Sc = Episode['scenes'][number];
@@ -65,10 +66,26 @@ export function arcGaps(ep: Episode): string[] {
   return gaps;
 }
 
+const FILLER = /^\s*(so|well|now|basically|actually|okay|ok|alright|right)\b[,.]?\s/i;
+/** Variety, rhythm and specificity gaps of a whole script (advisory text for the drafter retry and the critic notes). */
+export function styleGaps(ep: Episode): string[] {
+  const g: string[] = [], n = ep.scenes.length, v = varietyStats(ep);
+  if (n >= 10 && v.talkShare > 0.55) g.push(`${Math.round(v.talkShare * 100)}% of the scenes are plain talk; turn some into big_number, compare, before_after, list, checklist, table, stats, timeline or chart.`);
+  if (n >= 10 && v.kinds < 4) g.push(`Only ${v.kinds} scene types used; use at least 4 different types.`);
+  if (v.maxRun >= 3 && ep.scenes.some((s, i) => i > 1 && s.type !== 'talk' && s.type === ep.scenes[i - 1].type && s.type === ep.scenes[i - 2].type)) g.push('The same non-talk scene type appears three times in a row.');
+  const lens = ep.scenes.flatMap(s => (s.narration.match(/[^.!?]+[.!?]*/g) ?? []).map(x => x.trim().split(/\s+/).length));
+  if (lens.length >= 12) { const m = lens.reduce((a, b) => a + b, 0) / lens.length, sd = Math.sqrt(lens.reduce((a, b) => a + (b - m) ** 2, 0) / lens.length); if (sd < 3) g.push('Sentence lengths are all alike; mix very short sentences (2-5 words) with longer ones.'); }
+  const filler = ep.scenes.filter((s, i) => i > 0 && FILLER.test(s.narration)).length;
+  if (filler >= 3) g.push(`${filler} scenes open with filler ("so", "well", "now"); start with the fact.`);
+  const concrete = ep.scenes.filter(s => /\d|\b(dollars?|percent|years?|months?|thousand|million)\b/i.test(s.narration)).length;
+  if (n >= 10 && concrete < Math.ceil(n / 4)) g.push('Too few concrete numbers or worked examples; give real amounts, rates or durations.');
+  return g;
+}
+
 /** Slop and arc problems as lint-style messages (advisory, never blocks). */
 export function criticNotes(ep: Episode): string[] {
   const n = ep.scenes.flatMap((s, i) => slopHits(s.narration).map(h => `Scene ${i + 1}: stock phrase "${h}".`));
-  return [...n, ...arcGaps(ep)];
+  return [...n, ...arcGaps(ep), ...styleGaps(ep)];
 }
 
 /** Deterministic scrub over the whole episode. */
