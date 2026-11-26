@@ -34,3 +34,13 @@ Visual, from a contact sheet (every 4 s):
 - The lower ~35% of the frame is a dark empty band under the captions.
 - Captions read "ONE THOUSAND EIGHT HUNDRED": the drafter writes numbers as words, so captions lose the numerals. The prompt should ask for numerals ($1,825); TTS spells them out anyway.
 - Script: $1,825 is said four times in the 12 beats. Story variety (A2: story.ts/outline).
+
+### B2 notes (ep012-steps: fresh Groq draft, health topic, 55.8 s)
+
+QA 15/18. Fails: pace 176 wpm (cap 175), visual change rate 3.5 s, longest scene 6.6 s. The scene length is fixed on the B2 side in 49c8ca9: a long data scene is split into a talk beat. Captions now show numerals and break on sense units ("ADVERTISED AS OPTIMAL HEALTH").
+
+For A2:
+- Gauge bug: the label reads "7497.9%" and "8104.4%". A step count (7,500 / 10,000) is fed to the gauge as a percent; a gauge should show only real percentages, or the raw number without %.
+- The CTA says "Follow Money Myths" on a health video. The series/channel name comes from the default channel; the outro should use the channel name or none.
+- An orange-robed monk stock photo for "around 7,500 steps": an off-topic person. Prefer a walking/feet/sneakers query.
+- Change rate: most talk beats show a single shot.
