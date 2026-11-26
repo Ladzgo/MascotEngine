@@ -37,8 +37,8 @@ const RULES: {kind: VisualKind; re: RegExp; low?: boolean}[] = [
 const EMOTION_FALLBACK: Record<string, VisualKind> = {worried: 'warning', sweating: 'warning', shocked: 'warning', angry: 'warning', confused: 'question', thinking: 'question', happy: 'check', excited: 'check', smug: 'check', explaining: 'bulb', sad: 'arrow_down', neutral: 'bulb'};
 
 /** Hero + up to two supporting illustrations for a scene: the explicit `visual`, else ranked narration keywords, else an emotion-based default. */
-export function pickVisuals(scene: Pick<Scene, 'narration' | 'emphasis' | 'emotion' | 'visual'>): {hero: VisualKind; support: VisualKind[]} {
-  const text = `${scene.emphasis.join(' ')} ${scene.narration}`;
+export function pickVisuals(scene: Pick<Scene, 'narration' | 'emphasis' | 'emotion' | 'visual'>, extra = ''): {hero: VisualKind; support: VisualKind[]} {
+  const text = `${scene.emphasis.join(' ')} ${extra} ${scene.narration}`;
   const hits = RULES.map((r, n) => ({k: r.kind, low: !!r.low, i: text.search(r.re), n})).filter(h => h.i >= 0).sort((a, b) => +a.low - +b.low || a.i - b.i || a.n - b.n).map(h => h.k);
   const all = [...new Set([...(scene.visual ? [scene.visual.kind] : []), ...hits])];
   if (!all.length) all.push(EMOTION_FALLBACK[scene.emotion] ?? 'bulb');

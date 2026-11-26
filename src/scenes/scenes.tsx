@@ -367,18 +367,34 @@ export const StatsScene: React.FC<SceneProps<Extract<Scene, {type: 'stats'}>>> =
   );
 };
 
+/** Scene types whose own layout leaves a free strip: an illustration fills it (right of the content when the mascot stands left, else left). */
+const ART_W = 340;
+const sceneText = (s: Scene) => (s.type === 'big_number' ? s.label : s.type === 'list' ? s.items.join(' ') : s.type === 'checklist' ? s.steps.join(' ') : '');
+const WithArt: React.FC<{props: SceneProps; children: (box: Box) => React.ReactNode}> = ({props, children}) => {
+  const {box, frame, fps, scene, accent} = props;
+  if (box.w < 1000) return <>{children(box)}</>;
+  const right = box.x > 500, {hero} = pickVisuals(scene, sceneText(scene));
+  const inner = {...box, x: right ? box.x : box.x + ART_W + 10, w: box.w - ART_W - 10};
+  return (
+    <>
+      {children(inner)}
+      <VisualStage box={{x: right ? box.x + box.w - ART_W : box.x, y: box.y + (box.h - ART_W) / 2, w: ART_W, h: ART_W}} hero={hero} support={[]} t={frame / fps - 0.2} accent={accent} />
+    </>
+  );
+};
+
 export const SceneContent: React.FC<SceneProps> = props => {
   const s = props.scene;
   switch (s.type) {
     case 'title': return <TitleScene {...props} />;
     case 'talk': return <TalkScene {...props} />;
-    case 'big_number': return <BigNumberScene {...(props as SceneProps<typeof s>)} />;
+    case 'big_number': return <WithArt props={props}>{box => <BigNumberScene {...(props as SceneProps<typeof s>)} box={box} />}</WithArt>;
     case 'chart': return <ChartScene {...(props as SceneProps<typeof s>)} />;
     case 'compare': return <CompareScene {...(props as SceneProps<typeof s>)} />;
-    case 'list': return <ListScene {...(props as SceneProps<typeof s>)} />;
+    case 'list': return <WithArt props={props}>{box => <ListScene {...(props as SceneProps<typeof s>)} box={box} />}</WithArt>;
     case 'before_after': return <BeforeAfterScene {...(props as SceneProps<typeof s>)} />;
     case 'table': return <TableScene {...(props as SceneProps<typeof s>)} />;
-    case 'checklist': return <ChecklistScene {...(props as SceneProps<typeof s>)} />;
+    case 'checklist': return <WithArt props={props}>{box => <ChecklistScene {...(props as SceneProps<typeof s>)} box={box} />}</WithArt>;
     case 'stats': return <StatsScene {...(props as SceneProps<typeof s>)} />;
     case 'timeline': return <TimelineScene {...(props as SceneProps<typeof s>)} />;
   }

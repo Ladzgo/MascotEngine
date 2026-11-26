@@ -27,7 +27,7 @@ export const VisualStage: React.FC<{box: Box; hero: VisualKind; support: VisualK
   const fs = label ? Math.max(44, Math.min(96, Math.floor(box.w / (Math.min(label.length, 16) * 0.72)))) : 0;
   const lines = label ? Math.max(1, Math.ceil((label.length * 0.72 * fs) / (box.w - 40))) : 0;
   const labelH = label ? Math.round(lines * fs * 1.25 + 24) : 0;
-  const S = Math.max(80, Math.min(box.h - labelH - 10, box.w / (support.length ? 1.95 : 1.3)));
+  const S = Math.max(80, Math.min(box.h - labelH - 10, box.w / (support.length ? 1.95 : 1.05)));
   const cx = box.w / 2, top = Math.max(0, (box.h - labelH - S) / 2);
   const sup = S * 0.5;
   const spots = [{x: cx - S * 0.5 - sup * 0.8, y: top + S * 0.55, rot: -8}, {x: cx + S * 0.5 - sup * 0.2, y: top + S * 0.0, rot: 7}];
