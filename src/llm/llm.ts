@@ -232,7 +232,7 @@ export async function testProvider(p: string, env: NodeJS.ProcessEnv = process.e
   if (!(PROVIDERS as string[]).includes(p)) return {ok: false, message: `Unknown provider "${p}".`};
   const t0 = Date.now();
   try {
-    const text = await chat({system: 'Reply with the single word OK.', messages: [{role: 'user', content: 'ping'}], env: {...env, LLM_PROVIDER: p, LLM_TIMEOUT_MS: '60000'}});
+    const text = await chat({system: 'Reply with the single word OK.', messages: [{role: 'user', content: 'ping'}], env: {...env, LLM_PROVIDER: p, LLM_TIMEOUT_MS: '60000', LLM_FALLBACK: '0'}});
     return {ok: true, ms: Date.now() - t0, message: `Works (${((Date.now() - t0) / 1000).toFixed(1)} s): "${text.trim().slice(0, 40)}"`};
   } catch (e) { return {ok: false, ms: Date.now() - t0, message: (e as Error).message}; }
 }
@@ -241,9 +241,19 @@ export async function testProvider(p: string, env: NodeJS.ProcessEnv = process.e
 export async function chat(o: {system: string; messages: ChatMsg[]; json?: boolean; env?: NodeJS.ProcessEnv}): Promise<string> {
   const env = o.env ?? process.env;
   const p = await resolveProvider(env);
-  if (p === 'gemini') return viaGemini(o.system, o.messages, !!o.json, env);
-  if (p === 'groq' || p === 'openrouter' || p === 'cerebras') return viaOpenAi(p, o.system, o.messages, !!o.json, env);
   if (p === 'ollama') return viaOllama(o.system, o.messages, !!o.json, env);
+  if (p === 'gemini' || p === 'groq' || p === 'openrouter' || p === 'cerebras') {
+    // free tiers run out: the other keyed free providers, then local Ollama (never a paid API). LLM_FALLBACK=0 pins the named provider.
+    const chain = env.LLM_FALLBACK === '0' ? [p] : [p, ...(['groq', 'cerebras', 'openrouter'] as const).filter(x => x !== p && env[OPENAI_COMPAT[x].key]?.trim())];
+    let first: Error | undefined;
+    for (const q of chain) {
+      try { return q === 'gemini' ? await viaGemini(o.system, o.messages, !!o.json, env) : await viaOpenAi(q as keyof typeof OPENAI_COMPAT, o.system, o.messages, !!o.json, env); }
+      catch (e) { first ??= e as Error; }
+    }
+    if (env.LLM_FALLBACK === '0') throw first!;
+    try { return await viaOllama(o.system, o.messages, !!o.json, env); }
+    catch (e) { throw new Error(`${first!.message} (local Ollama fallback: ${(e as Error).message})`); }
+  }
   return viaAnthropic(o.system, o.messages, env);
 }
 

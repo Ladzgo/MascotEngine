@@ -34,7 +34,7 @@ test('gemini: json mode, 429 retry then clear error', async () => {
   let n = 0, body: any;
   mockFetch((_u, init) => { n++; body = JSON.parse(init.body); return j({}, 429); });
   try {
-    await assert.rejects(chat({system: 's', json: true, messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'm', LLM_RETRY_MS: '1'}}), /Gemini free quota reached, try later/);
+    await assert.rejects(chat({system: 's', json: true, messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'm', LLM_RETRY_MS: '1', LLM_FALLBACK: '0'}}), /Gemini free quota reached, try later/);
     assert.equal(n, 2);
     assert.equal(body.generationConfig.responseMimeType, 'application/json');
     mockFetch(() => j({candidates: [{content: {parts: [{text: '{"ok":1}'}]}}]}));
@@ -107,5 +107,20 @@ test('cerebras: OpenAI format at api.cerebras.ai, model ranked from its own /mod
   try {
     assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'cerebras', CEREBRAS_API_KEY: 'csk-1'}}), 'OK');
     assert.match(seen.u, /api\.cerebras\.ai/); assert.equal(seen.model, 'llama-3.3-70b');
+  } finally { restore(); }
+});
+
+test('free fallback: groq quota out -> cerebras (keyed) -> local ollama; never a paid API', async () => {
+  const hosts: string[] = [];
+  mockFetch((u, init) => {
+    hosts.push(new URL(u).hostname);
+    if (u.endsWith('/models')) return j({data: []});
+    if (u.includes('/api/tags')) return j({models: [{name: 'qwen2.5:7b'}]});
+    if (u.includes('/api/chat')) return new Response(JSON.stringify({message: {content: 'local'}}) + '\n');
+    return j({}, 429);
+  });
+  try {
+    assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'groq', GROQ_API_KEY: 'g', CEREBRAS_API_KEY: 'c', OLLAMA_MODEL: 'qwen2.5:7b', LLM_RETRY_MS: '1', ANTHROPIC_API_KEY: 'paid'}}), 'local');
+    assert.ok(hosts.includes('api.cerebras.ai') && hosts.includes('127.0.0.1') && !hosts.some(h => /anthropic/.test(h)), hosts.join(','));
   } finally { restore(); }
 });
