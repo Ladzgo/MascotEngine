@@ -96,3 +96,9 @@ test('planStats: plain share, distinct pictures and closest repeat', () => {
   const st = planStats([pl('a'), pl('b'), pl('a', 'split'), pl('c')], [{type: 'talk'}, {type: 'talk', stock: 1}, {type: 'talk'}, {type: 'chart'}]);
   assert.equal(st.plainShare, 0.25); assert.equal(st.distinct, 0.75); assert.equal(st.minRepeatGap, 2); assert.equal(st.stockShare, 0.25);
 });
+
+test('punch chunks follow sense units, not a fixed 3-word window', () => {
+  const ph = (t: string) => buildPunchPhrases([words(t)]).map(p => p.words.map(w => w.w).join(' '));
+  assert.deepEqual(ph('One coffee costs $5. A year of them costs $1,825.'), ['One coffee costs $5.', 'A year of them', 'costs $1,825.']);
+  assert.deepEqual(ph('That single cup habit quietly eats your yearly budget.'), ['That single cup habit', 'quietly eats', 'your yearly budget.']);
+});

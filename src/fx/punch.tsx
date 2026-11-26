@@ -8,32 +8,38 @@ const UNIT = /^(years?|months?|weeks?|days?|hours?|percent|dollars?|euros?|times
 const bare = (w: string) => w.replace(/[^\w$%.,-]/g, '').replace(/[.,;:!?]+$/, '');
 /** Words that must not end a caption chunk (the phrase would dangle: "EIGHTEEN YEARS TO"). */
 const DANGLING = new Set('a an the of to in on at for and or but with as by from than then that this your their its is are was were be it you we they if so not no into over under about'.split(' '));
+/** Words that open a new sense unit, so a cut right before them reads naturally ("A YEAR OF THEM | COSTS $1,825"). */
+const STARTERS = new Set('the a an your my our their his her this these those to in on at for with from by into over under about and but or so because if when while than then who which until unless before after since'.split(' '));
 /**
- * 'punch' preset chunks: at most 3 words (4 when a number+unit run needs it), cut at punctuation, never between a number and its unit,
- * never ending on a dangling function word (that word moves to the next chunk).
+ * 'punch' preset chunks: 1-4 words per sense unit. Each clause (cut at punctuation) is split by a small cost search instead of
+ * greedily taking 3 words: never between a number and its unit, never ending on a dangling function word, not before "of",
+ * preferably right before a starter word, and single words or long chunks only when nothing better fits.
  */
 export function buildPunchPhrases(sceneWords: CaptionWord[][]): Phrase[] {
   const out: Phrase[] = [];
   for (const ws of sceneWords) {
-    let i = 0;
-    while (i < ws.length) {
-      let n = 0;
-      while (i + n < ws.length) {
-        n++;
-        const w = ws[i + n - 1], next = ws[i + n];
-        if (/[.!?,;:]$/.test(w.w)) break;
-        if (!next) break;
-        const glued = NUM.test(bare(w.w)) && (UNIT.test(bare(next.w)) || NUM.test(bare(next.w))); // number + unit (or number + number) stay together
-        if (n >= (glued ? 4 : 3)) break;
-        if (n === 2 && w.w.length + ws[i].w.length > 13 && !glued) break;
-      }
-      while (n > 1 && DANGLING.has(bare(ws[i + n - 1].w).toLowerCase()) && !/[.!?,;:]$/.test(ws[i + n - 1].w)) n--; // do not end on "to", "the"...
-      const cur = ws.slice(i, i + n);
-      out.push({start: cur[0].start, end: cur[cur.length - 1].end, words: cur});
-      i += n;
-    }
+    let a = 0;
+    ws.forEach((w, k) => {
+      if (!/[.!?,;:]$/.test(w.w) && k < ws.length - 1) return;
+      for (const cur of chunkClause(ws.slice(a, k + 1))) out.push({start: cur[0].start, end: cur[cur.length - 1].end, words: cur});
+      a = k + 1;
+    });
   }
   return out;
+}
+function chunkClause(c: CaptionWord[]): CaptionWord[][] {
+  const low = (k: number) => bare(c[k].w).toLowerCase();
+  const glued = (k: number) => NUM.test(bare(c[k].w)) && (UNIT.test(bare(c[k + 1].w)) || NUM.test(bare(c[k + 1].w)));
+  const best = [0, ...c.map(() => Infinity)], from = c.map(() => 0).concat(0);
+  for (let e = 1; e <= c.length; e++) for (let n = 1; n <= Math.min(4, e); n++) {
+    const s = e - n, chars = c.slice(s, e).reduce((x, w) => x + bare(w.w).length, 0);
+    let cost = 1 + (n === 1 && c.length > 1 ? 4 : n === 4 ? 0.3 : 0) + Math.max(0, chars - 18) * 0.5; // 1 per chunk: fewer, fuller chunks win ties
+    if (e < c.length) cost += (glued(e - 1) ? 20 : 0) + (DANGLING.has(low(e - 1)) ? 8 : 0) + (low(e) === 'of' ? 2 : 0) - (STARTERS.has(low(e)) || (/^\w{3,}ly$/.test(low(e)) && !/^(daily|weekly|monthly|yearly|early|only|likely|family|friendly|costly)$/.test(low(e))) ? 1 : 0); // adverbs open a unit too ("QUIETLY EATS")
+    if (best[s] + cost < best[e]) { best[e] = best[s] + cost; from[e] = s; }
+  }
+  const res: CaptionWord[][] = [];
+  for (let e = c.length; e > 0; e = from[e]) res.unshift(c.slice(from[e], e));
+  return res;
 }
 
 const isKey = (w: string) => /\d|%|\$/.test(w) || !isFunctionWord(w);
