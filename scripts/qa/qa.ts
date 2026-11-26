@@ -38,6 +38,7 @@ export function edgeSilence(log: string, total: number): {lead: number; tail: nu
     const a = l.match(/silence_start: (-?[\d.]+)/), b = l.match(/silence_end: ([\d.]+)/);
     if (a) open = Math.max(0, +a[1]);
     if (b && open === 0) lead = +b[1];
+    if (b && open > 0 && +b[1] >= total - 0.05) tail = total - open; // ffmpeg closes a trailing silence with an end at EOF
     if (b) open = -1;
   }
   if (open >= 0) tail = total - open;
