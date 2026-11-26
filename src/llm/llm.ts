@@ -161,14 +161,15 @@ const OPENAI_COMPAT = {
 const ranked = new Map<string, string[]>();
 async function rankOpenAiModels(p: keyof typeof OPENAI_COMPAT, key: string): Promise<string[]> {
   if (p !== 'groq') return []; // OpenRouter ids are stable enough; shortcut: extend when a :free id breaks
-  if (ranked.has(p)) return ranked.get(p)!;
+  const ck = p + key;
+  if (ranked.has(ck)) return ranked.get(ck)!;
   let out: string[] = [];
   try {
     const r = await fetch(OPENAI_COMPAT[p].url.replace('/chat/completions', '/models'), {headers: {Authorization: `Bearer ${key}`}, signal: AbortSignal.timeout(15000)});
     const ids: string[] = ((await r.json()) as any).data?.filter((m: any) => m.active !== false && (m.output_modalities ?? ['text']).includes('text') && !/whisper|guard|tts|allam/.test(m.id)).map((m: any) => m.id) ?? [];
     out = [...new Set(['gpt-oss-120b', 'llama-3.3-70b', 'qwen', 'gpt-oss-20b', 'llama'].flatMap(k => ids.filter(i => i.includes(k))))];
   } catch { /* fall back to the default */ }
-  ranked.set(p, out);
+  ranked.set(ck, out);
   return out;
 }
 /** Groq (gsk_ keys, free tier) and OpenRouter speak the OpenAI chat format. */
