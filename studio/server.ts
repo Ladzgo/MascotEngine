@@ -163,7 +163,7 @@ function enqueue(id: string, b: {stages?: unknown; engine?: unknown}) {
   if (active.length >= 20) throw new HttpError(429, 'Too many runs are waiting (20). Wait for some to finish or remove them in the Queue.');
   if (active.some(j => j.status === 'queued' && j.episode === id && j.stages.join() === stages.join())) throw new HttpError(409, 'The same run is already waiting for this episode.');
   const engine = String(b.engine ?? 'auto');
-  if (!['auto', 'say', 'espeak-ng', 'piper', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be auto, say, espeak-ng, piper, eleven, local or silent.');
+  if (!['auto', 'say', 'espeak-ng', 'piper', 'kokoro', 'edge', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be auto, say, kokoro, piper, edge, espeak-ng, eleven, local or silent.');
   if (stages.includes('voice') && engine === 'eleven' && (!process.env.ELEVENLABS_API_KEY || !process.env.ELEVENLABS_VOICE_ID)) throw new HttpError(422, 'ElevenLabs key or voice ID is missing. Add them in Settings.');
   if (stages.includes('voice') && engine === 'local') {
     const miss = Array.from({length: sceneCount(d)}, (_, i) => i + 1).filter(n => !sceneAudio(d, n));
@@ -229,9 +229,9 @@ const nextId = (topic: string) => {
   const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 4).join('-');
   return `ep${String(n).padStart(3, '0')}${slug ? '-' + slug : ''}`;
 };
-function runNpm(args: string[], onLine?: (l: string) => void) {
+function runNpm(args: string[], onLine?: (l: string) => void, env: Record<string, string> = {}) {
   return new Promise<{code: number | null; out: string[]}>(ok => {
-    const child = spawn('npm', ['run', ...args], {cwd: ROOT, env: process.env});
+    const child = spawn('npm', ['run', ...args], {cwd: ROOT, env: {...process.env, ...env}});
     const out: string[] = [];
     const onData = (b: Buffer) => { const ls = b.toString().split('\n').filter(l => l.trim()); out.push(...ls); ls.forEach(l => onLine?.(l)); };
     child.stdout.on('data', onData); child.stderr.on('data', onData);
@@ -241,13 +241,43 @@ function runNpm(args: string[], onLine?: (l: string) => void) {
 }
 /** Section progress of the running draft (DRAFT_PROGRESS lines from the CLI), polled by the Studio. */
 let draftProgress: {done: number; total: number; label: string} | null = null;
-const runDraft = (topic: string, id: string, angle: string, channel: string, short = false) => {
+const runDraft = (topic: string, id: string, angle: string, channel: string, short = false, model = '', onProgress?: (p: {done: number; total: number; label: string}) => void) => {
   draftProgress = {done: 0, total: 0, label: 'Planning the outline'};
+  if (process.env.STUDIO_TEST_FAKE_JOBS) return (async () => { // tests: no LLM, instant episode (topic "fail" errors)
+    for (let k = 1; k <= 2; k++) { onProgress?.({done: k, total: 2, label: `part ${k}`}); await new Promise(r => setTimeout(r, 150)); }
+    if (/fail/.test(topic)) return {code: 1, out: ['Draft failed: outline failed after 3 tries']};
+    fs.mkdirSync(`${EPISODES}${id}`, {recursive: true});
+    fs.writeFileSync(`${EPISODES}${id}/episode.json`, JSON.stringify({id, title: topic, series: 's', seed: 0, scenes: [{type: 'talk', emotion: 'explaining', narration: 'Hello there.', emphasis: []}], sources: [], disclaimer: true}));
+    return {code: 0, out: [`DRAFT_OK ${EPISODES}${id}/episode.json`]};
+  })().finally(() => { draftProgress = null; });
   return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : []), ...(short ? ['--short'] : [])], l => {
     const m = /^DRAFT_PROGRESS (\d+)\/(\d+) (.*)$/.exec(l);
-    if (m) draftProgress = {done: +m[1], total: +m[2], label: m[3]};
-  }).finally(() => { draftProgress = null; });
+    if (m) { draftProgress = {done: +m[1], total: +m[2], label: m[3]}; onProgress?.(draftProgress); }
+  }, model ? {OLLAMA_MODEL: model, DRAFT_MODEL: model} : {}).finally(() => { draftProgress = null; });
 };
+/** Background drafts: the HTTP call returns at once, the browser polls GET /api/drafts/:id (progress, errors, and the render run that follows a "make"). */
+type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; jobId?: string; startedAt: number; topic: string};
+const drafts = new Map<string, DraftJob>();
+function startDraft(o: {topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}}) {
+  needAi('draft');
+  const id = nextId(o.topic);
+  if (!ID_RE.test(id)) throw new HttpError(400, 'Invalid episode id.');
+  if (fs.existsSync(epDir(id)) || drafts.get(id)?.state === 'running') throw new HttpError(409, `Episode ${id} already exists.`);
+  const release = lockAi();
+  const job: DraftJob = {id, state: 'running', progress: {done: 0, total: 0, label: 'Planning the outline'}, startedAt: Date.now(), topic: o.topic};
+  drafts.set(id, job);
+  void (async () => {
+    try {
+      const {code, out} = await runDraft(o.topic, id, o.angle, o.channel, o.short, o.model, p => { job.progress = p; });
+      if (!(code === 0 && out.some(l => l.startsWith('DRAFT_OK')) && fs.existsSync(`${EPISODES}${id}/episode.json`))) throw new Error(cliMessage(out, code));
+      if (o.ideaId) { const f = readIdeas(o.channel), idea = f.ideas.find(i => i.id === o.ideaId); if (idea) { idea.status = 'drafted'; idea.episodeId = id; writeIdeas(o.channel, f); } }
+      if (o.make) job.jobId = enqueue(id, {stages: o.make.stages, engine: o.make.engine}).jobId;
+      job.state = 'done';
+    } catch (e) { job.state = 'error'; job.error = (e as Error).message || 'The draft failed.'; }
+    finally { release(); }
+  })();
+  return job;
+}
 const scriptInstalled = (name: string) => !!readJson<{scripts?: Record<string, string>}>(`${ROOT}package.json`)?.scripts?.[name];
 const cliMessage = (out: string[], code: number | null) => friendlyError(out.filter(l => !l.startsWith('>') && !/^npm (warn|notice)/.test(l)).slice(-6).join('\n')) || `Command failed (exit ${code}).`;
 /** One AI command at a time (draft, ideas, publish pack). Returns a release function. */
@@ -624,9 +654,9 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
     if (p[3] && p.length === 5 && p[4] === 'draft' && m === 'POST') {
       const f = readIdeas(id), idea = f.ideas.find(i => i.id === p[3]);
       if (!idea) throw new HttpError(404, 'Idea not found.');
-      const r = await draftEpisode(idea.title, idea.angle, id);
-      idea.status = 'drafted'; idea.episodeId = r.id; writeIdeas(id, f);
-      return json(res, 200, {id: r.id});
+      const b = await body(req, DraftBody);
+      const j = startDraft({topic: idea.title, angle: idea.angle, channel: id, short: b.format === 'short', ideaId: idea.id});
+      return json(res, 202, {id: j.id, draft: true});
     }
     if (p[3] && p.length === 4 && m === 'PATCH') {
       const b = await body(req, IdeaStatusBody);
@@ -763,9 +793,9 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
       const channel = typeof b.channel === 'string' && b.channel ? b.channel : 'default';
       needChannel(channel);
-      const {id} = await draftEpisode(topic, angle, channel, undefined, b.format === 'short');
-      const engine = String(readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
-      return json(res, 202, {id, jobId: enqueue(id, {stages: b.stopAtPreview === false ? ['voice', 'direct', 'final'] : ['voice', 'direct', 'preview'], engine}).jobId});
+      const engine = String(b.engine ?? readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
+      const j = startDraft({topic, angle, channel, short: b.format === 'short', model: typeof b.model === 'string' ? b.model.replace(/[^\w.:-]/g, '') : '', make: {stages: b.stopAtPreview === false ? ['voice', 'direct', 'final'] : ['voice', 'direct', 'preview'], engine}});
+      return json(res, 202, {id: j.id, draft: true});
     }
     if (p[0] === 'draft' && m === 'POST') {
       const b = await body(req, DraftBody);
@@ -830,6 +860,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return void res.end(toCsv(await scheduleRows(ROOT)));
     }
     if (p[0] === 'analytics' && m === 'GET') return json(res, 200, summarize(ROOT));
+    if (p[0] === 'drafts' && p[1] && m === 'GET') { const j = drafts.get(p[1]); if (!j) return json(res, 404, {error: 'No draft is running for this episode (the Studio may have been restarted).'}); return json(res, 200, j); }
     if (p[0] === 'draft-progress' && m === 'GET') return json(res, 200, draftProgress ?? {done: 0, total: 0, label: ''});
     if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
     if (p[0] === 'overview' && m === 'GET') return json(res, 200, {channels: overview()});

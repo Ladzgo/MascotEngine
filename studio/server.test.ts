@@ -149,3 +149,21 @@ test('interrupted job: after a restart a running run is an error with Retry text
     assert.equal(q.running?.jobId, 'j-wait');
   } finally { c.kill(); fs.rmSync(file, {force: true}); }
 });
+
+// Regression: "Create draft" on an idea used to hold one HTTP call open for the whole (minutes-long) LLM run, with no feedback. Drafts are now background jobs.
+test('make: returns at once, draft progress is polled, success enqueues the render run, failure carries a plain message', async () => {
+  const slug = `zz-test-${process.pid}`;
+  try {
+    const t0 = Date.now(), r = await fetch(`${BASE}/api/make`, {method: 'POST', headers: J, body: JSON.stringify({topic: slug, format: 'short'})});
+    assert.equal(r.status, 202); assert.ok(Date.now() - t0 < 1000, 'must not wait for the draft');
+    const {id} = await r.json() as {id: string};
+    let st: {state: string; progress: {total: number}; jobId?: string} = {state: 'running', progress: {total: 0}};
+    for (let i = 0; i < 40 && st.state === 'running'; i++) { await new Promise(r => setTimeout(r, 100)); st = await (await fetch(`${BASE}/api/drafts/${id}`)).json() as typeof st; }
+    assert.equal(st.state, 'done'); assert.equal(st.progress.total, 2); assert.ok(st.jobId);
+    const bad = await (await fetch(`${BASE}/api/make`, {method: 'POST', headers: J, body: JSON.stringify({topic: 'will fail'})})).json() as {id: string};
+    let e: {state: string; error?: string} = {state: 'running'};
+    for (let i = 0; i < 40 && e.state === 'running'; i++) { await new Promise(r => setTimeout(r, 100)); e = await (await fetch(`${BASE}/api/drafts/${bad.id}`)).json() as typeof e; }
+    assert.equal(e.state, 'error'); assert.match(e.error ?? '', /outline/);
+    assert.equal((await fetch(`${BASE}/api/drafts/nope`)).status, 404);
+  } finally { for (const d of fs.readdirSync(`${ROOT}episodes`)) if (d.includes(slug) || d.includes('will-fail')) fs.rmSync(`${ROOT}episodes/${d}`, {recursive: true, force: true}); }
+});
