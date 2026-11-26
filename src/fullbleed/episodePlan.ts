@@ -1,10 +1,11 @@
 import {planShots, objectFor, candidatesFor} from './shots';
 import {OBJECTS} from './objects';
+import {objectAsset, characterAsset} from './assetPick';
 import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} from './catalog';
 
 type W = {w: string; start: number; end: number};
 export type PlannedShot = {kind: string; at: number; why?: string; action: string};
-export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string};
+export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string};
 
 /** Where each kind of subject likes to live; the engine rotates through these so neighbouring scenes never share a setting. */
 const ENV_BY_GROUP: Record<string, Setting[]> = {
@@ -22,6 +23,8 @@ export const groupOf = (kind: string): string => Object.entries(GROUPS).find(([,
 const DEBT_TEXT = /\b(debts?|owe[sd]?|owing|loans?|borrow\w*)\b/i;
 /** Pictures that only mean money (coins, cards, bills, rates): a battery or sleep video never gets them, not even as a variety fallback (after-tech had a DEBT HOLE). */
 export const MONEY_ONLY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'jar_fill', 'coin_spin', 'vault', 'safe', 'bank', 'atm', 'card', 'card_swipe', 'paycheck', 'bills', 'receipts', 'tax_form', 'debt_counter', 'percent', 'price_up', 'pricetag', 'subscriptions', 'person_atm', 'person_bills', 'hole', 'snowball', 'ticker']);
+// overdue bills / DUE stamps mean owing: a sentence about spending or a yearly total is not a bill (ep011: "You could spend $1,825 a year" over a DUE stack scored 5)
+const BILLS = new Set(['bills', 'person_bills', 'receipts', 'debt_counter']), BILL_TEXT = /\b(bills?|due|overdue|owe[sd]?|owing|debts?|loans?|invoices?|receipts?|statements?|minimum)\b/i;
 export const MONEY_TOPIC = /\$|\b(money|dollars?|cents?|debts?|loans?|invest\w*|sav(e|es|ed|ing|ings)|budget\w*|spend\w*|prices?|costs?|banks?|credit|tax(es)?|income|pay(s|ing|ment\w*)?|paid|cash|mortgage|rent|salary|wealth|retire\w*|stocks?|funds?|interest|cheap|expensive|afford\w*)\b/i;
 function fresh(kind: string, recent: string[], also: string[] = [], text = '', home: string[] = [], money = true): string {
   const bad = new Set([...recent, ...also, ...(money ? [] : MONEY_ONLY)]);
@@ -44,14 +47,15 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
   const home = [...new Set(scenes.map(s => s.shot?.subject).filter((x): x is string => typeof x === 'string').map(groupOf))];
   const lastSix = () => perScene.slice(-8).flat(); // variety window = the last 8 beats (scenes), not 8 shots
   const envHist: Setting[] = []; // backdrops of drawn beats only (stock beats show footage)
+  const usedAssets = new Set<string>();
   let prevEnv: Setting | undefined, prevLayout: Layout | undefined, prevCam = -1, talkN = 0;
   scenes.forEach((s, i) => {
     const sh = s.shot ?? {}, words = wordsPer[i] ?? [], dur = durs[i] ?? 4;
-    const visuals = money ? s.visuals : s.visuals?.filter((v: {kind: string}) => !MONEY_ONLY.has(objectFor(v.kind)));
+    const billOk = BILL_TEXT.test(s.narration ?? ''), visuals = s.visuals?.filter((v: {kind: string}) => (money || !MONEY_ONLY.has(objectFor(v.kind))) && (billOk || !BILLS.has(objectFor(v.kind))));
     const raw = planShots({...s, visuals: visuals?.length ? visuals : undefined}, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
     // a topic word said in the sentence ("battery", "sleep", "coffee") beats a storyboard subject the sentence never names (after-tech: pie for "sluggish chemistry")
     const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor), topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-2).flat().includes(k));
-    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!topical || said.includes(sh.subject))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || said.includes(sh.subject))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
     else if (topical) raw[0] = {kind: topical, at: 0, why: `shot.topic word -> ${topical}`};
     // the drawn subject lands when the voice says its word (max 1.2 s in; before that the backdrop/footage carries the beat)
     if (typeof sh.at === 'string' && raw[0]?.why?.startsWith('shot.')) {
@@ -65,6 +69,19 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home, money);
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
+    // library assets (Fluent 3D, src/assets): a fallback/variety picture becomes the object the sentence names; a long one-picture beat gets it as its second shot
+    if (!s.stockFile && !['big_number', 'chart', 'title'].includes(s.type)) {
+      for (const x of shots) if (/fallback|variety|mid-scene/.test(x.why ?? '')) { const a = objectAsset(s.narration ?? '', usedAssets); if (a) { usedAssets.add(a.id); x.why = `${x.why} -> asset "${a.word}"`; x.kind = `asset:${a.id}`; } }
+      const last = shots[shots.length - 1];
+      if (shots.length < Math.ceil(dur / 2.6) && dur - last.at > 2.6) {
+        const a = objectAsset(s.narration ?? '', usedAssets), w = a && words.find(x => x.w.toLowerCase().replace(/[^a-z]/g, '').startsWith(a.word));
+        const at = Math.min(dur - 1.2, Math.max(last.at + 1.5, w?.start ?? (last.at + dur) / 2));
+        if (a) { usedAssets.add(a.id); shots.push({kind: `asset:${a.id}`, at, why: `asset "${a.word}"`, action: 'pop_in'}); }
+      }
+    }
+    // a character (a person doing it, or a face reacting) beside the hero in every third drawn beat
+    const character = !s.stockFile && i % 3 === 1 && ['talk', 'list', 'checklist', 'timeline'].includes(s.type) ? characterAsset(s.narration ?? '', String(s.emotion ?? 'neutral'), usedAssets) : undefined;
+    if (character) usedAssets.add(character);
     perScene.push(shots.map(x => x.kind));
     const g = groupOf(shots[0].kind), envs = ENV_BY_GROUP[g] ?? ['abstract'];
     // backdrop: the explicit/group choice unless it was seen in the last 8 drawn beats, then the least recently used one (group settings first)
@@ -89,7 +106,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       if (layout === prevLayout) layout = layout === 'hero' ? 'kinetic' : 'hero';
     }
     if ((layout === 'pip' || layout === 'broll') && !s.stockFile) layout = 'hero';
-    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion});
+    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character});
     prevEnv = env; prevLayout = layout; prevCam = camera;
   });
   // palettes: never the same index twice in a row

@@ -4,7 +4,8 @@ import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
 import {GradDefs, IsoBox, Txt, pop, seg} from './kit';
-import {OBJECTS} from './objects';
+import {objectOf} from './assetObj';
+import {assetFile} from './assetPick';
 import {planShots} from './shots';
 import {actionCopies, ActionOverlay} from './actions';
 import {planEpisode, type ScenePlan} from './episodePlan';
@@ -115,13 +116,21 @@ export function beatZoom(o: {mv: number; close: boolean; index: number; stockFil
 }
 
 /** Licensed b-roll fills the frame: photo gets a gentle Ken Burns move, video plays muted and still-framed; both are graded toward the scene palette with a vignette and a darker floor so captions stay readable. */
-const StockLayer: React.FC<{file: string; p: number; mv: number; w: number; h: number; pal: [string, string, string, string]}> = ({file, p, mv, w, h, pal}) => {
+/** One colour grade per video (picked from the title): footage from ten sources and the drawn scenes read as shot together. A shared tint (soft-light) over every
+ *  scene plus the same saturation/contrast on all footage; per-scene palette washes over stock are gone (they made each clip a different colour). */
+export const GRADES = [
+  {name: 'warm', tint: '#ffb27a', filter: 'saturate(1.06) contrast(1.06) sepia(0.08)'},
+  {name: 'teal', tint: '#6fb7c9', filter: 'saturate(1.02) contrast(1.08) hue-rotate(-4deg)'},
+  {name: 'gold', tint: '#ffd78a', filter: 'saturate(1.08) contrast(1.05) sepia(0.05)'},
+] as const;
+export const gradeFor = (title: string) => GRADES[[...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % GRADES.length];
+const StockLayer: React.FC<{file: string; p: number; mv: number; w: number; h: number; pal: [string, string, string, string]; grade: string}> = ({file, p, mv, w, h, pal, grade}) => {
     const video = /\.mp4$/i.test(file), {sc, tx} = stockMove(video, mv, p, w);
-  const style: React.CSSProperties = {position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', transform: `translateX(${tx}px) scale(${sc})`, filter: 'saturate(1.15) contrast(1.05)'};
+  const style: React.CSSProperties = {position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', transform: `translateX(${tx}px) scale(${sc})`, filter: grade};
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: pal[2]}}>
       {video ? <OffthreadVideo src={staticFile(file)} muted style={style} /> : <Img src={staticFile(file)} style={style} />}
-      <div style={{position: 'absolute', inset: 0, background: `linear-gradient(180deg, ${pal[0]}66, ${pal[1]}44 55%, ${pal[2]}cc)`, mixBlendMode: 'multiply'}} />
+      <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0) 35%, rgba(0,0,0,0.3))'}} />
       <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6))'}} />
     </div>
   );
@@ -228,6 +237,18 @@ const ChartBars: React.FC<{labels: string[]; values: number[]; t: number}> = ({l
   );
 };
 
+/** A library character (Fluent 3D person or reacting face) stands at the side of the hero: pops in after the hero, sways, a small hop on landing. */
+const Character: React.FC<{id: string; t: number; w: number; feet: number; left: boolean}> = ({id, t, w, feet, left}) => {
+  const [failed, setFailed] = React.useState(false), file = assetFile(id);
+  if (!file || failed) return null;
+  const size = w * 0.3, e = pop(t, 0.45, 0.5), hop = Math.abs(Math.sin(Math.max(0, t - 0.45) * 2.2)) * size * 0.04 * Math.exp(-Math.max(0, t - 0.45) * 0.6);
+  return (
+    <div style={{position: 'absolute', left: left ? w * 0.05 : w * 0.95 - size, top: feet - size * 0.92 - hop, width: size, height: size, transform: `scale(${Math.max(0.01, e)}) rotate(${Math.sin(t * 1.4) * 3}deg)`, transformOrigin: '50% 100%', filter: 'drop-shadow(0 18px 18px rgba(0,0,0,0.35))'}}>
+      <Img src={staticFile(file)} maxRetries={0} onError={() => setFailed(true)} style={{width: '100%', height: '100%', objectFit: 'contain', transform: left ? undefined : 'scaleX(-1)'}} />
+    </div>
+  );
+};
+
 export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0, plan: planIn}) => {
   const f = frame + preroll, t = f / fps, dur = Math.max(1, dec.durSec), p = clamp(t / dur);
   const tall = h > w;
@@ -239,6 +260,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   void prevKind;
 
   // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage. Close scenes sit tighter than wide ones.
+  const grade = gradeFor(episodeTitle);
   const mv = plan.camera, {sc, panX, rot} = stageCamera(mv, plan.zoom === 'close', index, !!scene.stockFile, p, w), tiltY = 0;
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
@@ -259,13 +281,13 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
-      {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: /\.mp4$/i.test(scene.stockFile) ? undefined : `scale(${1.05 * Math.max(1, subZ)}) translate(${subX * w * 0.4}px, 0px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /></div> : (
+      {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: /\.mp4$/i.test(scene.stockFile) ? undefined : `scale(${1.05 * Math.max(1, subZ)}) translate(${subX * w * 0.4}px, 0px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} grade={grade.filter} /></div> : (
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.12 * Math.max(1, subZ)}) translateX(${panX * 0.4 + subX * w * 0.3}px)`, transformOrigin: '50% 60%', filter: `blur(${tall ? 3 : 2}px)`}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
       </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
         {shots.map((s, i) => {
-          const Obj = OBJECTS[s.kind], local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
+          const Obj = objectOf(s.kind), local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
           if (local < 0 || out >= 1 || !Obj) return null;
           const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * hs * 0.008, over = 0.8 + 0.2 * pop(local, 0, 0.5);
           const isChart = scene.type === 'chart' && i === 0;
@@ -278,7 +300,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
             : lay === 'pip' ? [{x: w * 0.74, s: 1, feet: h * 0.74, kind: s.kind, delay: 0, main: true}]
             : [{x: hx, s: 1, feet, kind: s.kind, delay: 0, main: true}];
           return slots.map((sl, si) => {
-            const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
+            const O = objectOf(sl.kind) ?? Obj, lt = local - sl.delay;
             if (lt < 0) return null;
             // reach: how far off-centre the object may sit and still be whole at the end of the camera push (<= 1.12 incl. close framing) and a 1.04 sub-shot
             const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), reach = lay === 'split' || lay === 'grid' ? w / 2 - size * 0.4 : Math.max(0, w / 2 / 1.12 / 1.04 - size * 0.47), sx0 = w / 2 + Math.max(-reach, Math.min(reach, sl.x - w / 2)), sy0 = sl.feet - 0.325 * size;
@@ -326,7 +348,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           return <Callout key={i} text={txt} t={t} at={at} x={x} y={yy} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.62 + (py - h * 0.62) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} />;
         });
       })()}
+      {plan.character && <Character id={plan.character} t={t} w={w} feet={groundY} left={index % 2 === 0} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
+      <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: grade.tint, mixBlendMode: 'soft-light', opacity: 0.28}} />
       {active < 0 && null}
     </div>
   );

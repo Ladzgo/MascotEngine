@@ -59,3 +59,15 @@ Abstract science sentences ("slow-wave sleep cements facts") score 0 with any dr
 Every hit must carry a title word of the episode (topic gate); text/logo/fashion hits and animals/babies (unless asked) are dropped; the match must come
 from the query's non-topic words; tries narrow: full query -> woman/man for "person" -> topic + 2 words -> topic + last word -> topic + woman/man -> topic alone
 (topic must lead the tags); one picture once per video; keyless archives are skipped when Pixabay is keyed.
+
+## Vision check of candidates (2026-11-27, src/stock/index.ts `vlmScore`)
+The top 4 ranked hits of every try are scored by the local qwen2.5vl:7b (free, Ollama) on their preview image cropped to what the frame shows
+(centre 9:16 of a landscape clip in a Short), against the beat's sentence; best score wins, below 5 ("unrelated") is rejected, at most 10 checks per beat,
+then the drawn subject stays. Scores are cached in assets/stock-cache/vlm/. On for `npm run stock` / direct when the model is pulled (STOCK_VLM=0 turns it off);
+callers that pass their own env (tests) opt in with STOCK_VLM=1. Shorts take Pixabay's large (1920) file so the 9:16 crop is not a 405 px upscale;
+`isLowQuality` clips are skipped, clips >= 8 s rank up, < 5 s down; prepared clips start 1 s in (fade-ins, slates). Timeline beats get no stock (their dated
+callouts need the drawn growth picture). The 7B model is coarse: it answers 0 or 5 for most thumbnails, so it mainly removes the clearly wrong ones
+(a CPU socket for "put the phone in your pocket", a corridor for "five dollars times 365").
+| episode | stock before -> after | semantic median |
+|---|---|---|
+| ep011-v3 coffee | 6 beats (incl. cash clip on "if you invested", corridor man) -> 4 (coffee mug, coffee clip, espresso, jar; corridor kept at 5) | 5 -> 6 |

@@ -6,12 +6,12 @@ const MIN_GAP = 1.5, MAX_SHOTS = 4;
 
 /** Narration word -> candidate objects, most specific first. A word can point at several (money -> coins, cash, wallet): the planner takes the first one not just shown. */
 const RULES: [string, RegExp][] = [
-  ['battery', /^(batter(y|ies)|charg\w*|recharg\w*|drain\w*|lithium|ions?|cells?)$/], ['bed', /^(sleep\w*|asleep|bed\w*|naps?|napping|rest\w*|insomnia|tired|night|nights|overnight|rem)$/], ['moon', /^(night\w*|midnight|dark|moon\w*|dreams?|dreaming|slow-wave)$/],
+  ['battery', /^(batter(y|ies)|charg\w*|recharg\w*|drain\w*|lithium|ions?|cells?)$/], ['bed', /^(sleep\w*|asleep|bed\w*|naps?|napping|rest|resting|rested|insomnia|tired|night|nights|overnight|rem)$/], ['moon', /^(night\w*|midnight|dark|moon\w*|dreams?|dreaming|slow-wave)$/],
   ['brain', /^(brains?|memor(y|ies)|recall\w*|remember\w*|mind|focus\w*|neurons?|cognit\w+|learn\w*|facts?|think\w*|concentrat\w+)$/],
   ['shoe', /^(run\w*|jog\w*|sneakers?|shoes?|marathon|sprint\w*|stride|footwear)$/], ['dumbbell', /^(gym|lift\w*|workouts?|strength|muscles?|weights?|train\w*|exercis\w+)$/], ['stopwatch', /^(pace|stopwatch|timer|speed|laps?|seconds)$/], ['medal', /^(medals?|race|podium|finish\w*)$/],
   ['heart', /^(heart|health\w*|cardio|pulse|wellness|healthy)$/], ['apple', /^(apples?|fruits?|vegetables?|nutrition|diet|fiber|vitamins?)$/], ['pill', /^(pills?|medicine|medic\w+|drugs?|supplements?|doctor)$/], ['drop', /^(water|hydrat\w+|drink\w*|sweat\w*)$/],
   ['plane', /^(fl(y|ight|ights|ying)|plane|airline|airport|travel\w*|trip|vacation|abroad)$/], ['globe', /^(world\w*|global\w*|countries|country|planet|earth|international)$/], ['suitcase', /^(luggage|suitcase|pack\w*|hotel|tourist\w*)$/], ['mountain', /^(mountains?|hik\w+|summit|peak|trail|climb\w*|nature)$/],
-  ['laptop', /^(laptops?|computers?|software|code|coding|programm\w+|developer\w*|websites?)$/], ['chip', /^(chips?|ai|processor|hardware|algorithms?|robots?|semiconductors?)$/], ['flask', /^(science|experiments?|chemic\w+|lab|research\w*|study|studies)$/], ['atom', /^(atoms?|physics|energy|quantum|molecul\w+)$/],
+  ['laptop', /^(laptops?|computers?|software|code|coding|programm\w+|developer\w*|websites?)$/], ['chip', /^(chips?|ai|processor|hardware|algorithms?|robots?|semiconductors?)$/], ['flask', /^(science|experiments?|chemi\w+|lab|research\w*|study|studies)$/], ['atom', /^(atoms?|physics|energy|quantum|molecul\w+)$/],
   ['sprout', /^(sprout\w*|garden\w*|green|organic|environment\w*|sustainab\w+|plants?)$/], ['sun', /^(sun\w*|summer|morning|daylight|solar|weather)$/], ['burger', /^(burgers?|fast|junk|restaurants?|cook\w*|recipes?|meals?|dinner|lunch|breakfast)$/], ['book', /^(books?|read\w*|learn\w*|lessons?|courses?|knowledge|study)$/],
   ['person_atm', /^(atm|withdraw\w*)$/], ['atm', /^(atm|withdraw\w*|machine)$/], ['paycheck', /^(paychecks?|salary|wages?|income|earn\w*|paid|payday)$/], ['bills', /^(bills?|utilit\w+|invoices?|statements?)$/],
   ['person_bills', /^(stress\w*|worr\w*|anxious|anxiety|panic\w*|overwhelm\w*)$/], ['person_celebrate', /^(celebrat\w+|freedom|joy\w*|thrilled|happy|party)$/], ['person_shocked', /^(shock\w*|surpris\w*|wow|unbelievable|stunned)$/],
@@ -38,7 +38,7 @@ const RULES: [string, RegExp][] = [
   ['cart', /^(shop\w*|buy\w*|bought|purchas\w+|stores?|retail\w*|cart)$/], ['pricetag', /^(prices?|priced|costs?|sticker|discounts?|sales?|cheap\w*|expensive|pricey)$/],
   ['bulb', /^(ideas?|tips?|tricks?)$/], ['handshake', /^(deals?|handshake|negotiat\w+|partner\w*)$/],
   ['gradcap', /^(school|college|students?|educat\w+|tuition|university)$/], ['gears', /^(process|machine|engine|mechanism|gears?)$/], ['pin', /^(where|locat\w+|local|cit(y|ies)|nearby|map)$/],
-  ['magnifier', /^(print|inspect\w*|magnif\w*|hidden)$/], ['doc', /^(documents?|polic(y|ies)|paperwork|agreements?|forms?)$/],
+  ['magnifier', /^(print|inspect\w*|magnif\w*|hidden|check|checks|checking|verify|verif\w+|research)$/], ['doc', /^(documents?|polic(y|ies)|paperwork|agreements?|forms?)$/],
   ['skyline', /^(econom\w+|business\w*|compan(y|ies)|corporat\w+|recession|industry)$/],
 ];
 const POOL = ['coin_stacks', 'bars_arrow', 'skyline', 'cash', 'pie', 'receipts', 'wallet', 'calendar']; // neutral, on-topic fillers only (no people/clock/bulb unless the text is about them)
