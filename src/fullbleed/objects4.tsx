@@ -293,8 +293,8 @@ export const StackedBars: Obj = ({t}) => (
   </g>
 );
 
-export const Calculator: Obj = ({t}) => {
-  const v = 1200 * seg(t, 0.2, 2);
+export const Calculator: Obj = ({t, value}) => {
+  const v = (value ?? 0) * seg(t, 0.2, 2); // only the beat's own number; no number = the display counts nothing
   return (
     <g transform={`rotate(-5 200 200) scale(${Math.max(0.01, pop(t, 0, 0.5))})`} style={{transformOrigin: '200px 200px'}}>
       <Shadow rx={110} />

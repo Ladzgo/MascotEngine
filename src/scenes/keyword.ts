@@ -5,7 +5,8 @@ const GENERIC = new Set(['takeaway', 'takeaways', 'yourself', 'follow', 'insight
 
 /** Callout text for a talk scene: the author's emphasis, else a number, else the whole sentence when it is short (a lone random word like "THROUGH" says nothing), else the longest content word. */
 export function pickKeyword(narration: string, emphasis: string[]): string {
-  if (emphasis[0]) return emphasis[0];
+  const emph = emphasis.find(e => !GENERIC.has(e.toLowerCase()));
+  if (emph) return emph;
   const ws = narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(Boolean);
   const num = ws.find(w => /\d/.test(w));
   if (num) return num;

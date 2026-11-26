@@ -9,8 +9,9 @@ export const CACHE_DIR = `${ROOT}assets/stock-cache/`;
 type Env = Record<string, string | undefined>;
 export type Format = 'short' | 'wide';
 
-// finance b-roll should not show faces, logos, brands or text: such hits rank last (never silently dropped, a result beats none)
-const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face|selfie|logo|brand|sign|text|poster|banner|screenshot|advert\w*)\b/i;
+// b-roll should not show faces, logos, brands or text: in an episode (topic known) such hits are dropped, the drawn subject is better;
+// in the Studio's Swap grid (no topic) they only rank last, the user decides
+const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face|selfie|model|lady|fashion|cigarette|logo|brand|sign|text|poster|banner|screenshot|advert\w*)\b/i;
 
 /** Rank hits: right orientation, enough pixels, no faces/logos/text, then bigger. Hits below the minimum size are dropped. */
 export function rank(hits: StockHit[], a: Query, format: Format, topic: string[] = []): StockHit[] {
@@ -21,7 +22,7 @@ export function rank(hits: StockHit[], a: Query, format: Format, topic: string[]
   const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
   // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
   // and it must name the video's topic ("sleep", "credit"): a hand with a pen matches "hands writing" but says nothing about sleep (en-sleep)
-  const tw = topic.map(stem), onTopic = (h: StockHit) => !tw.length || tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w));
+  const tw = topic.map(stem), onTopic = (h: StockHit) => !tw.length || (tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w)) && !AVOID.test(`${h.title} ${h.tags ?? ''}`));
   const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => (x.ov >= need || !words.length) && onTopic(x.h));
   return relevant.sort((x, y) => y.s - x.s).map(x => x.h);
 }
