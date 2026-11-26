@@ -16,7 +16,7 @@ const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face
 export function rank(hits: StockHit[], a: Query, format: Format): StockHit[] {
   const minW = format === 'short' ? 720 : 1280, minH = format === 'short' ? 1280 : 720;
   const words = a.query.toLowerCase().split(/\W+/).filter(x => x.length > 2).map(x => x.replace(/(ing|es|s)$/, ''));
-  const overlap = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase(); return words.filter(x => t.includes(x)).length; };
+  const stem = (x: string) => x.replace(/(ing|es|s)$/, ''), overlap = (h: StockHit) => { const t = new Set(`${h.title} ${h.provider === 'pixabay' || h.provider === 'pexels' ? h.tags ?? '' : ''}`.toLowerCase().split(/\W+/).map(stem)); return words.filter(x => t.has(x)).length; }; // whole words only: 'sign' must not match 'design'
   const sized = hits.filter(h => h.url && (!h.width || !h.height || (h.kind === 'video' ? Math.max(h.width, h.height) >= 1280 : h.width >= minW * 0.9 && h.height >= minH * 0.9)));
   const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
   // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
