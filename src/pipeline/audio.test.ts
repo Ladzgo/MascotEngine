@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import {synth} from './audio.js';
 import type {SfxKind} from '../director/types.js';
 
-const kinds: SfxKind[] = ['pop', 'whoosh', 'tick', 'ding'];
+const kinds: SfxKind[] = ['pop', 'whoosh', 'tick', 'ding', 'chime'];
 for (const kind of kinds) {
-  for (const v of [0, 1, 2]) {
+  for (const v of [0, 1, 2, 3, 4, 5]) {
     test(`synth ${kind}/${v}`, () => {
       const a = synth(kind, v), b = synth(kind, v);
       assert.deepEqual(a, b);

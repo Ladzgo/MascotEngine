@@ -9,34 +9,44 @@ const SR = 44100;
 /** Tiny deterministic noise source so synthesised SFX are identical on every render. */
 function lcg(seed: number) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296) * 2 - 1; }
 
-/** Synthesised SFX (no sample files needed). variant 0-2 changes pitch/character. */
+/** Pentatonic note ratios: ding/chime variants stay consonant with each other and with the music. */
+const PENTA = [1, 1.122, 1.26, 1.498, 1.682, 1.888];
+
+/** Synthesised SFX (no sample files needed). Variants 0-5 change pitch, sweep direction and character so neighbouring cues never sound identical. */
 export function synth(kind: SfxKind, variant: number): Float32Array {
-  const dur = {pop: 0.14, whoosh: 0.45, tick: 0.035, ding: 0.9}[kind];
+  const dur = {pop: 0.16, whoosh: 0.5, tick: 0.035, ding: 1.0, chime: 1.3}[kind];
   const n = Math.floor(dur * SR);
   const out = new Float32Array(n);
   const noise = lcg(1000 + variant);
-  let lp = 0;
+  const v6 = ((variant % 6) + 6) % 6;
+  let lp = 0, lp2 = 0;
   for (let i = 0; i < n; i++) {
-    const t = i / SR;
+    const t = i / SR, u = t / dur;
     let v = 0;
     switch (kind) {
-      case 'pop': {
-        const f = 420 + variant * 90 - 260 * (t / dur);
-        v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 28) * 0.6;
+      case 'pop': { // soft bubble: pitch drops, tiny click on the attack, higher variants are brighter
+        const f = 380 + v6 * 70 - (220 + v6 * 20) * u;
+        v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * (24 + v6 * 3)) * 0.55 + noise() * Math.exp(-t * 900) * 0.12;
         break;
       }
-      case 'whoosh': {
-        const a = Math.sin(Math.PI * (t / dur)) ** 2;
-        lp += (noise() - lp) * (0.05 + 0.25 * (t / dur) * (1 + variant * 0.3));
-        v = lp * a * 1.1;
+      case 'whoosh': { // filtered noise sweep; even variants rise, odd variants fall; band-passed so it never sounds like hiss
+        const a = Math.sin(Math.PI * u) ** 2.2, k = v6 % 2 ? 0.32 - 0.27 * u : 0.05 + 0.27 * u;
+        lp += (noise() - lp) * k * (1 + v6 * 0.08);
+        lp2 += (lp - lp2) * 0.35;
+        v = (lp - lp2) * a * 2.4;
         break;
       }
       case 'tick':
         v = Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t * 160) * 0.35;
         break;
       case 'ding': {
-        const f = 880 * [1, 1.122, 1.26][variant];
-        v = (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(2 * Math.PI * f * 2.01 * t)) * Math.exp(-t * 5) * 0.35;
+        const f = 880 * PENTA[v6] * 0.75;
+        v = (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(2 * Math.PI * f * 2.01 * t) + 0.12 * Math.sin(2 * Math.PI * f * 3.97 * t)) * Math.exp(-t * (4.5 + v6 * 0.4)) * Math.min(1, t * 900) * 0.32;
+        break;
+      }
+      case 'chime': { // chapter start: two soft notes, a rising fifth
+        const f = 523 * PENTA[v6 % 3], g = f * 1.498, t2 = Math.max(0, t - 0.16);
+        v = (Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 4) + (t > 0.16 ? Math.sin(2 * Math.PI * g * t2) * Math.exp(-t2 * 4) : 0)) * Math.min(1, t * 600) * 0.22;
         break;
       }
     }
@@ -117,7 +127,7 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
     for (const c of d.sfx) {
       const k = `${c.kind}${c.variant}`;
       if (!cache.has(k)) cache.set(k, synth(c.kind, c.variant));
-      add(sfx, cache.get(k)!, d.startSec + c.t, c.kind === 'tick' ? 0.3 : 0.5);
+      add(sfx, cache.get(k)!, d.startSec + c.t, ({tick: 0.3, chime: 0.55, whoosh: 0.42} as Partial<Record<SfxKind, number>>)[c.kind] ?? 0.5);
     }
     if (takes[i]) { hasVoice = true; add(voice, takes[i]!, d.startSec + d.speechStart, gains[i]); }
   });

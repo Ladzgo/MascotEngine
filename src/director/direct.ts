@@ -359,7 +359,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     // sfx with variant selection (never the same variant twice in a row per kind)
     const variant = (kind: string) => {
       const last = sfxVariantLast[kind] ?? [];
-      const free = [0, 1, 2].filter(x => !last.includes(x)); // never one of the last two variants of this kind (3 variants: leaves 1)
+      const free = [0, 1, 2, 3, 4, 5].filter(x => !last.includes(x)); // never one of the last two variants of this kind (6 variants: leaves 4)
       const v = free[Math.floor(rand() * free.length)] ?? 0;
       sfxVariantLast[kind] = [...last, v].slice(-2);
       return v;
@@ -368,6 +368,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     if (i > 0 && transition !== 'cut') sfx.push({t: 0, kind: 'whoosh', variant: variant('whoosh')});
     if (s.type === 'list') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (['compare', 'before_after', 'timeline', 'table', 'checklist'].includes(s.type)) elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
+    if (s.chapter) sfx.push({t: 0.2, kind: 'chime', variant: variant('chime')}); // chapter tag slides in
     if (s.type === 'title') sfx.push({t: 0.15, kind: 'pop', variant: variant('pop')});
     if ((s.type === 'big_number' || s.type === 'stats') && elements[0] > 0.5) sfx.push({t: round(Math.max(0, elements[0] - 0.45)), kind: 'whoosh', variant: variant('whoosh')}); // riser into the number
     if (s.type === 'big_number') {
