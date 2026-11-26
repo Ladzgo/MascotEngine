@@ -3,17 +3,35 @@ import {DISPLAY, clamp, easeOut, spring} from '../theme';
 import {isFunctionWord, type CaptionWord, type Phrase} from './captions';
 
 /** 'punch' caption preset: 2-3 words at a time, centred in the lower third, heavy white type with a black outline, current keyword yellow. */
+const NUM = /^(\d[\d,.]*%?|\$\d[\d,.]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|twenty-\w+)$/i;
+const UNIT = /^(years?|months?|weeks?|days?|hours?|percent|dollars?|euros?|times|thousand|million|billion|hundred|cents?|%)$/i;
+const bare = (w: string) => w.replace(/[^\w$%.,-]/g, '').replace(/[.,;:!?]+$/, '');
+/** Words that must not end a caption chunk (the phrase would dangle: "EIGHTEEN YEARS TO"). */
+const DANGLING = new Set('a an the of to in on at for and or but with as by from than then that this your their its is are was were be it you we they if so not no into over under about'.split(' '));
+/**
+ * 'punch' preset chunks: at most 3 words (4 when a number+unit run needs it), cut at punctuation, never between a number and its unit,
+ * never ending on a dangling function word (that word moves to the next chunk).
+ */
 export function buildPunchPhrases(sceneWords: CaptionWord[][]): Phrase[] {
   const out: Phrase[] = [];
   for (const ws of sceneWords) {
-    let cur: CaptionWord[] = [];
-    const flush = () => { if (cur.length) out.push({start: cur[0].start, end: cur[cur.length - 1].end, words: cur}); cur = []; };
-    ws.forEach((w, i) => {
-      cur.push(w);
-      const chars = cur.reduce((a, x) => a + x.w.length, 0), end = /[.!?,;:]$/.test(w.w);
-      if (cur.length >= 3 || end || (cur.length === 2 && chars > 13) || (cur.length === 2 && ws[i + 1] && /[.!?]$/.test(ws[i + 1].w) && false)) flush();
-    });
-    flush();
+    let i = 0;
+    while (i < ws.length) {
+      let n = 0;
+      while (i + n < ws.length) {
+        n++;
+        const w = ws[i + n - 1], next = ws[i + n];
+        if (/[.!?,;:]$/.test(w.w)) break;
+        if (!next) break;
+        const glued = NUM.test(bare(w.w)) && (UNIT.test(bare(next.w)) || NUM.test(bare(next.w))); // number + unit (or number + number) stay together
+        if (n >= (glued ? 4 : 3)) break;
+        if (n === 2 && w.w.length + ws[i].w.length > 13 && !glued) break;
+      }
+      while (n > 1 && DANGLING.has(bare(ws[i + n - 1].w).toLowerCase()) && !/[.!?,;:]$/.test(ws[i + n - 1].w)) n--; // do not end on "to", "the"...
+      const cur = ws.slice(i, i + n);
+      out.push({start: cur[0].start, end: cur[cur.length - 1].end, words: cur});
+      i += n;
+    }
   }
   return out;
 }

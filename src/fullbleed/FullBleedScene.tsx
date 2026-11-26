@@ -99,7 +99,7 @@ const calloutWidth = (text: string, size: number, maxW: number) => Math.min(size
 const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right' | 'down'; maxW: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW}) => {
   const e = easeOut((t - at) / 0.35);
   if (e <= 0) return null;
-  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : align === 'down' ? x + wpx / 2 : x, ay0 = align === 'down' ? y + size * 1.9 : y + size * 0.8;
+  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : align === 'down' ? x + wpx / 2 : x, ay0 = align === 'down' ? y + size * 1.6 : y + size * 0.8;
   return (
     <>
       <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
@@ -123,12 +123,18 @@ const calloutTexts = (s: Scene): string[] => {
 };
 
 /** Animated counter (big_number): pill + count-up. */
-const Counter: React.FC<{s: Extract<Scene, {type: 'big_number'}>; t: number; w: number; y: number; accent: string}> = ({s, t, w, y, accent}) => {
-  const k = seg(t, 0.35, 1.7), v = s.value * k, txt = `${s.prefix}${v.toLocaleString('en-US', {minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals})}${s.suffix}`;
-  const e = easeOut((t - 0.2) / 0.4), size = Math.min(w * 0.2, 230) * (txt.length > 9 ? 0.72 : 1);
+const NUMWORD = /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)/i;
+/** Counts only the number: units and words stay put, and the count finishes before the number is spoken. */
+const Counter: React.FC<{s: Extract<Scene, {type: 'big_number'}>; t: number; w: number; y: number; accent: string; words: Word[]}> = ({s, t, w, y, accent, words}) => {
+  const said = words.find(x => /\d/.test(x.w) || NUMWORD.test(x.w.replace(/[^a-z]/gi, '')));
+  const end = Math.max(0.8, (said?.start ?? 1.4) - 0.05), k = seg(t, 0.15, end);
+  const timeUnit = /^\s*(years?|months?|days?|weeks?|hours?|minutes?)\b/i.test(s.suffix), word = /^[a-z]/i.test(s.suffix.trim()) ? s.suffix.trim() : '';
+  const prefix = timeUnit ? '' : s.prefix, unit = word || (timeUnit ? s.suffix.trim() : '');
+  const num = `${prefix}${(s.value * k).toLocaleString('en-US', {minimumFractionDigits: s.decimals, maximumFractionDigits: s.decimals})}${word ? '' : s.suffix}`;
+  const e = easeOut((t - 0.1) / 0.35), size = Math.min(w * 0.2, 230) * (num.length + unit.length > 9 ? 0.72 : 1);
   return (
     <div style={{position: 'absolute', left: 0, width: w, top: y, textAlign: 'center', opacity: e, transform: `scale(${0.8 + 0.2 * e})`}}>
-      <div style={{display: 'inline-block', fontFamily: DISPLAY, fontSize: size, lineHeight: 1, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 14px 34px rgba(0,0,0,0.5)`, WebkitTextStroke: '3px rgba(0,0,0,0.25)'}}>{txt}</div>
+      <div style={{display: 'inline-block', fontFamily: DISPLAY, fontSize: size, lineHeight: 1, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 14px 34px rgba(0,0,0,0.5)`, WebkitTextStroke: '3px rgba(0,0,0,0.25)'}}>{num}{unit && <span style={{fontSize: size * 0.45, marginLeft: size * 0.12}}>{unit}</span>}</div>
       <div style={{marginTop: size * 0.12, fontFamily: SANS, fontWeight: 800, fontSize: size * 0.2, color: '#fff', background: 'rgba(10,12,30,0.7)', display: 'inline-block', padding: '8px 24px', borderRadius: 40, maxWidth: w * 0.86}}>{s.label}</div>
     </div>
   );
@@ -174,9 +180,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // hero stands on the ground plane (y = 68% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
-  const base = tall ? w * 1.2 : h * 1.0;
+  const base = tall ? w * 1.3 : h * 1.05;
   const scale = hasCallouts ? (tall ? 0.6 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : 1;
-  const hs = base * scale, groundY = tall ? h * 0.68 : h * 0.8, cy = groundY - 0.325 * hs;
+  const hs = base * scale, groundY = tall ? h * 0.62 : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (
@@ -185,7 +191,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.06 + 0.1 * p}) translateX(${panX * 0.5}px)`, transformOrigin: '50% 60%'}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
       </div>
-      <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 68%'}}>
+      <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
         {shots.map((s, i) => {
           const Obj = OBJECTS[s.kind], local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
           if (local < 0 || out >= 1 || !Obj) return null;
@@ -196,6 +202,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
               <svg viewBox="0 0 400 400" width={hs} height={hs} style={{position: 'absolute', left: hx - hs / 2, top: cy - hs / 2 + bob, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5), transform: `scale(${over * (1 + 0.12 * easeInOut(out))}) rotate(${Math.sin(t * 0.9 + i) * 1.2}deg) translateX(${out * -w * 0.06}px)`, filter: 'drop-shadow(0 18px 24px rgba(0,0,0,0.35))'}}>
                 {isChart && scene.type === 'chart' ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={local} /> : <Obj t={local} accent={accent} value={scene.type === 'big_number' && i === 0 ? scene.value : undefined} />}
               </svg>
+              <svg viewBox="0 0 400 400" width={hs} height={hs} style={{position: 'absolute', left: hx - hs / 2, top: cy - hs / 2 + bob + 0.65 * hs, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5) * 0.22, transform: `scaleY(-1) scale(${over})`, WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', maskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', filter: 'blur(2px)', pointerEvents: 'none'}}>
+                {isChart && scene.type === 'chart' ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={local} /> : <Obj t={local} accent={accent} value={scene.type === 'big_number' && i === 0 ? scene.value : undefined} />}
+              </svg>
               <div style={{position: 'absolute', inset: 0, opacity: 1 - out}}><Particles t={local} w={w} h={h} cx={hx} cy={cy} money={MONEY.has(s.kind)} accent={accent} seed={index * 7 + i} /></div>
             </React.Fragment>
           );
@@ -203,16 +212,21 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       </div>
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
-      {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} />}
+      {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} words={words} />}
       {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
-      {hasCallouts && ctxText.map((txt, i) => {
-        const size = tall ? 48 : 44, maxW = tall ? w * 0.84 : w * 0.4, wp = calloutWidth(txt, size, maxW);
-        const y = tall ? h * 0.1 + i * (size * 2.7) : h * 0.14 + i * (size * 3.3);
-        const x = tall ? (w - wp) / 2 + (i % 2 ? w * 0.04 : -w * 0.04) : w * 0.04;
-        const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
-        const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move
-        return <Callout key={i} text={txt} t={t} at={at} x={x} y={y} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.68 + (py - h * 0.68) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} />;
-      })}
+      {hasCallouts && (() => {
+        const size = tall ? 48 : 44, maxW = tall ? w * 0.86 : w * 0.4;
+        let y = tall ? h * 0.075 : h * 0.14; // pills stack by their real (wrapped) height, so they never overlap each other
+        return ctxText.map((raw, i) => {
+          const txt = raw.length > 38 ? raw.slice(0, 36).replace(/[\s,;:]+\S*$/, '') + '…' : raw, wp = calloutWidth(txt, size, maxW);
+          const lines = Math.max(1, Math.ceil((txt.length * size * 0.6) / Math.max(1, wp - size * 1.8))), hgt = lines * size * 1.12 + size * 0.64 + size * 0.3, yy = y;
+          y += hgt + size * 0.35;
+          const x = tall ? (w - wp) / 2 : w * 0.04;
+          const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
+          const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move
+          return <Callout key={i} text={txt} t={t} at={at} x={x} y={yy} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.62 + (py - h * 0.62) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} />;
+        });
+      })()}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
       {active < 0 && null}
     </div>

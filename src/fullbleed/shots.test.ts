@@ -20,9 +20,9 @@ test('explicit visuals use the keyword time; unknown kinds fall back; skip avoid
   assert.equal(objectFor('nonsense'), 'coin_stacks');
   assert.notEqual(planShots(sc('hello there'), words('hello there'), 3, {skip: 'percent'})[0].kind, 'percent');
 });
-test('punch captions: at most three words, punch word only on every 4th number-ish phrase', () => {
+test('punch captions: at most four words, punch word only on every 4th number-ish phrase', () => {
   const ph = buildPunchPhrases([words('Over sixty months that is about three thousand eight hundred dollars in interest.')]);
-  assert.ok(ph.every(p => p.words.length <= 3));
+  assert.ok(ph.every(p => p.words.length <= 4));
   assert.equal(punchWord(ph[0], 1), undefined);
 });
 
@@ -31,4 +31,18 @@ test('word -> object relevance: minimums are bills, not clocks; money words offe
   assert.ok(candidatesFor('minimums').includes('receipts') && !candidatesFor('minimums').includes('clock'));
   assert.ok(candidatesFor('money').length >= 2);
   assert.deepEqual(candidatesFor('the'), []);
+});
+
+test('punch chunks: number+unit stay together, no chunk ends on a function word', () => {
+  const ph = buildPunchPhrases([words('It takes eighteen years to pay off two thousand dollars at the typical rate.')]).map(p => p.words.map(w => w.w).join(' '));
+  assert.ok(ph.some(p => /eighteen years/.test(p)), ph.join(' | '));
+  assert.ok(!ph.some(p => /\b(to|the|at)$/.test(p)), ph.join(' | '));
+  assert.ok(ph.some(p => /two thousand dollars/.test(p)), ph.join(' | '));
+});
+test('debt object only for debt narration; generic objects need literal words', () => {
+  const n = 'Prices rise every year, so plan ahead.', s = planShots(sc(n), words(n), 5);
+  assert.ok(!s.some(x => x.kind === 'debt_counter'));
+  assert.ok(!s.some(x => ['clock', 'people', 'bulb'].includes(x.kind)));
+  const d = 'You owe a lot on that loan.';
+  assert.equal(planShots(sc(d), words(d), 5)[0].kind, 'debt_counter');
 });

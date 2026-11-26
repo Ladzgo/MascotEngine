@@ -98,7 +98,7 @@ export const Gauge: Obj = ({t}) => {
       <circle cx={200} cy={250} r={166} fill={url('navy')} opacity={0.0} />
       {arc(0, 60, PALETTES.green[1])}{arc(60, 120, PALETTES.gold[1])}{arc(120, 180, PALETTES.red[1])}
       <g transform={`rotate(${ang} 200 250)`}><polygon points="194,250 206,250 200,134" fill="#fff" /></g><circle cx={200} cy={250} r={20} fill={url('gold')} />
-      <Txt x={200} y={312} size={52} fill="#fff" stroke="#12142a">{`${(4 + k * 21).toFixed(1)}%`}</Txt>
+      <Txt x={200} y={236} size={44} fill="#fff" stroke="#12142a">{`${(4 + k * 21).toFixed(1)}%`}</Txt>
     </g>
   );
 };
