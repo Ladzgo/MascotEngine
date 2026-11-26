@@ -19,9 +19,9 @@ export function rank(hits: StockHit[], a: Query, format: Format): StockHit[] {
   const overlap = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase(); return words.filter(x => t.includes(x)).length; };
   const sized = hits.filter(h => h.url && (!h.width || !h.height || (h.kind === 'video' ? Math.max(h.width, h.height) >= 1280 : h.width >= minW * 0.9 && h.height >= minH * 0.9)));
   const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
-  // a hit that shares no word with the query is only used when nothing relevant exists (providers' own relevance order is kept as a tie-break)
-  const relevant = scored.filter(x => x.ov > 0 || !words.length);
-  return (relevant.length ? relevant : scored).sort((x, y) => y.s - x.s).map(x => x.h);
+  // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
+  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => x.ov >= need || !words.length);
+  return relevant.sort((x, y) => y.s - x.s).map(x => x.h);
 }
 
 /** Provider registry, in order of preference. Adding a source = one function `(fetcher, query, env) => StockHit[]` plus one line here.

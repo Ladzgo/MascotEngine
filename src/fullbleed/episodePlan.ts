@@ -44,6 +44,12 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     const sh = s.shot ?? {}, words = wordsPer[i] ?? [], dur = durs[i] ?? 4;
     const raw = planShots(s, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
     if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    // the drawn subject lands when the voice says its word (max 1.2 s in; before that the backdrop/footage carries the beat)
+    if (typeof sh.at === 'string' && raw[0]?.why?.startsWith('shot.')) {
+      const w = words.find(x => x.w.toLowerCase().replace(/[^\p{L}\p{N}%$'-]/gu, '') === sh.at);
+      if (w) raw[0] = {...raw[0], at: Math.min(1.2, Math.max(0, w.start)), why: `${raw[0].why} @"${sh.at}"`};
+      for (let k = raw.length - 1; k > 0; k--) if (raw[k].at < raw[0].at + 1.5) raw.splice(k, 1); // later shots keep their spacing
+    }
     const shots: PlannedShot[] = [];
     for (const [k, r] of raw.entries()) {
       const explicit = !!r.why?.startsWith('shot.') || !!r.why?.startsWith('visual') ;

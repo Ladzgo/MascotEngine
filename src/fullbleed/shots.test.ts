@@ -79,3 +79,11 @@ test('reselect: weak stock beat loses its stock, weak drawn beat gets another su
   assert.equal(r.ep.scenes[0].stock, undefined); assert.equal(r.ep.scenes[1].shot!.subject, 'heart'); assert.equal(r.ep.scenes[2].shot!.subject, 'trophy');
   assert.equal(median([1, 9, 5, 7]), 6);
 });
+
+test('shot.at: the subject lands on its spoken word, later shots stay ordered', () => {
+  const w = (t: string) => t.split(' ').map((x, i) => ({w: x, start: i * 0.4, end: i * 0.4 + 0.3}));
+  const n = 'Every morning your heart pumps more blood';
+  const p = planEpisode([{narration: n, emphasis: [], emotion: 'neutral', type: 'talk', shot: {subject: 'heart', action: 'pulse', at: 'heart'}}], [w(n)], [5]);
+  assert.equal(p[0].shots[0].kind, 'heart'); assert.ok(Math.abs(p[0].shots[0].at - 1.2) < 1e-6);
+  p[0].shots.forEach((s, i) => { if (i) assert.ok(s.at > p[0].shots[i - 1].at); });
+});

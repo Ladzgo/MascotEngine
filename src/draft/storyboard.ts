@@ -17,6 +17,8 @@ export const STOCK_MIN = 0.4, STOCK_MAX = 0.55, STOCK_GAP = 8;
 // data beats stay procedural (the number/chart IS the picture); everything else may carry real footage
 const NO_STOCK = new Set(['big_number', 'chart']);
 const cleanQuery = (q: unknown): string | null => { const t = String(q ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); return /^[a-z0-9 '-]{3,60}$/.test(t) ? t : null; };
+/** The word of the sentence the picture should land on (must really occur in it; the renderer looks up its time in the voice). */
+const atWord = (w: unknown, narration: string): string | undefined => { const t = String(w ?? '').toLowerCase().replace(/[^\p{L}\p{N}%$'-]/gu, ''); return t && narration.toLowerCase().split(/\s+/).some(x => x.replace(/[^\p{L}\p{N}%$'-]/gu, '') === t) ? t : undefined; };
 const near = (a: number, b: number) => Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b), 1e-9);
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 const subjectOf = (k: unknown): string | null => { const s = String(k ?? '').toLowerCase().replace(/\s+/g, '_'); return FB_KINDS.includes(s) ? s : FB_FOR[s] ?? null; };
@@ -58,7 +60,8 @@ export function repairShots(ep: Episode, raw: Record<number, Partial<Shot> & {st
     if (out.length && out[i - 1].action === action) action = ACTIONS.find(a => a !== action && a !== out[i - 1].action && !out.slice(-3).some(o => o.action === a)) ?? action;
     const n = numOf(r.number);
     const shot: Shot = {subject, action, ...(r.setting ? {setting: String(r.setting).slice(0, 40)} : {}), ...(r.label ? {label: String(r.label).slice(0, 40)} : {}), ...(n !== null && facts.some(f => near(f, n)) ? {number: typeof r.number === 'number' ? r.number : String(r.number).slice(0, 24)} : {}),
-      ...((MOODS as readonly string[]).includes(String(r.mood)) ? {mood: String(r.mood)} : {}), ...((CAMERAS as readonly string[]).includes(String(r.camera)) ? {camera: String(r.camera)} : {})};
+      ...((MOODS as readonly string[]).includes(String(r.mood)) ? {mood: String(r.mood)} : {}), ...((CAMERAS as readonly string[]).includes(String(r.camera)) ? {camera: String(r.camera)} : {}),
+      ...(atWord(r.at, s.narration) ? {at: atWord(r.at, s.narration)} : {})};
     out.push(shot);
   });
   // at least MIN_ACTIONS different actions: re-assign repeats (never the neighbours' action)
@@ -95,7 +98,7 @@ export function pickStock(ep: Episode, raw: Record<number, {stock?: unknown}>, s
 }
 
 const sys = `You are the storyboard artist of a short explainer video. For every numbered beat decide what the picture shows at that exact moment.
-Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "setting": "3-5 words", "label": "text to show on screen, max 4 words, optional", "number": a number that appears in the beat (optional), "mood": ..., "camera": ..., "stock": {"query": "2-4 plain English words for a real photo or stock video of what is said (a place, activity or object, no brands, no text, no people's faces), e.g. \"runner morning park\"", "kind": "photo" or "video"} or null}]}
+Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "setting": "3-5 words", "label": "text to show on screen, max 4 words, optional", "number": a number that appears in the beat (optional), "mood": ..., "camera": ..., "at": "the ONE word from the sentence at which this picture should appear (the thing being named)", "stock": {"query": "2-4 plain English words for a real photo or stock video of what is said (a place, activity or object, no brands, no text, no people's faces), e.g. \"runner morning park\"", "kind": "photo" or "video"} or null}]}
 subject = ONE concrete thing named or implied by the sentence, exactly one of: ${FB_KINDS.join(', ')}.
 action = what happens to it, one of: ${ACTIONS.join(', ')}.
 mood one of: ${MOODS.join(', ')}. camera one of: ${CAMERAS.join(', ')}.
