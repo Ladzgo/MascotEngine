@@ -2,6 +2,7 @@
 export type StockHit = {
   id: string; provider: 'pexels' | 'pixabay' | 'openverse' | 'wikimedia'; kind: 'photo' | 'video';
   url: string; width: number; height: number; pageUrl: string; author: string; license: string; title: string; tags?: string;
+  thumb?: string; duration?: number; // preview image (for the vision check) and clip length in seconds
 };
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export type Query = {query: string; kind: 'photo' | 'video'; orientation: 'portrait' | 'landscape'};
@@ -75,12 +76,12 @@ export async function pixabay(f: Fetcher, a: Query, env: Env): Promise<StockHit[
   if (a.kind === 'video') {
     await pixabayGate();
     const d = await j(f, `https://pixabay.com/api/videos/?${q({key, q: a.query, per_page: 12, video_type: 'film', safesearch: 'true'})}`);
-    // medium (1080p) is plenty for a 1080-wide frame and about 4x smaller than the 4K file
-    return (d.hits ?? []).flatMap((v: any) => { const x = v.videos?.medium?.url ? v.videos.medium : v.videos?.large; return x?.url ? [{id: `pixabay-v${v.id}`, provider: 'pixabay', kind: 'video', url: x.url, width: x.width, height: x.height, pageUrl: v.pageURL, author: v.user ?? 'Pixabay', license: 'Pixabay License', title: strip(v.tags), tags: v.tags} as StockHit] : []; });
+    // a 9:16 crop of a landscape clip keeps only its middle third: Shorts take the large file (1920 wide) so the crop is not a blurry upscale; wide frames take medium (1280-1920)
+    return (d.hits ?? []).filter((v: any) => !v.isLowQuality).flatMap((v: any) => { const x = a.orientation === 'portrait' && v.videos?.large?.url ? v.videos.large : v.videos?.medium?.url ? v.videos.medium : v.videos?.large; return x?.url ? [{id: `pixabay-v${v.id}`, provider: 'pixabay', kind: 'video', url: x.url, width: x.width, height: x.height, pageUrl: v.pageURL, author: v.user ?? 'Pixabay', license: 'Pixabay License', title: strip(v.tags), tags: v.tags, thumb: x.thumbnail ?? v.videos?.medium?.thumbnail, duration: v.duration} as StockHit] : []; });
   }
   await pixabayGate();
   const d = await j(f, `https://pixabay.com/api/?${q({key, q: a.query, image_type: 'photo', orientation: o, per_page: 15, safesearch: 'true'})}`);
-  return (d.hits ?? []).map((p: any): StockHit => ({id: `pixabay-${p.id}`, provider: 'pixabay', kind: 'photo', url: p.largeImageURL, width: p.imageWidth, height: p.imageHeight, pageUrl: p.pageURL, author: p.user ?? 'Pixabay', license: 'Pixabay License', title: strip(p.tags), tags: p.tags}));
+  return (d.hits ?? []).map((p: any): StockHit => ({id: `pixabay-${p.id}`, provider: 'pixabay', kind: 'photo', url: p.largeImageURL, width: p.imageWidth, height: p.imageHeight, pageUrl: p.pageURL, author: p.user ?? 'Pixabay', license: 'Pixabay License', title: strip(p.tags), tags: p.tags, thumb: p.webformatURL}));
 }
 
 export async function openverse(f: Fetcher, a: Query): Promise<StockHit[]> {

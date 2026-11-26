@@ -39,3 +39,13 @@ test('every SFX cue peaks under -3 dBFS and sits at least 8 dB below a typical v
   const bad = audit(-15).filter(r => !r.ok).map(r => r.cue);
   assert.deepEqual(bad, []);
 });
+
+import {beatZoom} from '../../src/fullbleed/FullBleedScene.js';
+test('camera: stock clips never zoom, photos <= 4.5%, drawn push <= 6%, cuts <= 5%, one zooming layer at a time', () => {
+  for (let mv = 0; mv < 4; mv++) for (let index = 0; index < 6; index++) for (const close of [false, true]) {
+    const v = beatZoom({mv, close, index, stockFile: 'a.mp4', fixedStage: false, dur: 7});
+    assert.equal(v.move, 0); assert.equal(v.cut, 0);
+    const p = beatZoom({mv, close, index, stockFile: 'a.jpg', fixedStage: false, dur: 7}), d = beatZoom({mv, close, index, fixedStage: false, dur: 7});
+    assert.ok(p.move <= 0.046 && d.move <= 0.062 && p.cut <= 0.05 && d.cut <= 0.05 && p.layers <= 1 && d.layers <= 1, JSON.stringify({mv, index, p, d}));
+  }
+});

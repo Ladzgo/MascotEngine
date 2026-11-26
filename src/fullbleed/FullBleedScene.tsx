@@ -89,11 +89,34 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
   );
 };
 
+// footage already moves: a clip gets a static cover crop (1.02 hides edges); a photo gets ONE slow move of <= 4.5% (in, out or a slow pan, alternating), never stacked
+export const stockMove = (video: boolean, mv: number, p: number, w: number) => {
+  const e = easeInOut(p), k = mv % 3;
+  return {sc: video ? 1.02 : k === 0 ? 1 + 0.045 * e : k === 1 ? 1.045 - 0.045 * e : 1.045, tx: video || k !== 2 ? 0 : (e - 0.5) * w * 0.04 * (mv % 2 ? -1 : 1)};
+};
+/** Stage camera of a drawn beat: ONE visible move, like an editor: 0 = push in 6%, 1/2 = slow pan (no zoom), 3 = slow drift-rotate (no zoom); every 3rd beat just holds.
+ *  'close' is a static framing (+4%), not added zoom. Over stock footage the drawn accent never moves the camera (the clip is the motion). */
+export const stageCamera = (mv: number, close: boolean, index: number, stock: boolean, p: number, w: number) => {
+  const hold = index % 3 === 2 || stock, e = easeInOut(p);
+  return {sc: 1.02 + (close ? 0.04 : 0) + (!hold && mv === 0 ? 0.06 * e : 0), panX: hold ? 0 : mv === 1 ? (e - 0.5) * -0.08 * w : mv === 2 ? (e - 0.5) * 0.08 * w : 0, rot: !hold && mv === 3 ? (e - 0.5) * 1.6 : 0};
+};
+/** Visible zoom of one beat from the same functions the renderer uses (QA "motion" check): the continuous move of the layer that moves, the largest scale jump
+ *  at a sub-shot cut, and how many layers zoom at once (must be <= 1). |log scale| units (0.05 ~ 5%). */
+export function beatZoom(o: {mv: number; close: boolean; index: number; stockFile?: string; fixedStage: boolean; dur: number}) {
+  const lg = (a: number, b: number) => Math.abs(Math.log(b / a)), video = !!o.stockFile && /\.mp4$/i.test(o.stockFile);
+  const st0 = stageCamera(o.mv, o.close, o.index, !!o.stockFile, 0, 1000).sc, st1 = stageCamera(o.mv, o.close, o.index, !!o.stockFile, 1, 1000).sc;
+  const ph = o.stockFile ? lg(stockMove(video, o.mv, 0, 1000).sc, stockMove(video, o.mv, 1, 1000).sc) : 0;
+  const n = subShots(o.dur), subs = Array.from({length: n}, (_, k) => (k === 0 ? 1 : SUB_FRAMES[(k + o.index) % SUB_FRAMES.length][0]));
+  // what scales at a cut: the drawn stage (unless its callouts pin it), the backdrop/photo wrapper by max(1, subZ); a clip is never reframed
+  let cut = 0;
+  for (let k = 1; k < n; k++) cut = Math.max(cut, video ? 0 : lg(Math.max(1, subs[k - 1]), Math.max(1, subs[k])), o.fixedStage || o.stockFile ? 0 : lg(subs[k - 1], subs[k]));
+  const move = Math.max(lg(st0, st1), ph), layers = (lg(st0, st1) > 0.001 ? 1 : 0) + (ph > 0.001 ? 1 : 0);
+  return {move, cut, layers};
+}
+
 /** Licensed b-roll fills the frame: photo gets a gentle Ken Burns move, video plays muted and still-framed; both are graded toward the scene palette with a vignette and a darker floor so captions stay readable. */
 const StockLayer: React.FC<{file: string; p: number; mv: number; w: number; h: number; pal: [string, string, string, string]}> = ({file, p, mv, w, h, pal}) => {
-  // footage already moves: a clip gets a static cover crop (1.02 hides edges); a photo gets ONE slow move of <= 4.5% (in, out or a slow pan, alternating), never stacked
-  const video = /\.mp4$/i.test(file), e = easeInOut(p), k = mv % 3;
-  const sc = video ? 1.02 : k === 0 ? 1 + 0.045 * e : k === 1 ? 1.045 - 0.045 * e : 1.045, tx = video || k !== 2 ? 0 : (e - 0.5) * w * 0.04 * (mv % 2 ? -1 : 1);
+    const video = /\.mp4$/i.test(file), {sc, tx} = stockMove(video, mv, p, w);
   const style: React.CSSProperties = {position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', transform: `translateX(${tx}px) scale(${sc})`, filter: 'saturate(1.15) contrast(1.05)'};
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: pal[2]}}>
@@ -216,12 +239,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   void prevKind;
 
   // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage. Close scenes sit tighter than wide ones.
-  // ONE visible move per beat, like an editor: 0 = push in 6%, 1/2 = slow pan (no zoom), 3 = slow drift-rotate (no zoom); every 3rd beat just holds.
-  // 'close' is a static framing (+4%), not added zoom. Over stock footage the drawn accent never moves the camera (the clip is the motion).
-  const mv = plan.camera, close = plan.zoom === 'close' ? 0.04 : 0, hold = index % 3 === 2 || !!scene.stockFile, e = easeInOut(p);
-  const panX = hold ? 0 : mv === 1 ? (e - 0.5) * -0.08 * w : mv === 2 ? (e - 0.5) * 0.08 * w : 0;
-  const rot = !hold && mv === 3 ? (e - 0.5) * 1.6 : 0, tiltY = 0;
-  const sc = 1.02 + close + (!hold && mv === 0 ? 0.06 * e : 0);
+  const mv = plan.camera, {sc, panX, rot} = stageCamera(mv, plan.zoom === 'close', index, !!scene.stockFile, p, w), tiltY = 0;
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // sub-shots: a long beat is cut into 2-3 s pieces, each a new framing (hard punch-in/out, like an editor's cut), so no picture holds > 3 s.
@@ -262,8 +280,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           return slots.map((sl, si) => {
             const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
             if (lt < 0) return null;
-            // reach: how far off-centre the object may sit and still be whole at the end of the camera push (~1.24 + close) and a 1.1 sub-shot
-            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), reach = lay === 'split' || lay === 'grid' ? w / 2 - size * 0.4 : Math.max(0, w / 2 / (1.24 + close) / 1.1 - size * 0.47), sx0 = w / 2 + Math.max(-reach, Math.min(reach, sl.x - w / 2)), sy0 = sl.feet - 0.325 * size;
+            // reach: how far off-centre the object may sit and still be whole at the end of the camera push (<= 1.12 incl. close framing) and a 1.04 sub-shot
+            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), reach = lay === 'split' || lay === 'grid' ? w / 2 - size * 0.4 : Math.max(0, w / 2 / 1.12 / 1.04 - size * 0.47), sx0 = w / 2 + Math.max(-reach, Math.min(reach, sl.x - w / 2)), sy0 = sl.feet - 0.325 * size;
             const ac = actionCopies(sl.main ? s.action : 'pop_in', lt);
             return (
               <React.Fragment key={`${i}-${si}`}>

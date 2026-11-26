@@ -69,6 +69,13 @@ export function planShots(scene: {narration: string; emphasis: string[]; emotion
   if (scene.visuals?.length) {
     const n = scene.visuals.length;
     shots = scene.visuals.map((v, i) => ({kind: objectFor(v.kind), at: i === 0 ? 0 : timeOf(v.at, (durSec * i) / n), why: `visuals[]=`}));
+    // one storyboard picture on a long beat: the next object the voice names takes over (a 7.9 s beat held one cash pile, ep011-v3)
+    for (const w of words) {
+      const last = shots[shots.length - 1];
+      if (shots.length >= Math.ceil(durSec / 2.6) || shots.length >= MAX_SHOTS) break;
+      const k = candidatesFor(w.w).find(x => !GENERIC.has(x) && x !== 'debt_counter' && !shots.some(s => s.kind === x));
+      if (k && w.start - last.at >= MIN_GAP && durSec - w.start >= 1.0) shots.push({kind: k, at: w.start, why: `word "${w.w.replace(/[^\w$%]/g, '')}"`});
+    }
   } else {
     const seen = new Set<string>();
     const free = (c: string[], last?: string) => c.find(k => k !== last && !seen.has(k)) ?? c.find(k => k !== last);

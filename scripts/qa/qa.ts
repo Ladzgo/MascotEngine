@@ -7,6 +7,7 @@ import {planShots} from '../../src/fullbleed/shots.js';
 import {buildPhrases} from '../../src/fx/captions.js';
 import {activeRmsDb} from '../../src/pipeline/audio.js';
 import {spoken} from '../../src/pipeline/speech.js';
+import {zoomRows} from './zoom.js';
 
 /** Thresholds (documented in docs/QA.md). */
 export const LIMITS = {
@@ -178,6 +179,7 @@ export function qa(id: string, fileArg?: string) {
 
   const script = scoreScript(ep);
   add('script score', script.total >= SCORE_FAIL_BELOW, `${script.total}/100 (${script.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`, `>= ${SCORE_FAIL_BELOW}`);
+  if (ep.look === 'fullbleed') { const z = zoomRows(ep.id), over = z.filter(r => r.over.length); add('camera zoom', !over.length, over.length ? over.slice(0, 3).map(r => `beat ${r.beat} ${r.kind}: ${r.over.join(', ')}`).join('; ') : `max move ${(Math.max(...z.map(r => r.move)) * 100).toFixed(1)}%, max cut ${(Math.max(...z.map(r => r.cut)) * 100).toFixed(1)}%, one layer at a time`, 'clip 0%, photo <= 4.5%, push <= 6%, cut <= 5%'); }
   if (ep.scenes.some(s => s.shot)) { const se = checkShots(ep); add('storyboard', !se.length, se.length ? se.slice(0, 3).join('; ') : 'subjects vary, actions vary, numbers from the script'); }
   const ok = checks.every(c => c.ok);
   const report = {id: ep.id, file, at: new Date().toISOString(), ok, checks, loudness: L, pauses: P, script};

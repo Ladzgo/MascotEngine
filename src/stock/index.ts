@@ -24,7 +24,7 @@ export function rank(hits: StockHit[], a: Query, format: Format, topic: string[]
   const wantsPeople = /\b(person|people|someone|man|woman|runner|worker|student|sleeping)\b/i.test(a.query); // "sleeping person bedroom" should find a person, not a cat
   const stem = (x: string) => x.replace(/(ing|es|s)$/, ''), overlap = (h: StockHit) => { const t = new Set(`${h.title} ${h.provider === 'pixabay' || h.provider === 'pexels' ? h.tags ?? '' : ''}`.toLowerCase().split(/\W+/).map(stem)); return words.filter(x => t.has(x)).length; }; // whole words only: 'sign' must not match 'design'
   const sized = hits.filter(h => h.url && (!h.width || !h.height || (h.kind === 'video' ? Math.max(h.width, h.height) >= 1280 : h.width >= minW * 0.9 && h.height >= minH * 0.9)));
-  const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) && !wantsPeople ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
+  const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') ? 2 : h.kind === 'video' ? 1 : 0) + (h.kind === 'video' && h.duration ? (h.duration >= 8 ? 0.5 : h.duration < 5 ? -1 : 0) : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) && !wantsPeople ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
   // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
   // and it must name the video's topic ("sleep", "credit"): a hand with a pen matches "hands writing" but says nothing about sleep (en-sleep)
   // with a topic, the match must come from the non-topic words: "sleep couch" -> a sailboat tagged "sleep" is not a couch
@@ -53,7 +53,9 @@ export function prepVideo(raw: string, format: Format, dir: string): string {
   const out = path.join(dir, `${path.basename(raw, '.mp4')}-${format}.mp4`);
   if (fs.existsSync(out)) return out;
   const [w, h] = format === 'short' ? [1080, 1920] : [1920, 1080];
-  const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-stream_loop', '-1', '-i', raw, '-t', '20', '-an', '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=30`, '-c:v', 'libx264', '-crf', '24', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', `${out}.part.mp4`]);
+  // skip the first second of a longer clip (fade-ins, slates, the camera settling): the beat opens on the clip's moving part
+  const len = Number(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', raw]).stdout?.toString().trim()) || 0;
+  const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', ...(len >= 6 ? ['-ss', '1'] : []), '-stream_loop', '-1', '-i', raw, '-t', '20', '-an', '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=30`, '-c:v', 'libx264', '-crf', '24', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', `${out}.part.mp4`]);
   if (r.status !== 0) { fs.rmSync(`${out}.part.mp4`, {force: true}); return raw; }
   fs.renameSync(`${out}.part.mp4`, out);
   return out;
@@ -99,7 +101,39 @@ export async function chooseStock(epDir: string, scene: number, stock: {query: s
   return rec;
 }
 /** Best licensed match for one query. Provider order: Pexels, Pixabay (when keyed), then Openverse, Wikimedia Commons. Downloads once into assets/stock-cache/<sha1>.<ext>. */
-export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]; exclude?: Set<string>}): Promise<Fetched | null> {
+const VLM_HOST = () => (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, ''), VLM_MODEL = () => process.env.VLM_MODEL ?? 'qwen2.5vl:7b';
+export const VLM_MIN = 5, VLM_BUDGET = 10; // below 5 ("unrelated") a candidate is not used: the drawn subject is better than off-topic footage; at most 10 checks per beat, then the drawn subject stays
+let vlmUp: boolean | undefined;
+/** Is the local vision model there? Asked once per process. */
+export async function vlmAvailable(): Promise<boolean> {
+  if (vlmUp === undefined) try { const r = await fetch(`${VLM_HOST()}/api/tags`, {signal: AbortSignal.timeout(3000)}); vlmUp = r.ok && JSON.stringify(await r.json()).includes(VLM_MODEL().split(':')[0]); } catch { vlmUp = false; }
+  return vlmUp;
+}
+/** Vision check of one candidate: its preview image, cropped to what the frame will show (centre 9:16 of a landscape clip in a Short), scored 0-10 against the
+ *  sentence by the local model (same question as qa:semantic). Cached per (image, sentence) in <cache>/vlm/. null = could not check. */
+export async function vlmScore(hit: StockHit, sentence: string, format: Format, dir: string, f: Fetcher = fetch): Promise<number | null> {
+  if (!hit.thumb) return null;
+  const key = crypto.createHash('sha1').update(`${hit.thumb}|${sentence}|${format}`).digest('hex').slice(0, 20), cf = path.join(dir, 'vlm', `${key}.json`);
+  try { return JSON.parse(fs.readFileSync(cf, 'utf8')).score; } catch { /* not cached */ }
+  try {
+    const r = await f(hit.thumb, {signal: AbortSignal.timeout(30000)}); if (!r.ok) return null;
+    fs.mkdirSync(path.dirname(cf), {recursive: true});
+    const src = `${cf}.src`, png = `${cf}.png`; fs.writeFileSync(src, Buffer.from(await r.arrayBuffer()));
+    const crop = format === 'short' ? 'crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9),scale=-2:640' : 'crop=min(iw\\,ih*16/9):min(ih\\,iw*9/16),scale=640:-2';
+    const c = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-vf', crop, '-frames:v', '1', png]); fs.rmSync(src, {force: true});
+    if (c.status !== 0) return null;
+    const prompt = `This picture is b-roll in an explainer video. At this moment the narrator says: "${sentence}"\nDoes the picture illustrate what is said (the objects, people, place or action make sense for those words)? Reply with JSON only: {"score": integer 0-10 (0 = unrelated, 5 = loosely related, 10 = exactly what is described)}`;
+    const res = await fetch(`${VLM_HOST()}/api/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(240000),
+      body: JSON.stringify({model: VLM_MODEL(), stream: false, format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})});
+    fs.rmSync(png, {force: true});
+    if (!res.ok) return null;
+    const score = Math.max(0, Math.min(10, Number(JSON.parse(((await res.json()) as {message?: {content?: string}}).message?.content ?? '{}').score) || 0));
+    fs.writeFileSync(cf, JSON.stringify({score, thumb: hit.thumb, sentence}));
+    return score;
+  } catch { return null; }
+}
+
+export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]; exclude?: Set<string>; sentence?: string; vlm?: boolean; log?: (m: string) => void}): Promise<Fetched | null> {
   const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR, topic = o.topic ?? [];
   setApiCacheDir(path.join(dir, 'api'));
   const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
@@ -110,6 +144,7 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
   // the last two are plain topic b-roll ("sleep"): semantic QA scores an on-topic picture far above a drawn shield on an abstract sentence
   const tries = [...new Set(qs.map(x => x.trim()))].map(query => ({...a, query})).flatMap(x => (o.kind === 'video' ? [x, {...x, kind: 'photo' as const}] : [x])); // a video query falls back to a photo
   const keyed = PROVIDERS.some(p => p.needsKey && env[p.needsKey]);
+  let checked = 0;
   for (const kinds of tries) {
     for (const p of PROVIDERS) {
       if (p.needsKey && !env[p.needsKey]) continue;
@@ -117,7 +152,15 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
       const t = () => p.search(f, kinds, env);
       let hits: StockHit[] = [];
       try { hits = await t(); } catch { continue; } // a provider being down is never an error
-      for (const hit of rank(hits, kinds, o.format, topic).filter(h => !o.exclude?.has(h.pageUrl)).slice(0, 3)) { // one picture once per video
+      let cands = rank(hits, kinds, o.format, topic).filter(h => !o.exclude?.has(h.pageUrl)).slice(0, o.vlm && o.sentence ? 4 : 3); // one picture once per video
+      if (o.vlm && o.sentence && cands.length) { // the vision model re-orders the top candidates by how well their frame shows the sentence and drops weak ones
+        const sc = new Map<StockHit, number>();
+        if (checked >= VLM_BUDGET) return null;
+        for (const h of cands) { const v = await vlmScore(h, o.sentence, o.format, dir, f); checked++; sc.set(h, v ?? VLM_MIN); }
+        o.log?.(`  vlm "${kinds.query}" ${kinds.kind}: ${cands.map(h => sc.get(h)).join(', ')}`);
+        cands = cands.filter(h => sc.get(h)! >= VLM_MIN).sort((x, y) => sc.get(y)! - sc.get(x)!);
+      }
+      for (const hit of cands) {
         const file = await downloadHit(hit, f, dir, o.format);
         if (file) return {file, hit};
       }
@@ -136,13 +179,15 @@ export function creditLines(items: StockRecord[]): string[] {
 /** Fetch stock for every scene with `stock`, write episodes/<id>/stock.json and return the records.
  *  Idempotent: a beat whose query is unchanged and whose file still exists keeps its record (so a "Swap image" choice survives re-runs).
  *  A beat without a result is skipped silently (procedural visuals stay). Progress goes to `o.progress(done, total, query)`. */
-export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void; progress?: (done: number, total: number, query: string) => void} = {}): Promise<StockRecord[]> {
+export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}; narration?: string}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void; progress?: (done: number, total: number, query: string) => void} = {}): Promise<StockRecord[]> {
   const items: StockRecord[] = [], prev = readStock(epDir).items, total = scenes.filter(s => s.stock).length, cache = o.cacheDir ?? CACHE_DIR, topic = topicWords(epDir);
   let done = 0;
+  // vision check of candidates: on for real runs (no env passed, model pulled; STOCK_VLM=0 turns it off), opt-in (STOCK_VLM=1) when a caller passes its own env (tests)
+  const vlm = (o.env ? o.env.STOCK_VLM === '1' : process.env.STOCK_VLM !== '0') && await vlmAvailable();
   for (const [i, s] of scenes.entries()) {
     if (!s.stock) continue;
     const keep = prev.find(x => x.scene === i && x.query === s.stock!.query && x.kind === s.stock!.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
-    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic, exclude: new Set(items.map(x => x.pageUrl))});
+    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic, exclude: new Set(items.map(x => x.pageUrl)), sentence: s.narration, vlm, log: o.log});
     o.progress?.(++done, total, s.stock.query);
     if (keep) { items.push(keep); continue; }
     if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }

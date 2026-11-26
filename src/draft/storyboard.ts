@@ -15,7 +15,7 @@ type Shot = NonNullable<Sc['shot']>;
 type Stock = NonNullable<Sc['stock']>;
 export const STOCK_MIN = 0.4, STOCK_MAX = 0.55, STOCK_GAP = 8;
 // data beats stay procedural (the number/chart IS the picture); everything else may carry real footage
-const NO_STOCK = new Set(['big_number', 'chart']);
+const NO_STOCK = new Set(['big_number', 'chart', 'timeline']); // timeline: its dated callouts need the drawn growth picture ("if you invested ... ten years later" over a cash clip scored 5, ep011)
 // queries must describe something a camera filmed: charts, arrows, symbols and numbers are drawn by the engine, stock for them is always off-topic
 const NOT_FILMABLE = /\b(chart|graph|arrows?|bars?|icons?|symbols?|signs?|percent\w*|numbers?|infographics?|diagram|3d|logo|text|digital|abstract|concept)\b/;
 const cleanQuery = (q: unknown): string | null => { const t = String(q ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); return /^[a-z0-9 '-]{3,60}$/.test(t) && !NOT_FILMABLE.test(t) ? t : null; };
