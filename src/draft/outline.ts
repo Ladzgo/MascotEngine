@@ -220,6 +220,7 @@ export async function draftByOutline(o: {
   const device = o.device === 'none' ? undefined : pickDevice(o.topic, o.epsRoot ? recentDevices(o.epsRoot) : [], o.device);
   if (device) o.log?.(`story device: ${device.name}`);
   const outline = await draftOutline({device, short: o.short, client: o.client, topic: o.topic, angle: o.angle, voice: o.voice, channelContext: o.channelContext, lang: o.lang, model: o.model, log: o.log});
+  if (o.angle) outline.extras = {...(outline.extras && typeof outline.extras === 'object' ? outline.extras : {}), angle: o.angle}; // numbers in the supplied angle/facts are allowed in the narration
   if (device) {
     outline.device = device.id;
     const okH = (h: string) => unsupportedNumbers(h, allowedNumbers(outline)).length === 0;

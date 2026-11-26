@@ -242,7 +242,7 @@ function runNpm(args: string[], onLine?: (l: string) => void, env: Record<string
 }
 /** Section progress of the running draft (DRAFT_PROGRESS lines from the CLI), polled by the Studio. */
 let draftProgress: {done: number; total: number; label: string} | null = null;
-const runDraft = (topic: string, id: string, angle: string, channel: string, short = false, model = '', onProgress?: (p: {done: number; total: number; label: string}) => void) => {
+const runDraft = (topic: string, id: string, angle: string, channel: string, short = false, model = '', device = '', onProgress?: (p: {done: number; total: number; label: string}) => void) => {
   draftProgress = {done: 0, total: 0, label: 'Planning the outline'};
   if (process.env.STUDIO_TEST_FAKE_JOBS) return (async () => { // tests: no LLM, instant episode (topic "fail" errors)
     for (let k = 1; k <= 2; k++) { onProgress?.({done: k, total: 2, label: `part ${k}`}); await new Promise(r => setTimeout(r, 150)); }
@@ -251,7 +251,7 @@ const runDraft = (topic: string, id: string, angle: string, channel: string, sho
     fs.writeFileSync(`${EPISODES}${id}/episode.json`, JSON.stringify({id, title: topic, series: 's', seed: 0, scenes: [{type: 'talk', emotion: 'explaining', narration: 'Hello there.', emphasis: []}], sources: [], disclaimer: true}));
     return {code: 0, out: [`DRAFT_OK ${EPISODES}${id}/episode.json`]};
   })().finally(() => { draftProgress = null; });
-  return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : []), ...(short ? ['--short'] : [])], l => {
+  return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : []), ...(short ? ['--short'] : []), ...(device && /^[a-z_]+$/.test(device) ? ['--device', device] : [])], l => {
     const m = /^DRAFT_PROGRESS (\d+)\/(\d+) (.*)$/.exec(l);
     if (m) { draftProgress = {done: +m[1], total: +m[2], label: m[3]}; onProgress?.(draftProgress); }
   }, model ? {OLLAMA_MODEL: model, DRAFT_MODEL: model} : {}).finally(() => { draftProgress = null; });
@@ -259,7 +259,7 @@ const runDraft = (topic: string, id: string, angle: string, channel: string, sho
 /** Background drafts: the HTTP call returns at once, the browser polls GET /api/drafts/:id (progress, errors, and the render run that follows a "make"). */
 type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; jobId?: string; startedAt: number; topic: string};
 const drafts = new Map<string, DraftJob>();
-function startDraft(o: {topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}}) {
+function startDraft(o: {device?: string; topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}}) {
   needAi('draft');
   const id = nextId(o.topic);
   if (!ID_RE.test(id)) throw new HttpError(400, 'Invalid episode id.');
@@ -269,7 +269,7 @@ function startDraft(o: {topic: string; angle: string; channel: string; short: bo
   drafts.set(id, job);
   void (async () => {
     try {
-      const {code, out} = await runDraft(o.topic, id, o.angle, o.channel, o.short, o.model, p => { job.progress = p; });
+      const {code, out} = await runDraft(o.topic, id, o.angle, o.channel, o.short, o.model, o.device, p => { job.progress = p; });
       if (!(code === 0 && out.some(l => l.startsWith('DRAFT_OK')) && fs.existsSync(`${EPISODES}${id}/episode.json`))) throw new Error(cliMessage(out, code));
       if (o.ideaId) { const f = readIdeas(o.channel), idea = f.ideas.find(i => i.id === o.ideaId); if (idea) { idea.status = 'drafted'; idea.episodeId = id; writeIdeas(o.channel, f); } }
       if (o.make) job.jobId = enqueue(id, {stages: o.make.stages, engine: o.make.engine}).jobId;
@@ -337,7 +337,7 @@ function readChannel(id: string): Channel | null {
 const listChannels = () => { ensureDefaultChannel(); return (fs.existsSync(CHANNELS) ? fs.readdirSync(CHANNELS) : []).filter(d => ID_RE.test(d)).map(readChannel).filter((c): c is Channel => !!c); };
 const episodesOf = (channel: string) => (fs.existsSync(EPISODES) ? fs.readdirSync(EPISODES) : []).filter(d => fs.existsSync(`${EPISODES}${d}/episode.json`)).map(episodeSummary).filter(e => e.channel === channel);
 
-type Idea = {id: string; title: string; angle: string; hook: string; whyInteresting: string; format: string; difficulty: string; needsSources: string[]; status: 'new' | 'drafted' | 'dismissed'; episodeId?: string; createdAt: string};
+type Idea = {id: string; title: string; angle: string; hook: string; whyInteresting: string; format: string; difficulty: string; needsSources: string[]; device?: string; viewer?: string; facts?: {fact: string; source?: string; calc?: string}[]; status: 'new' | 'drafted' | 'dismissed'; episodeId?: string; createdAt: string};
 type IdeasFile = {generatedAt: string; ideas: Idea[]};
 function readIdeas(channel: string): IdeasFile {
   const f = readJson<{generatedAt?: unknown; ideas?: unknown}>(`${chDir(channel)}ideas.json`);
@@ -345,6 +345,8 @@ function readIdeas(channel: string): IdeasFile {
   const ideas = (Array.isArray(f?.ideas) ? f.ideas : []).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && typeof (x as Record<string, unknown>).id === 'string' && typeof (x as Record<string, unknown>).title === 'string').map((x): Idea => ({
     id: x.id as string, title: x.title as string, angle: s(x.angle), hook: s(x.hook), whyInteresting: s(x.whyInteresting), format: s(x.format), difficulty: s(x.difficulty),
     needsSources: Array.isArray(x.needsSources) ? x.needsSources.filter((y): y is string => typeof y === 'string') : [],
+    ...(typeof x.device === 'string' ? {device: x.device} : {}), ...(typeof x.viewer === 'string' ? {viewer: x.viewer} : {}),
+    ...(Array.isArray(x.facts) ? {facts: (x.facts as Record<string, unknown>[]).filter(y => y && typeof y.fact === 'string').map(y => ({fact: y.fact as string, ...(typeof y.source === 'string' ? {source: y.source} : {}), ...(typeof y.calc === 'string' ? {calc: y.calc} : {})}))} : {}),
     status: x.status === 'drafted' || x.status === 'dismissed' ? x.status : 'new', ...(typeof x.episodeId === 'string' ? {episodeId: x.episodeId} : {}), createdAt: s(x.createdAt),
   }));
   return {generatedAt: s(f?.generatedAt), ideas};
@@ -656,7 +658,8 @@ async function channelApi(req: http.IncomingMessage, res: http.ServerResponse, _
       const f = readIdeas(id), idea = f.ideas.find(i => i.id === p[3]);
       if (!idea) throw new HttpError(404, 'Idea not found.');
       const b = await body(req, DraftBody);
-      const j = startDraft({topic: idea.title, angle: idea.angle, channel: id, short: b.format === 'short', ideaId: idea.id});
+      const angle = [idea.angle, idea.hook && `Opening idea: ${idea.hook}`, idea.viewer && `For: ${idea.viewer}`, ...(idea.facts ?? []).map(x => `Fact: ${x.fact}${x.calc ? ` (${x.calc})` : ''}${x.source ? ` [${x.source}]` : ''}`)].filter(Boolean).join('\n');
+      const j = startDraft({topic: idea.title, angle, channel: id, short: b.format === 'short', ideaId: idea.id, device: idea.device});
       return json(res, 202, {id: j.id, draft: true});
     }
     if (p[3] && p.length === 4 && m === 'PATCH') {

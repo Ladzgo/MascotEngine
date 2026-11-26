@@ -53,6 +53,7 @@ export const HU: Record<string, string> = {
   'Free voice (built into your Mac)': 'Ingyenes hang (a Mac beépített hangja)', 'Silent (estimated timing, for quick previews)': 'Néma (becsült időzítés, gyors előnézethez)', 'My own recordings (local)': 'Saját felvételeim (helyi)',
   'Welcome to Mascot Engine Studio': 'Üdv a Mascot Engine Studióban', 'First-run setup': 'Első indítás', Channel: 'Csatorna', 'Channel name': 'Csatorna neve', 'Language of the videos': 'A videók nyelve', Model: 'Modell', 'Script model': 'Script modell',
   Next: 'Tovább', Back: 'Vissza', Finish: 'Kész', Skip: 'Kihagyás', 'Check this machine': 'Gép ellenőrzése', 'Everything is ready.': 'Minden kész.', English: 'Angol', Hungarian: 'Magyar',
+  For: 'Kinek', 'Surprising facts': 'Meglepő tények',
   // New video flow, Today, purposes
   'New video': 'Új videó', 'Make your first video in 3 steps': 'Készítsd el az első videód 3 lépésben', 'Pick a topic': 'Válassz témát', 'Type one, or let the Studio suggest ideas.': 'Írj be egyet, vagy kérj ötleteket a Studiótól.',
   'Choose Short or Long': 'Válassz Shortot vagy hosszú videót', 'And the voice you want to hear.': 'És a hangot, amit hallani szeretnél.', 'Press Make video': 'Nyomd meg a Videó készítése gombot',

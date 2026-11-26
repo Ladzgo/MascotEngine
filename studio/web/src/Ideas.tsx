@@ -69,7 +69,9 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
               <p className="angle"><b>Angle</b> {i.angle}</p>
               <p className="hook">“{i.hook}”</p>
               <p className="small why">{i.whyInteresting}</p>
-              <div className="chips">{i.format && <i>{nice(i.format)}</i>}{i.difficulty && <i>{nice(i.difficulty)}</i>}</div>
+              {i.viewer && <p className="small"><b>{t('For')}</b> {i.viewer}</p>}
+              {i.facts && i.facts.length > 0 && <div className="small"><b>{t('Surprising facts')}</b><ul className="src">{i.facts.map((f, k) => <li key={k}>{f.fact}{f.source ? <span className="muted"> ({f.source})</span> : null}</li>)}</ul></div>}
+              <div className="chips">{i.device && <i>{nice(i.device)}</i>}{i.format && <i>{nice(i.format)}</i>}{i.difficulty && <i>{nice(i.difficulty)}</i>}</div>
               {i.needsSources.length > 0 && <div className="small"><b>Needs sources</b><ul className="src">{i.needsSources.map((s, k) => <li key={k}>{s}</li>)}</ul></div>}
               <div className="row idea-actions">
                 {i.status === 'new' && <><button className="btn primary sm" disabled={work !== null} onClick={() => draft(i)}><Wand size={15} />{work === i.id ? t('Starting…') : t('Make video')}</button><button className="btn ghost sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'dismissed'))}><Trash size={15} />Dismiss</button></>}

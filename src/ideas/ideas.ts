@@ -16,6 +16,10 @@ export const Idea = z.object({
   whyInteresting: z.string().min(3), format: Format,
   difficulty: z.number().int().min(1).max(3),
   needsSources: z.array(z.string()).default([]),
+  /** Angle package: narrative device (src/draft/story.ts ids), who it is for, and 3 surprising checkable facts. */
+  device: z.string().max(24).optional(),
+  viewer: z.string().max(200).optional(),
+  facts: z.array(z.object({fact: z.string().min(3).max(300), source: z.string().max(200).optional(), calc: z.string().max(120).optional()})).max(5).optional(),
   status: z.enum(['new', 'drafted', 'dismissed']).default('new'),
   episodeId: z.string().optional(), createdAt: z.string(),
 });
@@ -32,10 +36,10 @@ export function buildSystem(ch: ChannelInfo): string {
   return `You generate video ideas for a YouTube channel.
 ${channelContext(ch)}
 
-Rules: ideas must be specific (one concrete claim, number or situation, not a broad subject), surprising, and non-clickbait (no "you won't believe", no fear-baiting). Each has a clear opinion/angle. No guaranteed-returns or advice claims, never tell viewers what to buy, sell or hold. Every idea must be checkable: list what facts must be verified in needsSources. Write every field (title, angle, hook, whyInteresting) in the channel's language; keep the JSON keys and the format/difficulty values exactly as specified. Do not repeat or lightly reword the titles listed as already used, and do not reuse their core claim in a new wrapper. Vary the formats across the batch; about a third of the titles should contain a concrete number, amount or timeframe; never write generic titles like "Everything you need to know about X".
+Rules: ideas must be specific (one concrete claim, number or situation, not a broad subject), surprising, and non-clickbait (no "you won't believe", no fear-baiting). Each has a clear opinion/angle. No guaranteed-returns or advice claims, never tell viewers what to buy, sell or hold. Every idea needs an angle package: a hook that contains a number or a named person, a target viewer, and 3 surprising facts with sources (or a calc). Every idea must be checkable: list what facts must be verified in needsSources. Write every field (title, angle, hook, whyInteresting) in the channel's language; keep the JSON keys and the format/difficulty values exactly as specified. Do not repeat or lightly reword the titles listed as already used, and do not reuse their core claim in a new wrapper. Vary the formats across the batch; about a third of the titles should contain a concrete number, amount or timeframe; never write generic titles like "Everything you need to know about X".
 
 Output ONLY one JSON object (no prose, no code fences):
-{"ideas": [{"title": string, "angle": string (the opinion/take), "hook": string (first spoken sentence, 15 words max), "whyInteresting": string (1-2 lines: curiosity gap, stakes, timeliness), "format": "explainer"|"myth_vs_fact"|"story"|"how_to"|"comparison", "difficulty": 1|2|3 (production effort), "needsSources": [string]}]}`;
+{"ideas": [{"title": string, "angle": string (the opinion/take), "hook": string (first spoken sentence, 15 words max), "whyInteresting": string (1-2 lines: curiosity gap, stakes, timeliness), "format": "explainer"|"myth_vs_fact"|"story"|"how_to"|"comparison", "difficulty": 1|2|3 (production effort), "needsSources": [string], "device": "anecdote"|"myth_reality"|"simulation"|"mistake_reveal"|"countdown"|"banks_trick"|"before_after"|"question_chain" (the story shape that fits this idea best; vary it across the batch), "viewer": string (one line: who this is for and what they are doing right now), "facts": [exactly 3 surprising, checkable facts: {"fact": string with a concrete number, "source": "named official source or outlet", "calc": "simple arithmetic that produces the number, when derived"}]}]}`;
 }
 
 export function buildUser(count: number, used: string[], focus?: string): string {
