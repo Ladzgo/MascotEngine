@@ -63,7 +63,7 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
         </div>
       ) : data && !shown.length ? <p className="muted">No {filter} ideas.</p> : (
         <ul className="ideas">
-          {shown.map(i => (
+          {shown.map((i, k) => (
             <li key={i.id} className="panel idea">
               <h2>{i.title}</h2>
               <p className="angle"><b>Angle</b> {i.angle}</p>
@@ -74,7 +74,7 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
               <div className="chips">{i.device && <i>{nice(i.device)}</i>}{i.format && <i>{nice(i.format)}</i>}{i.difficulty && <i>{nice(i.difficulty)}</i>}</div>
               {i.needsSources.length > 0 && <div className="small"><b>Needs sources</b><ul className="src">{i.needsSources.map((s, k) => <li key={k}>{s}</li>)}</ul></div>}
               <div className="row idea-actions">
-                {i.status === 'new' && <><button className="btn primary sm" disabled={work !== null} onClick={() => draft(i)}><Wand size={15} />{work === i.id ? t('Starting…') : t('Make video')}</button><button className="btn ghost sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'dismissed'))}><Trash size={15} />Dismiss</button></>}
+                {i.status === 'new' && <><button className={`btn sm ${k === 0 ? 'primary' : ''}`} disabled={work !== null} onClick={() => draft(i)}><Wand size={15} />{work === i.id ? t('Starting…') : t('Make video')}</button><button className="btn ghost sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'dismissed'))}><Trash size={15} />Dismiss</button></>}
                 {i.status === 'drafted' && (i.episodeId ? <a className="btn sm" href={`#/ep/${i.episodeId}?ch=${channel.id}`}>Open episode</a> : <span className="muted small">Drafted</span>)}
                 {i.status === 'dismissed' && <button className="btn sm" disabled={work !== null} onClick={() => act(i, () => api.setIdea(channel.id, i.id, 'new'))}><Undo size={15} />Restore</button>}
               </div>
