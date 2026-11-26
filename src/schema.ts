@@ -7,6 +7,11 @@ export const Emotion = z.enum([
 ]);
 export type Emotion = z.infer<typeof Emotion>;
 
+/** Illustration library kinds (src/visuals). Keep in sync with VISUAL_KINDS there. */
+export const VISUAL_KINDS = ['credit_card', 'coins', 'jar', 'house', 'car', 'bank', 'piggy', 'calendar', 'clock', 'percent', 'shield', 'magnifier', 'receipt', 'document', 'arrow_up', 'arrow_down', 'scale', 'people', 'phone', 'chart_up', 'chart_down', 'bulb', 'wallet', 'cash', 'lock', 'question', 'warning', 'check', 'target', 'hourglass'] as const;
+export const VisualKind = z.enum(VISUAL_KINDS);
+export type VisualKind = z.infer<typeof VisualKind>;
+
 const Overrides = {
   layout: z.string().optional(),
   camera: z.string().optional(),
@@ -14,6 +19,8 @@ const Overrides = {
   pose: z.string().optional(),
   /** Backdrop art, public-dir relative; injected by render.ts when episodes/<id>/art/scene-N.png exists. */
   art: z.string().regex(/^art\/scene-\d+\.png$/).optional(),
+  /** Hero illustration for the scene (src/visuals); absent = picked from the narration keywords. */
+  visual: z.object({kind: VisualKind, label: z.string().max(40).optional()}).optional(),
 };
 
 const base = {
