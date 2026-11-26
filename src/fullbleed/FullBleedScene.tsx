@@ -140,6 +140,11 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
   );
 };
 
+/** Sub-shot framings [zoom, x shift (share of width), y shift (share of height)]: tight punch-in, wide pull-back, off-centre left/right. */
+export const SUB_FRAMES: [number, number, number][] = [[1.22, 0, 0.05], [0.9, 0, -0.02], [1.12, 0.07, 0.02], [1.12, -0.07, 0.02]];
+/** How many 2-3 s sub-shots a beat of `dur` seconds gets (one per started 2.8 s). */
+export const subShots = (dur: number) => Math.max(1, Math.ceil(dur / 2.8));
+
 const calloutTexts = (s: Scene): string[] => {
   switch (s.type) {
     case 'list': return s.items;
@@ -206,10 +211,13 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const push = 1.02 + close + 0.2 * p, panX = mv === 1 ? (p - 0.5) * -0.12 * w : mv === 2 ? (p - 0.5) * 0.12 * w : Math.sin(t * 0.7) * 0.012 * w;
   const rot = mv === 3 ? (p - 0.5) * 3.6 : Math.sin(t * 0.5) * 0.5, tiltY = mv === 0 ? (0.5 - p) * 0.03 * h : Math.cos(t * 0.6) * 0.008 * h;
   const sc = mv === 3 ? 1.08 + close + 0.1 * p : push;
-  const stage = `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})`;
-
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
+  // sub-shots: a long beat is cut into 2-3 s pieces, each a new framing (hard punch-in/out, like an editor's cut), so no picture holds > 3 s.
+  // Beats with callouts/cards keep one framing (their labels are laid out against the frame).
+  const nSub = hasCallouts || versus ? 1 : subShots(dur), sub = Math.min(nSub - 1, Math.floor(t / (dur / nSub)));
+  const [subZ, subX, subY] = sub === 0 ? [1, 0, 0] : SUB_FRAMES[(sub + index) % SUB_FRAMES.length];
+  const stage = `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
   // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.25 : h * 1.05; // wider objects (scale, bars) span the whole 400 box: above ~1.25 w they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
@@ -219,8 +227,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
-      {scene.stockFile ? <StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /> : (
-      <div style={{position: 'absolute', inset: 0, transform: `scale(${1.06 + 0.1 * p}) translateX(${panX * 0.5}px)`, transformOrigin: '50% 60%'}}>
+      {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: `scale(${Math.max(1, subZ) * (subX ? 1.15 : 1)}) translate(${subX * w * 0.5}px, ${subY * h * 0.5}px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /></div> : (
+      <div style={{position: 'absolute', inset: 0, transform: `scale(${(1.06 + 0.1 * p) * Math.max(1, subZ) * (subX ? 1.1 : 1)}) translateX(${panX * 0.5 + subX * w * 0.4}px)`, transformOrigin: '50% 60%'}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
       </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
@@ -234,7 +242,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           const feet = groundY, Cmp = plan.companion ?? s.kind;
           const slots: Slot[] = lay === 'split' && !hasCallouts && !versus ? [{x: w * 0.27, s: 0.44, feet, kind: s.kind, delay: 0, main: true}, {x: w * 0.73, s: 0.44, feet, kind: Cmp, delay: 0.25, main: false}]
             : lay === 'grid' && !hasCallouts && !versus ? Array.from({length: 6}, (_, k) => ({x: w * (0.19 + (k % 3) * 0.31), s: 0.28, feet: feet - Math.floor(k / 3) * hs * 0.3 * 0.62 - (k % 3 === 1 ? 14 : 0), kind: s.kind, delay: k * 0.12, main: k === 1}))
-            : lay === 'pip' || lay === 'broll' ? [{x: w * (lay === 'pip' ? 0.74 : 0.26), s: 1, feet: tall ? h * 0.74 : h * 0.74, kind: s.kind, delay: 0, main: true}]
+            : lay === 'broll' ? [] // full-frame footage alone: a drawn gear over a sleeping person read as noise (semantic QA en-sleep-v4)
+            : lay === 'pip' ? [{x: w * 0.74, s: 1, feet: h * 0.74, kind: s.kind, delay: 0, main: true}]
             : [{x: hx, s: 1, feet, kind: s.kind, delay: 0, main: true}];
           return slots.map((sl, si) => {
             const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
