@@ -13,14 +13,16 @@ export type Format = 'short' | 'wide';
 const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face|selfie|logo|brand|sign|text|poster|banner|screenshot|advert\w*)\b/i;
 
 /** Rank hits: right orientation, enough pixels, no faces/logos/text, then bigger. Hits below the minimum size are dropped. */
-export function rank(hits: StockHit[], a: Query, format: Format): StockHit[] {
+export function rank(hits: StockHit[], a: Query, format: Format, topic: string[] = []): StockHit[] {
   const minW = format === 'short' ? 720 : 1280, minH = format === 'short' ? 1280 : 720;
   const words = a.query.toLowerCase().split(/\W+/).filter(x => x.length > 2).map(x => x.replace(/(ing|es|s)$/, ''));
   const stem = (x: string) => x.replace(/(ing|es|s)$/, ''), overlap = (h: StockHit) => { const t = new Set(`${h.title} ${h.provider === 'pixabay' || h.provider === 'pexels' ? h.tags ?? '' : ''}`.toLowerCase().split(/\W+/).map(stem)); return words.filter(x => t.has(x)).length; }; // whole words only: 'sign' must not match 'design'
   const sized = hits.filter(h => h.url && (!h.width || !h.height || (h.kind === 'video' ? Math.max(h.width, h.height) >= 1280 : h.width >= minW * 0.9 && h.height >= minH * 0.9)));
   const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
   // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
-  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => x.ov >= need || !words.length);
+  // and it must name the video's topic ("sleep", "credit"): a hand with a pen matches "hands writing" but says nothing about sleep (en-sleep)
+  const tw = topic.map(stem), onTopic = (h: StockHit) => !tw.length || tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w));
+  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => (x.ov >= need || !words.length) && onTopic(x.h));
   return relevant.sort((x, y) => y.s - x.s).map(x => x.h);
 }
 
@@ -84,17 +86,20 @@ export async function chooseStock(epDir: string, scene: number, stock: {query: s
   return rec;
 }
 /** Best licensed match for one query. Provider order: Pexels, Pixabay (when keyed), then Openverse, Wikimedia Commons. Downloads once into assets/stock-cache/<sha1>.<ext>. */
-export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string}): Promise<Fetched | null> {
-  const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR;
+export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]}): Promise<Fetched | null> {
+  const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR, topic = o.topic ?? [];
   setApiCacheDir(path.join(dir, 'api'));
   const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
-  for (const kinds of o.kind === 'video' ? [a, {...a, kind: 'photo' as const}] : [a]) { // a video query falls back to a photo when no keyed provider has one
+  // second try puts the topic word in front, so "open book" becomes "sleep open book" when the plain query found nothing on topic
+  const anchored = topic[0] && !o.query.includes(topic[0]) ? {...a, query: `${topic[0]} ${o.query.split(' ').slice(0, 2).join(' ')}`} : null;
+  const tries = [a, ...(anchored ? [anchored] : [])].flatMap(x => (o.kind === 'video' ? [x, {...x, kind: 'photo' as const}] : [x])); // a video query falls back to a photo
+  for (const kinds of tries) {
     for (const p of PROVIDERS) {
       if (p.needsKey && !env[p.needsKey]) continue;
       const t = () => p.search(f, kinds, env);
       let hits: StockHit[] = [];
       try { hits = await t(); } catch { continue; } // a provider being down is never an error
-      for (const hit of rank(hits, kinds, o.format).slice(0, 3)) {
+      for (const hit of rank(hits, kinds, o.format, topic).slice(0, 3)) {
         const file = await downloadHit(hit, f, dir, o.format);
         if (file) return {file, hit};
       }
@@ -114,12 +119,12 @@ export function creditLines(items: StockRecord[]): string[] {
  *  Idempotent: a beat whose query is unchanged and whose file still exists keeps its record (so a "Swap image" choice survives re-runs).
  *  A beat without a result is skipped silently (procedural visuals stay). Progress goes to `o.progress(done, total, query)`. */
 export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void; progress?: (done: number, total: number, query: string) => void} = {}): Promise<StockRecord[]> {
-  const items: StockRecord[] = [], prev = readStock(epDir).items, total = scenes.filter(s => s.stock).length, cache = o.cacheDir ?? CACHE_DIR;
+  const items: StockRecord[] = [], prev = readStock(epDir).items, total = scenes.filter(s => s.stock).length, cache = o.cacheDir ?? CACHE_DIR, topic = topicWords(epDir);
   let done = 0;
   for (const [i, s] of scenes.entries()) {
     if (!s.stock) continue;
     const keep = prev.find(x => x.scene === i && x.query === s.stock!.query && x.kind === s.stock!.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
-    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir});
+    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic});
     o.progress?.(++done, total, s.stock.query);
     if (keep) { items.push(keep); continue; }
     if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
@@ -127,6 +132,14 @@ export async function stockForEpisode(epDir: string, scenes: {stock?: {query: st
   }
   fs.writeFileSync(path.join(epDir, 'stock.json'), JSON.stringify({items, credits: creditLines(items)}, null, 2));
   return items;
+}
+
+const TOPIC_STOP = new Set('your this that with what when why how does from into will about tricking really actually truth secret'.split(' '));
+/** The episode title's content words ("Sleep & Memory" -> sleep, memory): every stock hit must carry one of them. */
+export function topicWords(epDir: string): string[] {
+  let title = '';
+  try { title = String(JSON.parse(fs.readFileSync(path.join(epDir, 'episode.json'), 'utf8')).title ?? ''); } catch { return []; }
+  return title.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !TOPIC_STOP.has(w)).slice(0, 3);
 }
 
 export const readStock = (epDir: string): {items: StockRecord[]; credits: string[]} => { try { return JSON.parse(fs.readFileSync(path.join(epDir, 'stock.json'), 'utf8')); } catch { return {items: [], credits: []}; } };
