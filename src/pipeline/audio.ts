@@ -178,17 +178,17 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   }
   execFileSync('ffmpeg', [...args, '-filter_complex', filter, '-map', '[o]', '-t', totalSec.toFixed(3), mixed]);
 
-  // soft pre-limit tames hot voice peaks so linear two-pass loudnorm can reach -14.0 LUFS; final alimiter enforces the ceiling
+  // soft pre-limit tames hot voice peaks so linear two-pass loudnorm lands near -14 LUFS (target -13.5 because the final limiter shaves about 0.6 LU); final alimiter enforces the ceiling
   const pre = 'alimiter=limit=0.5:level=disabled:attack=5:release=50,';
-  const probe = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', mixed, '-af', pre + 'loudnorm=I=-13.8:TP=-1.5:LRA=11:print_format=json', '-f', 'null', '-'], {encoding: 'utf8', maxBuffer: 1 << 26});
+  const probe = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', mixed, '-af', pre + 'loudnorm=I=-13.5:TP=-1.5:LRA=11:print_format=json', '-f', 'null', '-'], {encoding: 'utf8', maxBuffer: 1 << 26});
   const m = /\{[^{}]*"input_i"[^{}]*\}/.exec(probe.stderr ?? '');
-  let norm = 'loudnorm=I=-13.8:TP=-1.5:LRA=11';
+  let norm = 'loudnorm=I=-13.5:TP=-1.5:LRA=11';
   if (m) {
     const j = JSON.parse(m[0]) as Record<string, string>;
     if (Number.isFinite(Number(j.input_i)))
       norm += `:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true`;
   }
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', mixed, '-af', `${pre}${norm},aresample=44100,alimiter=limit=0.7:level=disabled:attack=5:release=50`, '-ar', '44100', out]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', mixed, '-af', `${pre}${norm},aresample=44100,alimiter=limit=0.78:level=disabled:attack=5:release=50`, '-ar', '44100', out]);
   void hasVoice;
   return out;
 }

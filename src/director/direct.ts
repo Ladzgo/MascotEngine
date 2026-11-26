@@ -225,7 +225,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
   const treat: {type: string; layout: string; camera: string}[] = [];
   const decided: SceneDecision[] = [];
   let cursor = 0;
-  let sfxVariantLast: Record<string, number[]> = {}, lastObjSfx = -9;
+  let sfxVariantLast: Record<string, number[]> = {}, lastObjSfx = -9, lastWhoosh = -9;
   let prevPose = '';
 
   ep.scenes.forEach((s, i) => {
@@ -379,7 +379,9 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
       return v;
     };
     const sfx: SfxCue[] = [];
-    if (i > 0 && transition !== 'cut') sfx.push({t: 0, kind: 'whoosh', variant: variant('whoosh')});
+    // restrained: a whoosh only on every third cut at most (never back to back), and the beat's own object cue takes its place when it has one
+    const whooshHere = i > 0 && transition !== 'cut' && i - lastWhoosh >= 3;
+    if (whooshHere) { sfx.push({t: 0, kind: 'whoosh', variant: variant('whoosh')}); lastWhoosh = i; }
     if (s.type === 'list') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (['compare', 'before_after', 'timeline', 'table', 'checklist'].includes(s.type)) elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (s.chapter) sfx.push({t: 0.2, kind: 'chime', variant: variant('chime')}); // chapter tag slides in
@@ -396,6 +398,8 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     const objKind = ep.look === 'fullbleed' ? sfxForShot(s.shot, s.type) : null;
     if (objKind && i - lastObjSfx >= 2) {
       const at = s.shot?.at ? words.find(x => norm(x.w) === norm(s.shot!.at!)) : undefined, t = round(Math.max(0.1, at?.start ?? lead + 0.1));
+      const w0 = sfx.findIndex(c => c.kind === 'whoosh' && c.t === 0);
+      if (w0 >= 0 && t < 0.6) { sfx.splice(w0, 1); lastWhoosh = i - 3; } // the object cue replaces the cut whoosh, which stays available for the next cut
       if (!sfx.some(c => Math.abs(c.t - t) < 0.35)) { sfx.push({t, kind: objKind, variant: variant(objKind)}); lastObjSfx = i; }
     }
 

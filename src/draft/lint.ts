@@ -14,6 +14,9 @@ export function lintEpisode(ep: Episode): string[] {
   const hook = ep.scenes[0]?.narration ?? '';
   const words = hook.trim().split(/\s+/).length;
   if (words > 15) errs.push(`Hook (scene 1 narration) has ${words} words; must be 15 or fewer.`);
+  // numerals are spoken out ("$10k" = ten thousand dollars): a hook that takes over ~4.3 s to say makes the first beat the longest one
+  const spoken = hook.trim().split(/\s+/).reduce((n, w) => n + 1 + (/\d/.test(w) ? 1 + (/[$%]|\d[km]\b/i.test(w) ? 1 : 0) : 0), 0);
+  if (spoken > 13) errs.push(`Hook takes about ${(spoken * 60 / 165).toFixed(1)} s to say once numbers are spelled out; keep it under 4.3 s (about 12 spoken words).`);
   const hasNumbers = ep.scenes.some(s => s.type === 'big_number' || s.type === 'chart');
   if (hasNumbers && ep.sources.length === 0) errs.push('big_number/chart scenes need at least one URL in "sources".');
   ep.scenes.forEach((s, i) => {
