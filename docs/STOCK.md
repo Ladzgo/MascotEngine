@@ -15,3 +15,11 @@ Order of truth for a beat's picture: real stock photo/video (Pixabay, else Openv
 ## Measuring
 `npm run qa:semantic -- <id>` -> median/mean + weakest beats; `--fix` re-chooses beats below `--below 6` (drops stock or swaps the subject), then `npm run direct` + `npm run render`.
 `npm run qa:restoryboard -- <id> <new-id>` re-runs the storyboard on a copy (same script and voice) for before/after numbers.
+
+## Note for the stock/visuals owner: off-topic backgrounds (ep010, 2026-11-26)
+`ep010-why-the-minimum-credit` (EN Short, credit-card minimum payments): the hook beat got a photo of a cozy living room
+(`stock.query` = "living room debt counter"). Cause: the query is built as `<setting> <subject>` and the setting ("Living room",
+copied into every beat) dominates the search, so the photo matches the room, not the idea. Same pattern in beats 3 and 7
+("living room percent", "living room gauge"): none of those pictures say "debt" or "interest".
+Suggested fix: build `stock.query` from the sentence's concrete noun + the topic keyword (e.g. "credit card bill", "interest rate"),
+never from `setting`; drop hits whose title/tags share no word with the topic; keep the procedural object when no hit overlaps.
