@@ -312,8 +312,8 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
       elements = [lead + 0.5, Math.max(speechEnd, lead + 1.8)];
       tail = 0.35;
     } else if (s.type === 'big_number') {
-      const cs = 0.7;
-      elements = [cs, cs + 2.2];
+      const cs = pro ? 0.4 : 0.7;
+      elements = [cs, cs + (pro ? 1.3 : 2.2)]; // shorts-pro: a quick count, no 2 s of silence
       tail = Math.min(0.8, Math.max(0.3, elements[1] + 0.3 - speechEnd));
     } else if (s.type === 'title') tail = 0.25;
     else tail = pace === 'punchy' ? MIN_TAIL : pace === 'explain' ? 0.3 : 0.2;
@@ -331,6 +331,8 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     if (pro) tail = MIN_TAIL;
     if (i === ep.scenes.length - 1) tail = Math.max(tail, OUTRO_TAIL); // quiet outro: the video never ends on the last syllable
     if (i < ep.scenes.length - 1) tail += JCUT; // next scene's voice starts early, so this scene's picture holds on (L-cut feel)
+    // shorts-pro: every element lands while the voice is still speaking, so no scene waits in silence for an animation
+    if (pro && elements.length) { const cap = Math.max(lead + 0.3, speechEnd - 0.15); elements = elements.map((e, k) => Math.min(e, cap + k * 0.001)); }
     // whole frames: every scene starts on a frame, so a chunk's frame layout never depends on rounding of earlier scenes (render cache)
     const durSec = Math.ceil(Math.max(speechEnd + tail, elements.length ? Math.max(...elements) + 0.3 + (i < ep.scenes.length - 1 ? JCUT : 0) : 0) * 30 - 1e-6) / 30;
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {episodeDir, loadEpisode} from '../../src/schema.js';
+import {planShots} from '../../src/fullbleed/shots.js';
 import {buildPhrases} from '../../src/fx/captions.js';
 import {activeRmsDb} from '../../src/pipeline/audio.js';
 
@@ -131,8 +132,10 @@ export function qa(id: string, fileArg?: string) {
   const wpm = nWords / Math.max(1, vdur * (1 - P.share)) * 60;
   const [wLo, wHi] = short ? LIMITS.shortWpm : [140, 180];
   add('speaking pace', wpm >= wLo && wpm <= wHi, `${wpm.toFixed(0)} wpm`, `${wLo}..${wHi} wpm`);
-  // a visual change = a scene start, or an in-scene visual (full-bleed `visuals` sequence entry after the first)
-  const changes = ep.scenes.reduce((a, sc) => a + Math.max(1, (sc as {visuals?: unknown[]}).visuals?.length ?? 1), 0);
+  // a visual change = every shot the renderer plans inside a scene (src/fullbleed/shots.ts), or one per scene for the paper look
+  const changes = ep.look === 'fullbleed'
+    ? ep.scenes.reduce((a, sc, i) => { const d = dec.scenes[i], t0 = tim.scenes[i].start; return a + planShots(sc as any, tim.scenes[i].words.map((w: any) => ({w: w.w, start: w.start - t0 + d.speechStart, end: w.end - t0 + d.speechStart})), d.durSec, {seed: i}).length; }, 0)
+    : ep.scenes.length;
   const perChange = dur / Math.max(1, changes), cap = short ? LIMITS.shortChange : LIMITS.wideChange;
   add('visual change rate', perChange <= cap, `a new visual every ${perChange.toFixed(1)} s (${changes} changes)`, `<= ${cap} s`);
   const longest = Math.max(...dec.scenes.map((d: any) => d.durSec)), longCap = short ? 5 : 12;

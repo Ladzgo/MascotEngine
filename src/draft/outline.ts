@@ -103,7 +103,7 @@ export function planParts(o: Outline, short = false): Part[] {
   o.sections.forEach((x, i) => parts.push({key: `s${i + 1}`, label: x.heading, min: 3, max: 5, feature: FEATURES[(i + 1) % FEATURES.length], focus: x.calc?.result ?? x.numbers.at(-1), facts: `Section "${x.heading}"\nIdea: ${x.point}\nFact: ${x.fact}${x.calc ? `\nArithmetic: ${x.calc.expr} = ${x.calc.result}` : ''}`, brief: 'explain the idea, then land the fact with the exact numbers, then say what it means for the viewer.'}));
   parts.push({key: 'twist', label: 'The catch', min: 2, max: 4, feature: 'compare', facts: `Twist: ${o.twist}`, brief: 'start with a short turn ("but" is fine here), then explain the catch concretely.'});
   parts.push({key: 'closing', label: 'Recap and call to action', min: 2, max: 3, facts: `Recap: ${o.recap}\nCall to action: ${o.cta}`, brief: 'a one-line recap (a checklist scene is good), then the call to action as the very last beat.'});
-  if (short) return parts.filter(p => p.key !== 'twist' || o.twist).map(p => ({...p, min: 2, max: p.key === 'opening' ? 3 : 2, minWords: p.key === 'closing' ? 12 : 16, maxBeat: 22, feature: p.key === 'opening' || p.key === 'closing' ? undefined : p.feature, brief: `${p.brief} Shorts pacing: every beat is ONE short sentence of 6 to 14 words (about 3 seconds spoken).`}));
+  if (short) return parts.filter(p => p.key !== 'twist' || o.twist).map(p => ({...p, min: 2, max: p.key === 'opening' ? 3 : 2, minWords: p.key === 'closing' ? 12 : 16, maxBeat: 14, feature: p.key === 'opening' || p.key === 'closing' ? undefined : p.feature, brief: `${p.brief} Shorts pacing: every beat is ONE short sentence of 6 to 14 words (about 3 seconds spoken).`}));
   return parts;
 }
 
@@ -151,6 +151,11 @@ function parseBeats(out: string): Sc[] | string {
   const fixed = repairDraft({scenes: list.map(inferType)}).scenes as any[];
   const thou = (v: unknown) => (typeof v === 'string' && /^\d{4,}$/.test(v) ? Number(v).toLocaleString('en-US') : v);
   for (const b of fixed) { // tidy what small models get wrong on screen: long big-number labels (shrink to unreadable), bare 1000000
+    if (b.type === 'big_number') { // unit repairs: no currency sign before years/months/%, a space before a word suffix
+      const su = String(b.suffix ?? '');
+      if (/^\s*(year|month|week|day|hour|%|percent|x\b)/i.test(su) && /[$€£]/.test(String(b.prefix ?? ''))) b.prefix = '';
+      if (/^[A-Za-z]/.test(su)) b.suffix = ` ${su}`;
+    }
     if (b.type === 'big_number' && String(b.label).length > 40) b.label = String(b.label).split(/[.,:;]| - /)[0].slice(0, 40).trim() || 'The number';
     for (const k of ['left', 'right', 'before', 'after']) if (b[k] && typeof b[k] === 'object') b[k].value = thou(b[k].value);
   }

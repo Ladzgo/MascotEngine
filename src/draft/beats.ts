@@ -24,7 +24,7 @@ export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {
       for (let k = 1; k < parts.length; k++) { acc += wc(parts[k - 1]); const d = Math.abs(acc - wc(x) / 2); if (d < bestD) { bestD = d; best = k; } }
       return [parts.slice(0, best).join(' '), parts.slice(best).join(' ')];
     });
-    if (s.type !== 'talk' || s.quote || i === 0 || i === last || sents.length < 2 || wc(s.narration) <= MAX) { out.push(s); return; }
+    if (s.type !== 'talk' || s.quote || i === 0 || (i === last && !o.clauses) || sents.length < 2 || wc(s.narration) <= MAX) { out.push(s); return; }
     const groups: string[][] = [[]];
     for (const x of sents) { const g = groups[groups.length - 1]; if (g.length && wc(g.join(' ')) + wc(x) > MAX) groups.push([x]); else g.push(x); }
     groups.forEach((g, k) => {
