@@ -79,3 +79,18 @@ test('spoken length: numerals count as said; a long Short data scene is flagged,
   base.scenes.push({type: 'list', narration: 'Daily coffee $5, yearly $1,825, beats the national average of $1,100.', items: ['a', 'b']});
   assert.ok(lintEpisode(base).some(e => /Short beats must stay under 5 s/.test(e)));
 });
+
+test('numeralize: spelled-out amounts become numerals for captions; small bare counts and other languages stay', async () => {
+  const {numeralize} = await import('./lint.js');
+  assert.equal(numeralize('A five dollar coffee? That is over eighteen hundred dollars a year.'), 'A $5 coffee? That is over $1,800 a year.');
+  assert.equal(numeralize('You could spend one thousand eight hundred twenty-five dollars.'), 'You could spend $1,825.');
+  assert.equal(numeralize('Ten years at seven percent, a hundred dollars a month.'), 'Ten years at 7%, $100 a month.');
+  assert.equal(numeralize('Three hundred sixty five days.'), '365 days.');
+  assert.equal(numeralize('One coffee and two habits.'), 'One coffee and two habits.');
+  assert.equal(numeralize('Egy kettő három.'), 'Egy kettő három.');
+});
+
+test('numeralize leaves word lists alone', async () => {
+  const {numeralize} = await import('./lint.js');
+  assert.equal(numeralize('One two three four five six seven.'), 'One two three four five six seven.');
+});
