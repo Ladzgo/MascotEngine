@@ -30,3 +30,9 @@ test('fitDuration drops the longest middle talk beats but keeps hook and ending'
   assert.ok(dropped > 0 && o.scenes.length >= 8);
   assert.equal(o.scenes[0].narration, 'short beat here now'); assert.equal(o.scenes.at(-1)!.narration, ep.scenes.at(-1)!.narration);
 });
+
+test('splitBeats: a long two-sentence Short data scene keeps its first sentence, the rest becomes a talk beat', () => {
+  const ep = mk([sc('Hook.'), {type: 'list', emotion: 'explaining', narration: 'Mortality risk drops 30% at 7,500 steps. Then it plateaus for good.', items: ['30% lower risk', '7,500 steps'], emphasis: []}, sc('Bye.')]);
+  const out = splitBeats(ep, {max: 11, clauses: true});
+  assert.deepEqual(out.scenes.map(s => [s.type, s.narration]), [['talk', 'Hook.'], ['list', 'Mortality risk drops 30% at 7,500 steps.'], ['talk', 'Then it plateaus for good.'], ['talk', 'Bye.']]);
+});

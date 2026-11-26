@@ -25,6 +25,16 @@ export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {
       for (let k = 1; k < parts.length; k++) { acc += wc(parts[k - 1]); const d = Math.abs(acc - wc(x) / 2); if (d < bestD) { bestD = d; best = k; } }
       return [parts.slice(0, best).join(' '), parts.slice(best).join(' ')];
     });
+    // shorts-pro: a long data scene keeps its first sentence(s); the rest becomes a talk beat after it (a list or compare is never cut mid-sentence)
+    if (o.clauses && s.type !== 'talk' && s.type !== 'title' && i > 0 && sents.length >= 2 && wc(s.narration) > MAX) {
+      let k = 1;
+      while (k < sents.length - 1 && wc(sents.slice(0, k + 1).join(' ')) <= MAX) k++;
+      const head = sents.slice(0, k).join(' '), tail = sents.slice(k).join(' ');
+      const em = (t: string) => ((s as {emphasis?: string[]}).emphasis ?? []).filter(e => t.toLowerCase().includes(e.toLowerCase()));
+      out.push({...s, narration: head, ...('emphasis' in s ? {emphasis: em(head)} : {})} as Sc);
+      out.push({type: 'talk', emotion: (s as {emotion?: string}).emotion ?? 'neutral', emphasis: em(tail), narration: tail} as Sc);
+      return;
+    }
     if (s.type !== 'talk' || s.quote || i === 0 || (i === last && !o.clauses) || sents.length < 2 || wc(s.narration) <= MAX) { out.push(s); return; }
     const groups: string[][] = [[]];
     for (const x of sents) { const g = groups[groups.length - 1]; if (g.length && wc(g.join(' ')) + wc(x) > MAX) groups.push([x]); else g.push(x); }
