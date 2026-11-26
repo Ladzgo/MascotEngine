@@ -117,7 +117,7 @@ export function TopBar({route, chans, epTitle, epChannel, jobs, onPalette}: {rou
         <span className="pal-ph">Search or run a command</span><kbd>{mac ? '⌘' : 'Ctrl'} K</kbd>
       </button>
       <JobsChip jobs={jobs} />
-      <a className="btn primary plus-btn" href={hashFor({page: 'new', ch: route.ch})}>+ {t('New video')}</a>
+      {route.page !== 'today' && route.page !== 'new' && <a className="btn primary plus-btn" href={hashFor({page: 'new', ch: route.ch})}>+ {t('New video')}</a>}
     </header>
   );
 }

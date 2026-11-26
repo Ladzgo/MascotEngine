@@ -15,7 +15,7 @@ try {
   let browser;
   try { browser = await openBrowser('chrome', {browserExecutable: null, chromiumOptions: {}, forceDeviceScaleFactor: undefined, viewport: null, indent: false, logLevel: 'error'} as never); }
   catch (e) { console.log(`SKIP: no headless browser (${(e as Error).message.split('\n')[0]})`); process.exit(0); }
-  const pages = ['today', 'library', 'pipeline', 'ideas', 'clipper', 'analytics', 'channels', 'settings', 'queue', 'calendar'];
+  const pages = ['today', 'new', 'library', 'pipeline', 'ideas', 'clipper', 'analytics', 'channels', 'settings', 'queue', 'calendar'];
   if (eps[0]) pages.push(...['script', 'voice', 'visuals', 'render', 'publish'].map(s => `ep/${eps[0].id}/${s}`));
   const page = await browser.newPage({context: null as never, logLevel: 'error', indent: false, pageIndex: 0, onBrowserLog: null, onLog: () => undefined} as never);
   const errs: string[] = [];
@@ -32,6 +32,6 @@ try {
   }
   await browser.close({silent: true});
 } catch (e) { problems.push((e as Error).message); } finally { stop(); }
-if (problems.length) { console.error(`${problems.length} problem(s)`); process.exit(1); }
+if (problems.length) { console.error(`${problems.length} problem(s):\n${problems.join('\n')}`); process.exit(1); }
 console.log('UI smoke ok');
 void fs;

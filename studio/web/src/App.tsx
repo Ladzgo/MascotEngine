@@ -46,7 +46,7 @@ function Soon({name, hint}: {name: string; hint: string}) {
 }
 
 const PURPOSE: Partial<Record<string, string>> = {
-  pipeline: 'See every idea and episode by stage and what each one needs next.', library: 'Every episode in one place: search, filter, open or archive.', ideas: 'Video ideas for a channel. Pick one and the video is made for you.',
+  pipeline: 'See every idea and episode by stage and what each one needs next.', library: 'Every episode in one place: search, filter, open or archive.',
   channels: 'Each channel has its own voice, topics and look.', settings: 'Voice, script model and keys. Defaults work; change only what you need.', queue: 'Renders run one at a time; the rest wait here.',
   calendar: 'Schedule finished videos and record what went live.', clipper: 'Cut a long video into vertical clips.', analytics: 'What keeps viewers watching, from YouTube Studio exports.',
 };

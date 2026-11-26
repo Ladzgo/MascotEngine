@@ -27,3 +27,5 @@ export const parseBody = <S extends z.ZodType>(v: unknown, schema: S): z.infer<S
   const i = r.error.issues[0];
   throw Object.assign(new Error(`Invalid request: ${i.path.join('.') || 'body'} ${i.message}`), {schemaError: true});
 };
+
+export const StockKeyBody = z.looseObject({key: str});

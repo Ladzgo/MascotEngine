@@ -20,7 +20,8 @@ import react from '@vitejs/plugin-react';
 import {z} from 'zod';
 import {Episode} from '../src/schema.js';
 import {voiceEngines, previewVoice} from '../src/pipeline/voicePreview.js';
-import {VoicePreviewBody, ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
+import {VoicePreviewBody, ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, StockKeyBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
+import {testPixabayKey} from '../src/stock/providers.js';
 import {ensureOllama, llmSetupState, ollamaReachable, pickModel} from '../src/llm/llm.js';
 
 const ROOT = new URL('../', import.meta.url).pathname;
@@ -896,6 +897,16 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       let models: string[] = [];
       if (reachable) try { models = ((await (await fetch(`${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'}/api/tags`)).json()) as any).models.map((x: any) => x.name); } catch { /* ignore */ }
       return json(res, 200, {...llmSetupState(), reachable, models, chosen: pickModel(models, process.env.OLLAMA_MODEL?.trim() || undefined)});
+    }
+    if (p[0] === 'stock') { // licensed b-roll: Pixabay key (saved to .env, never echoed back) and a test call
+      const key = () => readEnv().PIXABAY_API_KEY || process.env.PIXABAY_API_KEY || '';
+      if (p[1] === 'status' && m === 'GET') return json(res, 200, {pixabay: !!key(), keyless: ['openverse', 'wikimedia']});
+      if (p[1] === 'key' && m === 'PUT') {
+        const b = await body(req, StockKeyBody), k = String(b.key ?? '').trim();
+        if (!/^[A-Za-z0-9-]{10,80}$/.test(k)) throw new HttpError(422, 'That does not look like a Pixabay key (letters, digits and dashes).');
+        writeEnv({PIXABAY_API_KEY: k}); return json(res, 200, {ok: true});
+      }
+      if (p[1] === 'test' && m === 'POST') { const k = key(); return json(res, 200, k ? await testPixabayKey(k) : {ok: false, message: 'No key saved yet.'}); }
     }
     if (p[0] === 'settings') {
       if (m === 'GET') { const e = readEnv(); return json(res, 200, {elevenKeySet: !!(e.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY), voiceId: e.ELEVENLABS_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID ?? '', model: e.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2', engine: e.STUDIO_ENGINE ?? 'auto', ffmpeg: await has('ffmpeg'), draftInstalled: draftInstalled(), ideasInstalled: scriptInstalled('ideas'), publishInstalled: scriptInstalled('publish-pack')}); }

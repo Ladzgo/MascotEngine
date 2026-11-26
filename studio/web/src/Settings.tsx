@@ -4,6 +4,7 @@ import {Check, Alert} from './icons';
 import {resetOnboarding} from './Onboarding';
 import {t} from './i18n';
 import {Loading} from './Loading';
+import {StockPanel} from './StockPanel';
 
 export type Check = {key: string; label: string; ok: boolean; fix: string};
 /** What is missing before Generate / Draft can work. Voice checks only apply to the ElevenLabs engine. */
@@ -53,6 +54,7 @@ export function Settings({onSaved}: {onSaved: () => void}) {
       <ReadinessPanel />
       <p className="small"><button type="button" className="btn sm" onClick={() => { resetOnboarding(); location.hash = '#/today'; location.reload(); }}>Run first-run setup again</button> <span className="muted">(only shows while there are no episodes)</span></p>
       <AiPanel />
+      <StockPanel />
       <label className="field"><span>{t('Voice engine')}</span>
         <select value={engine} onChange={e => setEngine(e.target.value)}>
           {voices.map(v => <option key={v.engine} value={v.engine}>{v.label}{v.ok ? '' : ' (not set up)'}</option>)}
