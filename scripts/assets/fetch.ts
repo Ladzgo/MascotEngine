@@ -1,4 +1,4 @@
-// npx tsx scripts/assets/fetch.ts [--only fluent,noto,peeps,bg,pixabay]
+// npx tsx scripts/assets/fetch.ts [--only fluent,noto,peeps,bg,pixabay,sfx]
 // Downloads the free asset library into assets/lib/ (gitignored) and rewrites src/assets/catalog.json (committed).
 // Sources (all free, commercial use allowed): Microsoft Fluent Emoji 3D (MIT), Google Noto animated emoji (Lottie, CC BY 4.0),
 // Open Peeps + Notionists via DiceBear (CC0), procedural SVG backdrops (original), Pixabay background loops (Pixabay licence, key needed).
@@ -13,7 +13,7 @@ import {backdrops} from './backdrops.js';
 
 const ROOT = `${path.resolve(new URL('../../', import.meta.url).pathname)}/`;
 const LIB = `${ROOT}assets/lib/`, SRC = `${ROOT}data/asset-src/`, CAT = `${ROOT}src/assets/catalog.json`;
-const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : ['fluent', 'noto', 'peeps', 'bg', 'pixabay'];
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : ['fluent', 'noto', 'peeps', 'bg', 'pixabay', 'sfx'];
 for (const d of [LIB, SRC]) { fs.mkdirSync(d, {recursive: true}); if (!fs.existsSync(`${d}.gitignore`)) fs.writeFileSync(`${d}.gitignore`, '*\n'); }
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -106,6 +106,34 @@ function shrink(file: string): boolean {
     return true;
   } catch { fs.rmSync(`${file}.tmp.mp4`, {force: true}); return false; }
 }
+// Kenney's CC0 audio packs (mirrored on OpenGameArt; kenney.nl hides the zip behind a form) + two more CC0 OGA sets
+const SFX_PACKS = [
+  {id: 'interface', url: 'https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip', by: 'Kenney'},
+  {id: 'rpg', url: 'https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip', by: 'Kenney'},
+  {id: 'casino', url: 'https://opengameart.org/sites/default/files/kenney_casino-audio.zip', by: 'Kenney'},
+  {id: 'ui', url: 'https://opengameart.org/sites/default/files/UI_SFX_Set.zip', by: 'Kenney'},
+  {id: 'digital', url: 'https://opengameart.org/sites/default/files/Digital_SFX_Set.zip', by: 'Kenney'},
+  {id: 'scifi', url: 'https://opengameart.org/sites/default/files/sci-fi_sounds.zip', by: 'Kenney'},
+];
+// "chipsStack3.ogg" -> chips stack; "footstep_wood_001" -> footstep wood
+const words = (f: string) => path.basename(f).replace(/\.[a-z0-9]+$/i, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_\-\d]+/g, ' ').toLowerCase().trim().split(/\s+/).filter(Boolean);
+async function sfx(): Promise<Asset[]> {
+  const out: Asset[] = [];
+  for (const p of SFX_PACKS) {
+    const zip = `${SRC}sfx/${p.id}.zip`, dir = `${SRC}sfx/${p.id}/`;
+    if (!(await download(p.url, zip))) { console.log(`sfx ${p.id}: download failed`); continue; }
+    if (!fs.existsSync(dir)) { fs.mkdirSync(dir, {recursive: true}); execFileSync('unzip', ['-q', '-o', zip, '-d', dir]); }
+    const files = (fs.readdirSync(dir, {recursive: true}) as string[]).filter(f => /\.(ogg|wav|mp3)$/i.test(f) && !/preview|__MACOSX/i.test(f)).sort();
+    for (const f of files) {
+      const name = slug(words(f).join(' ') + ' ' + path.basename(f).replace(/\D/g, '')), file = `lib/sfx/${p.id}-${name}${path.extname(f).toLowerCase()}`;
+      if (out.some(a => a.file === file)) continue;
+      fs.mkdirSync(`${LIB}sfx`, {recursive: true}); fs.copyFileSync(dir + f, `${ROOT}assets/${file}`);
+      out.push({id: `sfx-${p.id}-${name}`, file, kind: 'sfx', tags: [...words(f), p.id, 'sound', 'sfx'], license: 'CC0-1.0', attribution: `${p.by} (CC0), via OpenGameArt`, source: `sfx-${p.id}`, format: 'audio'});
+    }
+  }
+  return out;
+}
+
 const LOOPS = ['abstract background loop', 'bokeh background', 'gradient background', 'particles background', 'light rays', 'clouds timelapse', 'city night lights', 'ocean waves', 'money falling', 'stock market screen', 'office blur', 'kitchen blur', 'forest sunlight', 'rain window', 'neon lights', 'smoke background', 'snow falling', 'fire embers', 'starry sky', 'technology network'];
 async function pixabayLoops(): Promise<Asset[]> {
   if (!process.env.PIXABAY_API_KEY) { console.log('pixabay: no PIXABAY_API_KEY, skipped'); return []; }
@@ -125,7 +153,7 @@ async function pixabayLoops(): Promise<Asset[]> {
 }
 
 const prev: Asset[] = fs.existsSync(CAT) ? JSON.parse(fs.readFileSync(CAT, 'utf8')) : [];
-const steps: [string, string[], () => Asset[] | Promise<Asset[]>][] = [['fluent', ['fluent'], fluent], ['noto', ['noto'], noto], ['peeps', ['open-peeps', 'notionists', 'lorelei'], peeps], ['bg', ['procedural'], bg], ['pixabay', ['pixabay'], pixabayLoops]];
+const steps: [string, string[], () => Asset[] | Promise<Asset[]>][] = [['fluent', ['fluent'], fluent], ['noto', ['noto'], noto], ['peeps', ['open-peeps', 'notionists', 'lorelei'], peeps], ['bg', ['procedural'], bg], ['pixabay', ['pixabay'], pixabayLoops], ['sfx', SFX_PACKS.map(p => `sfx-${p.id}`), sfx]];
 let all: Asset[] = [];
 for (const [key, sources, fn] of steps) {
   const old = prev.filter(a => sources.includes(a.source));

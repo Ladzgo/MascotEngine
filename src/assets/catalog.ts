@@ -3,15 +3,15 @@
 // No fs here: this module is safe to import from the Remotion browser bundle.
 import data from './catalog.json';
 
-export type AssetKind = 'object' | 'character' | 'animated' | 'background';
+export type AssetKind = 'object' | 'character' | 'animated' | 'background' | 'sfx';
 export type Asset = {
   id: string; file: string; kind: AssetKind; tags: string[];
   /** SPDX-ish: MIT, CC0-1.0, CC-BY-4.0, Pixabay */
   license: string; attribution: string;
   /** library the asset came from (fluent, noto, open-peeps, notionists, procedural, pixabay) */
   source: string;
-  /** image | lottie | video */
-  format: 'image' | 'lottie' | 'video';
+  /** image | lottie | video | audio */
+  format: 'image' | 'lottie' | 'video' | 'audio';
   /** unicode glyph for emoji-based assets */
   glyph?: string;
 };
