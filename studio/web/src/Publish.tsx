@@ -34,7 +34,9 @@ export function Publish({epId, cfg, hasVideo, onStatus}: {epId: string; cfg: Set
   const [pack, setPack] = useState<PublishPack | null>(null), [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false), [err, setErr] = useState<string | null>(null);
   useEffect(() => { setPack(null); setLoaded(false); setErr(null); api.pack(epId).then(r => setPack(r.pack)).catch(e => setErr(e.message)).finally(() => setLoaded(true)); }, [epId]);
-  const make = async () => { setBusy(true); setErr(null); try { setPack((await api.makePack(epId)).pack); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); } };
+  const [t0, setT0] = useState(0), [, tick] = useState(0);
+  useEffect(() => { if (!busy) return; const i = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(i); }, [busy]);
+  const make = async () => { setBusy(true); setT0(Date.now()); setErr(null); try { setPack((await api.makePack(epId)).pack); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); } };
   const [thumbV, setThumbV] = useState(0), [thumbBusy, setThumbBusy] = useState(false), [thumbMissing, setThumbMissing] = useState(false);
   const makeThumb = async (text?: string) => { setThumbBusy(true); setErr(null); try { await api.makeThumb(epId, text); setThumbMissing(false); setThumbV(Date.now()); } catch (e) { setErr((e as Error).message); } finally { setThumbBusy(false); } };
   const block = cfg && !cfg.publishInstalled ? tr('The publish pack command is not installed yet.') : null;
@@ -47,12 +49,13 @@ export function Publish({epId, cfg, hasVideo, onStatus}: {epId: string; cfg: Set
         <button className="btn primary sm" onClick={make} disabled={busy || !!block || !loaded}><Send size={15} />{busy ? tr('Generating…') : pack ? tr('Regenerate pack') : tr('Generate publish pack')}</button>
         {pack && <span className={`pill ${pack.source === 'ai' ? 'ok' : 'bad'}`}>{pack.source === 'ai' ? tr('AI-generated') : tr('Fallback (no AI)')}</span>}
       </div>
+      {busy && <p className="small muted" role="status">{Math.round((Date.now() - t0) / 1000)} s · usually about a minute. You can leave this page.</p>}
       {block && <p className="hint">{block} <a href="#/settings">{tr('Settings')}</a></p>}
       {!hasVideo && !pack && <p className="hint">{tr('Chapters are most accurate after the voice step has run.')}</p>}
       <section className="pk"><div className="pk-h"><h3>{tr('Thumbnail')}</h3><button className="btn sm" disabled={thumbBusy} onClick={() => void makeThumb()}>{thumbBusy ? tr('Rendering…') : tr('Make thumbnail (free)')}</button></div>
         {!thumbMissing && <img key={thumbV} className="thumb-img" alt={tr('Thumbnail preview')} src={`/api/episodes/${epId}/media/thumbnail.png?v=${thumbV}`} onError={() => setThumbMissing(true)} style={{maxWidth: '100%', width: 480, borderRadius: 8, border: '2px solid var(--ink)'}} />}
         {thumbMissing && <p className="muted small">{tr('No thumbnail yet. It uses the first thumbnail text from the pack, or the title.')}</p>}</section>
-      {err && <p className="err-text pre" role="alert"><Alert size={13} /> {err}</p>}
+      {err && <p className="err-text pre" role="alert"><Alert size={13} /> {err} <button type="button" className="btn sm" onClick={() => void make()} disabled={busy}>{tr('Try again')}</button></p>}
       {pack && (
         <>
           <section className="pk"><h3>{tr('Title options')}</h3>

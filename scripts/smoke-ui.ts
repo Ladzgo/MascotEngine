@@ -2,7 +2,7 @@
 // Today -> New video -> Make video -> progress -> Cancel -> Retry -> episode pages, with screenshots in out/smoke-ui/.
 // Fails on console errors, page errors, empty pages or a broken step. Uses playwright-core with the headless Chrome Remotion ships.
 // Usage: npm run smoke:ui   (skips with exit 0 and a notice when no browser is installed)
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -82,6 +82,24 @@ try {
     await page.getByRole('button', {name: /^retry$/i}).click(); await page.waitForURL(/#\/(ep|new)/, {timeout: 10000}); await page.waitForSelector('main'); await shot('path-5-retried');
   });
   const mine = (await (await fetch(`${base}/api/episodes`)).json() as {id: string}[]).find(e => e.id.includes('zz-smoke'));
+  if (mine) {
+    const b = `${root}episodes/${mine.id}/build/`; fs.mkdirSync(b, {recursive: true});
+    const ff = spawnSync('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=c=0x223344:s=360x640:d=1', '-pix_fmt', 'yuv420p', `${b}${mine.id}-preview.mp4`], {stdio: 'ignore'});
+    if (ff.status === 0) {
+      await step('path: player shows the preview video', async () => {
+        await page.goto(`${base}/#/ep/${mine.id}/render`); await page.waitForSelector('main video', {timeout: 10000});
+        const src = await page.locator('main video').first().getAttribute('src');
+        if (!src?.includes('-preview.mp4')) throw new Error(`video src is ${src}`); await shot('path-6-player');
+      });
+      await step('path: Publish pack button is offered next to the finished preview', async () => {
+        await page.goto(`${base}/#/ep/${mine.id}/publish`); await page.getByRole('button', {name: /generate publish pack/i}).waitFor({timeout: 10000}); await shot('path-7-publish-pack');
+      });
+      await step('path: finished run page offers Make final and Publish pack', async () => {
+        await page.goto(`${base}/#/new/${mine.id}`); await page.waitForTimeout(500);
+        const t = await page.locator('main').first().innerText(); if (!/Make final|Making your video|lost track/i.test(t)) throw new Error('run page shows nothing useful');
+      });
+    } else console.log('SKIP player steps: ffmpeg not available');
+  }
   if (mine) for (const s of ['voice', 'render', 'publish']) await step(`path: episode ${s} page`, async () => {
     await page.goto(`${base}/#/ep/${mine.id}/${s}`); await page.waitForSelector('main', {timeout: 10000}); await page.waitForTimeout(1000);
     if (!(await page.locator('main').first().innerText()).trim()) throw new Error('empty main'); await shot(`path-6-${s}`);

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import type {JobState, Stage, Summary} from './api';
 import {Alert, Check, Film, Mic, Phone, Reel, Wand, X} from './icons';
 
@@ -11,7 +11,13 @@ const STAGES: {id: Stage; label: string; Icon: (p: {size?: number}) => React.Rea
 ];
 
 export function StageTrack({summary, job, onCancel, onRetry}: {summary: Summary; job: JobState | null; onCancel: () => void; onRetry: (from: Stage) => void}) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false), [now, setNow] = useState(Date.now()), t0 = useRef({key: '', at: Date.now()});
+  const key = `${job?.id}:${job?.current}`;
+  if (t0.current.key !== key) t0.current = {key, at: Date.now()};
+  useEffect(() => { if (job?.status !== 'running') return; const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, [job?.status]);
+  const el = (now - t0.current.at) / 1000, p0 = job?.progress ?? 0;
+  const fmt = (x: number) => x < 90 ? `${Math.max(5, Math.round(x / 5) * 5)} s` : `${Math.round(x / 60)} min`;
+  const eta = p0 > 0.05 && p0 < 1 ? ` · about ${fmt(el * (1 - p0) / p0)} left` : '';
   const running = job?.status === 'running';
   const failed = job?.status === 'error';
   const doneNow = (s: Stage) => (job && job.episode === summary.id && job.done.includes(s)) || (!running && !!summary.stages[s]);
@@ -35,10 +41,10 @@ export function StageTrack({summary, job, onCancel, onRetry}: {summary: Summary;
         })}
       </ol>
       <div className="msg" role="status" aria-live="polite">
-        {failed ? <span className="err-text">{job?.error}</span> : running ? <span>Working on {job?.current}… {job?.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? ''}</span> : job?.status === 'done' ? <span>Finished. Everything is up to date.</span> : job?.status === 'cancelled' ? <span>Cancelled.</span> : <span className="muted">Idle.</span>}
+        {failed ? <span className="err-text">{job?.error}</span> : running ? <span>Working on {job?.current}… {fmt(el)} so far{eta}. {job?.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? ''}</span> : job?.status === 'done' ? <span>Finished. Everything is up to date.</span> : job?.status === 'cancelled' ? <span>Cancelled.</span> : <span className="muted">Idle.</span>}
       </div>
       <div className="track-actions">
-        {failed && job?.current && <button className="btn sm" onClick={() => onRetry(job.current!)}>Retry {job.current}</button>}
+        {failed && job?.current && <button className="btn sm" onClick={() => onRetry(job.current!)}>Try again: {job.current}</button>}
         {running && <button className="btn ghost sm" onClick={onCancel}><X size={15} />Stop</button>}
         {job && <button className="btn ghost sm" onClick={() => setOpen(o => !o)} aria-expanded={open}>{open ? 'Hide log' : 'Log'}</button>}
       </div>
