@@ -13,11 +13,11 @@ const JOBS_TMP = `${os.tmpdir()}/studio-test-jobs-${process.pid}.json`;
 const J = {'Content-Type': 'application/json'};
 
 before(async () => {
-  child = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(PORT), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: JOBS_TMP}, stdio: 'ignore'});
+  child = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(PORT), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: JOBS_TMP, STUDIO_DRAFTS_FILE: JOBS_TMP + '.drafts', STUDIO_PID_FILE: JOBS_TMP + '.pids'}, stdio: 'ignore'});
   for (let i = 0; i < 100; i++) { try { if ((await fetch(`${BASE}/api/readiness`)).ok) return; } catch { /* not up yet */ } await new Promise(r => setTimeout(r, 300)); }
   throw new Error('server did not start');
 });
-after(() => { child?.kill(); fs.rmSync(JOBS_TMP, {force: true}); fs.rmSync(`${ROOT}data/uploads/zz-test.mp4`, {force: true}); });
+after(() => { child?.kill(); fs.rmSync(JOBS_TMP, {force: true}); fs.rmSync(JOBS_TMP + '.drafts', {force: true}); fs.rmSync(`${ROOT}data/uploads/zz-test.mp4`, {force: true}); });
 
 test('guard: bad host, foreign origin and non-JSON mutations are rejected', async () => {
   assert.equal((await fetch(`${BASE}/api/queue`)).status, 200);
@@ -176,4 +176,16 @@ test('llm providers: status never echoes keys, bad provider and missing key are 
   assert.equal((await put({provider: 'nope', key: 'x'})).status, 422);
   const t = await (await fetch(`${BASE}/api/llm/test`, {method: 'POST', headers: J, body: JSON.stringify({provider: 'bogus'})})).json() as {ok: boolean; message: string};
   assert.equal(t.ok, false); assert.match(t.message, /Unknown provider/);
+});
+
+test('make: Cancel stops a running draft, Retry starts it again with the same settings', async () => {
+  const topic = `zz-cancel-${process.pid}`, post = (u: string, b: object = {}) => fetch(`${BASE}${u}`, {method: 'POST', headers: J, body: JSON.stringify(b)});
+  const poll = async (id: string) => { let st: {state: string; error?: string; retry?: {topic: string}} = {state: 'running'}; for (let i = 0; i < 60 && st.state === 'running'; i++) { await new Promise(r => setTimeout(r, 100)); st = await (await fetch(`${BASE}/api/drafts/${id}`)).json() as typeof st; } return st; };
+  try {
+    const {id} = await (await post('/api/make', {topic})).json() as {id: string};
+    assert.equal(((await (await post(`/api/drafts/${id}/cancel`)).json()) as {ok: boolean}).ok, true);
+    const c = await poll(id); assert.equal(c.state, 'error'); assert.match(c.error ?? '', /Cancelled/);
+    assert.equal((await post(`/api/drafts/${id}/retry`)).status, 202);
+    assert.equal((await post('/api/drafts/nope/retry')).status, 404);
+  } finally { await new Promise(r => setTimeout(r, 800)); for (const d of fs.readdirSync(`${ROOT}episodes`)) if (d.includes('zz-cancel')) fs.rmSync(`${ROOT}episodes/${d}`, {recursive: true, force: true}); }
 });

@@ -247,10 +247,10 @@ function reapOrphans(): number {
   fs.rmSync(PID_FILE, {force: true}); return n;
 }
 function shutdown() { for (const pid of kids) killGroup(pid); for (const j of jobs.values()) j.child?.kill(); fs.rmSync(PID_FILE, {force: true}); process.exit(0); }
-function runNpm(args: string[], onLine?: (l: string) => void, env: Record<string, string> = {}) {
+function runNpm(args: string[], onLine?: (l: string) => void, env: Record<string, string> = {}, onPid?: (pid: number) => void) {
   return new Promise<{code: number | null; out: string[]}>(ok => {
     const child = spawn('npm', ['run', ...args], {cwd: ROOT, env: {...process.env, ...env}, detached: true});
-    if (child.pid) { kids.add(child.pid); savePids(); child.on('close', () => { kids.delete(child.pid!); savePids(); }); }
+    if (child.pid) { onPid?.(child.pid); kids.add(child.pid); savePids(); child.on('close', () => { kids.delete(child.pid!); savePids(); }); }
     const out: string[] = [];
     const onData = (b: Buffer) => { const ls = b.toString().split('\n').filter(l => l.trim()); out.push(...ls); ls.forEach(l => onLine?.(l)); };
     child.stdout.on('data', onData); child.stderr.on('data', onData);
@@ -260,7 +260,7 @@ function runNpm(args: string[], onLine?: (l: string) => void, env: Record<string
 }
 /** Section progress of the running draft (DRAFT_PROGRESS lines from the CLI), polled by the Studio. */
 let draftProgress: {done: number; total: number; label: string} | null = null;
-const runDraft = (topic: string, id: string, angle: string, channel: string, short = false, model = '', device = '', onProgress?: (p: {done: number; total: number; label: string}) => void) => {
+const runDraft = (topic: string, id: string, angle: string, channel: string, short = false, model = '', device = '', onProgress?: (p: {done: number; total: number; label: string}) => void, onPid?: (pid: number) => void) => {
   draftProgress = {done: 0, total: 0, label: 'Planning the outline'};
   if (process.env.STUDIO_TEST_FAKE_JOBS) return (async () => { // tests: no LLM, instant episode (topic "fail" errors)
     for (let k = 1; k <= 2; k++) { onProgress?.({done: k, total: 2, label: `part ${k}`}); await new Promise(r => setTimeout(r, 150)); }
@@ -272,33 +272,49 @@ const runDraft = (topic: string, id: string, angle: string, channel: string, sho
   return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : []), ...(short ? ['--short'] : []), ...(device && /^[a-z_]+$/.test(device) ? ['--device', device] : [])], l => {
     const m = /^DRAFT_PROGRESS (\d+)\/(\d+) (.*)$/.exec(l);
     if (m) { draftProgress = {done: +m[1], total: +m[2], label: m[3]}; onProgress?.(draftProgress); }
-  }, model ? {OLLAMA_MODEL: model, DRAFT_MODEL: model} : {}).finally(() => { draftProgress = null; });
+  }, model ? {OLLAMA_MODEL: model, DRAFT_MODEL: model} : {}, onPid).finally(() => { draftProgress = null; });
 };
 /** Background drafts: the HTTP call returns at once, the browser polls GET /api/drafts/:id (progress, errors, and the render run that follows a "make"). */
-type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; warning?: string; jobId?: string; startedAt: number; topic: string};
+type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; warning?: string; jobId?: string; startedAt: number; topic: string; retry?: DraftOpts};
+type DraftOpts = {device?: string; topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}};
 const drafts = new Map<string, DraftJob>();
-function startDraft(o: {device?: string; topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}}) {
+const draftPid = new Map<string, number>(), draftCancelled = new Set<string>();
+const DRAFTS_FILE = process.env.STUDIO_DRAFTS_FILE ?? `${ROOT}data/drafts.json`;
+const persistDrafts = () => { try { fs.mkdirSync(path.dirname(DRAFTS_FILE), {recursive: true}); fs.writeFileSync(DRAFTS_FILE, JSON.stringify([...drafts.values()].slice(-30))); } catch { /* best effort */ } };
+/** After a restart a draft that was running is gone (its process is reaped): show it as interrupted with a working Retry. */
+function loadDrafts() {
+  for (const j of readJson<DraftJob[]>(DRAFTS_FILE) ?? []) {
+    if (j.state === 'running') { j.state = 'error'; j.error = 'Interrupted: the Studio restarted while this script was being written. Press Retry.'; }
+    drafts.set(j.id, j);
+  }
+}
+function cancelDraft(id: string): boolean {
+  const j = drafts.get(id); if (!j || j.state !== 'running') return false;
+  draftCancelled.add(id); const pid = draftPid.get(id); if (pid) killGroup(pid); return true;
+}
+function startDraft(o: DraftOpts) {
   needAi('draft');
   const id = nextId(o.topic);
   if (!ID_RE.test(id)) throw new HttpError(400, 'Invalid episode id.');
   if (fs.existsSync(epDir(id)) || drafts.get(id)?.state === 'running') throw new HttpError(409, `Episode ${id} already exists.`);
   const release = lockAi();
-  const job: DraftJob = {id, state: 'running', progress: {done: 0, total: 0, label: 'Planning the outline'}, startedAt: Date.now(), topic: o.topic};
+  const job: DraftJob = {id, state: 'running', progress: {done: 0, total: 0, label: 'Planning the outline'}, startedAt: Date.now(), topic: o.topic, retry: o};
   const gb = os.totalmem() / 2 ** 30, big = Number(/(\d+)b\b/i.exec(o.model || process.env.OLLAMA_MODEL || 'qwen2.5:14b')?.[1] ?? 0), local = (process.env.LLM_PROVIDER || 'ollama') === 'ollama';
   if (local && big >= 12 && gb <= 18) job.warning = `This Mac has ${Math.round(gb)} GB of memory and a ${big}B model needs about 10 GB: the draft will be slow and the browser may stall. A 7B model or a cloud provider (Settings) is lighter.`;
-  drafts.set(id, job);
+  drafts.set(id, job); persistDrafts();
   void (async () => {
     try {
-      const {code, out} = await runDraft(o.topic, id, o.angle, o.channel, o.short, o.model, o.device, p => { job.progress = p; });
+      const {code, out} = await runDraft(o.topic, id, o.angle, o.channel, o.short, o.model, o.device, p => { job.progress = p; }, pid => draftPid.set(id, pid));
+      if (draftCancelled.has(id)) throw new Error('Cancelled. Nothing was kept.');
       const finished = !!readJson(`${EPISODES}${id}/episode.json`);
       // EEXIST = another (leftover) draft already wrote a complete script for this id: keep it instead of failing
       const ok = finished && (code === 0 && out.some(l => l.startsWith('DRAFT_OK')) || out.some(l => /EEXIST/.test(l)));
       if (!ok) throw new Error(cliMessage(out, code));
       if (o.ideaId) { const f = readIdeas(o.channel), idea = f.ideas.find(i => i.id === o.ideaId); if (idea) { idea.status = 'drafted'; idea.episodeId = id; writeIdeas(o.channel, f); } }
       if (o.make) job.jobId = enqueue(id, {stages: o.make.stages, engine: o.make.engine}).jobId;
-      job.state = 'done';
+      job.state = 'done'; persistDrafts();
     } catch (e) { job.state = 'error'; job.error = (e as Error).message || 'The draft failed.'; }
-    finally { release(); }
+    finally { release(); draftPid.delete(id); draftCancelled.delete(id); persistDrafts(); }
   })();
   return job;
 }
@@ -887,6 +903,12 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return void res.end(toCsv(await scheduleRows(ROOT)));
     }
     if (p[0] === 'analytics' && m === 'GET') return json(res, 200, summarize(ROOT));
+    if (p[0] === 'drafts' && p[1] && p[2] === 'cancel' && m === 'POST') return json(res, 200, {ok: cancelDraft(p[1])});
+    if (p[0] === 'drafts' && p[1] && p[2] === 'retry' && m === 'POST') {
+      const old = drafts.get(p[1]); if (!old?.retry) throw new HttpError(404, 'Nothing to retry for this run. Start a new video instead.');
+      if (old.state === 'running') throw new HttpError(409, 'This run is still going.');
+      return json(res, 202, {id: startDraft(old.retry).id, draft: true});
+    }
     if (p[0] === 'drafts' && p[1] && m === 'GET') { const j = drafts.get(p[1]); if (!j) return json(res, 404, {error: 'No draft is running for this episode (the Studio may have been restarted).'}); return json(res, 200, j); }
     if (p[0] === 'draft-progress' && m === 'GET') return json(res, 200, draftProgress ?? {done: 0, total: 0, label: ''});
     if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
@@ -991,5 +1013,5 @@ process.on('unhandledRejection', e => logLine(ROOT, 'unhandled', String(e instan
 if (!process.env.STUDIO_TEST) { const n = reapOrphans(); if (n) logLine(ROOT, 'orphans', `stopped ${n} leftover draft process(es) from the previous run`); }
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(sig, shutdown);
 ensureDefaultChannel();
-loadJobs(); pump();
+loadJobs(); loadDrafts(); pump();
 server.listen(PORT, '127.0.0.1', () => { console.log(`Mascot Engine Studio: http://localhost:${PORT}`); if (!process.env.STUDIO_TEST) void ensureOllama().catch(e => console.log(`Local AI: ${(e as Error).message}`)); });
