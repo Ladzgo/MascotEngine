@@ -55,7 +55,7 @@ test('video without a keyed provider falls back to a photo; nothing found = null
 test('rank: right orientation and no faces/logos first, tiny images dropped', () => {
   const h = (id: string, w: number, hh: number, title: string): StockHit => ({id, provider: 'pexels', kind: 'photo', url: `https://x/${id}.jpg`, width: w, height: hh, pageUrl: 'p', author: 'a', license: 'l', title});
   const r = rank([h('face', 1080, 1920, 'portrait of a woman'), h('wide', 2400, 1600, 'coins'), h('tiny', 300, 400, 'coins'), h('ok', 1080, 1920, 'coins on table')], {query: 'coins', kind: 'photo', orientation: 'portrait'}, 'short');
-  assert.deepEqual(r.map(x => x.id), ['ok', 'wide', 'face']);
+  assert.deepEqual(r.map(x => x.id), ['ok', 'wide']); // the face photo shares no word with the query, so it is dropped while relevant hits exist
 });
 
 test('stockForEpisode writes stock.json with credit lines, skips beats without stock', async () => {

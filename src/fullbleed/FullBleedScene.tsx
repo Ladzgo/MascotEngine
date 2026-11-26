@@ -6,11 +6,14 @@ import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
 import {GradDefs, IsoBox, Txt, pop, seg} from './kit';
 import {OBJECTS} from './objects';
 import {planShots} from './shots';
+import {actionCopies, ActionOverlay} from './actions';
+import {planEpisode, type ScenePlan} from './episodePlan';
+import {pickKeyword} from '../scenes/keyword';
 
 type Word = {w: string; start: number; end: number};
-export type FBProps = {scene: Scene; dec: SceneDecision; frame: number; fps: number; accent: string; w: number; h: number; words: Word[]; index: number; episodeTitle: string; prevKind?: string; preroll?: number};
+export type FBProps = {scene: Scene; dec: SceneDecision; frame: number; fps: number; accent: string; w: number; h: number; words: Word[]; index: number; episodeTitle: string; prevKind?: string; preroll?: number; plan?: ScenePlan};
 
-type Env = 'city' | 'room' | 'vault' | 'abstract';
+type Env = 'city' | 'room' | 'vault' | 'abstract' | 'sky' | 'office' | 'street' | 'kitchen';
 const ENV_OF: Record<string, Env> = {
   skyline: 'city', car: 'city', house: 'city', bank: 'city', people: 'city', pin: 'city', handshake: 'city', gradcap: 'city',
   card: 'room', card_swipe: 'room', phone: 'room', wallet: 'room', receipts: 'room', pricetag: 'room', price_up: 'room', cart: 'room', doc: 'room', debt_counter: 'room', magnifier: 'room', bulb: 'room', calendar: 'room',
@@ -21,6 +24,10 @@ const PALETTES_BY_ENV: Record<Env, [string, string, string, string][]> = {
   city: [['#1d2b5e', '#6a4c93', '#241a3d', '#ffd9a0'], ['#0f4c5c', '#e36414', '#0b3540', '#ffe0b0'], ['#3a1c71', '#d76d77', '#2a1346', '#ffc9d6'], ['#12263f', '#3d7ea6', '#0c1b2e', '#cfe9ff']],
   room: [['#4a3b6b', '#9a6fb0', '#2f2243', '#ffe9c0'], ['#1f4e5f', '#5fa8a0', '#143540', '#e6fff7'], ['#6b2f3a', '#d9825b', '#3d1a22', '#ffd8bd'], ['#2b3a67', '#7d8fd0', '#1b2548', '#e3e9ff']],
   vault: [['#0e3b43', '#2a9d8f', '#0b2a30', '#bfffee'], ['#2a1f12', '#8a6a2a', '#17110a', '#ffe9a8'], ['#1a2a1f', '#4f8f5b', '#0f1a13', '#d6ffdd'], ['#2c1b3d', '#7a4aa0', '#1a1025', '#e8d0ff']],
+  sky: [['#2f7de1', '#bfe3ff', '#2e7d4a', '#ffffff'], ['#f08a4b', '#ffd9a8', '#3a7a3a', '#fff3d6'], ['#6a5acd', '#f4b6d2', '#2d6a4f', '#ffe6f2'], ['#1b6ca8', '#9fe0e8', '#1f6f5a', '#e6ffff']],
+  office: [['#3b4a6b', '#8fa3c7', '#4a3a2a', '#ffffff'], ['#5a3b4a', '#c79a8f', '#4a3326', '#fff0e6'], ['#2d5a5a', '#8fc7c0', '#3d3a2a', '#e8fffb'], ['#4a4a6b', '#a3a3d0', '#41352b', '#f0f0ff']],
+  street: [['#232a4a', '#c0654a', '#2a2a33', '#ffd9a0'], ['#13384a', '#4fa3b8', '#262a30', '#d6f3ff'], ['#3a1f4a', '#c85a8a', '#27222e', '#ffd0e6'], ['#2a3a1f', '#a3b84f', '#2a2d22', '#f3ffd0']],
+  kitchen: [['#e9d9b8', '#f5ecd6', '#8a6a44', '#ffffff'], ['#cfe3d9', '#e8f3ee', '#7a5a3a', '#ffffff'], ['#f0c9c0', '#f8e3de', '#8a5a44', '#fff6f2'], ['#c9d9ef', '#e3ecf8', '#7a6a4a', '#ffffff']],
   abstract: [['#1f2b6b', '#5c7cfa', '#141b45', '#dbe4ff'], ['#3b1c5a', '#c2559b', '#26103b', '#ffd6ee'], ['#0e4a3c', '#37b38a', '#09302a', '#d3ffee'], ['#4a2a12', '#e8913a', '#2f1a0b', '#fff0d6']],
 };
 const envFor = (kind: string): Env => ENV_OF[kind] ?? 'abstract';
@@ -43,7 +50,15 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
       <svg width={w} height={h} style={{position: 'absolute', inset: 0}}>
         <ellipse cx={w / 2 - cx * 0.3} cy={hz - h * 0.12} rx={w * 0.6} ry={h * 0.22} fill="url(#fb-glow)" opacity={0.35} />
         {Array.from({length: 18}, (_, i) => { const r = 6 + rnd(i) * 22, x = ((rnd(i + 40) * w * 1.4 - cx * 0.15 - t * (5 + r * 0.5)) % (w * 1.4) + w * 1.4) % (w * 1.4) - w * 0.2; return <circle key={i} cx={x} cy={rnd(i + 80) * hz * 0.9} r={r} fill="#fff" opacity={0.04 + rnd(i + 5) * 0.1} />; })}
-        {env === 'city' && <>{bld(1, 12, 0.2, h * 0.08, h * 0.26, '#000', 0.22, false)}{bld(2, 8, 0.5, h * 0.1, h * 0.36, pal[2], 0.55, true)}{bld(3, 4, 0.9, h * 0.18, h * 0.5, '#000', 0.4, true)}</>}
+        {(env === 'city' || env === 'street') && <>{bld(1, 12, 0.2, h * 0.08, h * 0.26, '#000', 0.22, false)}{bld(2, 8, 0.5, h * 0.1, h * 0.36, pal[2], 0.55, true)}{bld(3, env === 'street' ? 3 : 4, 0.9, h * 0.18, h * (env === 'street' ? 0.62 : 0.5), '#000', 0.4, true)}</>}
+        {env === 'sky' && <>{Array.from({length: 7}, (_, i) => { const x = ((rnd(i + 300) * w * 1.5 - cx * (0.2 + (i % 3) * 0.2) - t * (8 + i * 3)) % (w * 1.5) + w * 1.5) % (w * 1.5) - w * 0.25, y = hz * (0.1 + rnd(i + 310) * 0.6), r = w * (0.08 + rnd(i + 320) * 0.1); return <g key={i} opacity={0.75}><ellipse cx={x} cy={y} rx={r * 1.6} ry={r * 0.5} fill="#fff" /><ellipse cx={x - r * 0.6} cy={y - r * 0.25} rx={r * 0.8} ry={r * 0.5} fill="#fff" /><ellipse cx={x + r * 0.5} cy={y - r * 0.2} rx={r * 0.7} ry={r * 0.45} fill="#fff" /></g>; })}
+          <polygon points={`-50,${hz} ${w * 0.2 - cx * 0.4},${hz - h * 0.12} ${w * 0.5 - cx * 0.4},${hz - h * 0.04} ${w * 0.8 - cx * 0.4},${hz - h * 0.14} ${w + 50},${hz}`} fill="#2e7d4a" opacity={0.5} /></>}
+        {env === 'office' && <>
+          <rect x={w * 0.08 - cx * 0.3} y={h * 0.08} width={w * 0.5} height={h * 0.26} rx={10} fill="#fff" opacity={0.85} /><path d={`M${w * 0.12 - cx * 0.3} ${h * 0.14} q60 -30 120 0 t120 0 M${w * 0.12 - cx * 0.3} ${h * 0.2} h${w * 0.38} M${w * 0.12 - cx * 0.3} ${h * 0.26} h${w * 0.25}`} stroke={pal[1]} strokeWidth={8} fill="none" opacity={0.7} />
+          <rect x={w * 0.66 - cx * 0.3} y={h * 0.1} width={w * 0.26} height={h * 0.3} rx={10} fill={pal[3]} opacity={0.35} />
+          {Array.from({length: 4}, (_, i) => <rect key={i} x={w * (0.05 + i * 0.26) - cx * 0.6} y={hz - h * 0.14} width={w * 0.12} height={h * 0.14} rx={14} fill="#000" opacity={0.28} />)}</>}
+        {env === 'kitchen' && <>{Array.from({length: 14}, (_, i) => <line key={`a${i}`} x1={i * w / 12 - cx * 0.2} y1={0} x2={i * w / 12 - cx * 0.2} y2={hz} stroke="#000" strokeOpacity={0.1} strokeWidth={3} />)}{Array.from({length: 8}, (_, i) => <line key={`b${i}`} x1={0} y1={i * hz / 7} x2={w} y2={i * hz / 7} stroke="#000" strokeOpacity={0.1} strokeWidth={3} />)}
+          {[0.2, 0.5, 0.8].map((fx, i) => <g key={i}><line x1={w * fx - cx * 0.4} y1={0} x2={w * fx - cx * 0.4} y2={h * 0.12} stroke="#555" strokeWidth={5} /><circle cx={w * fx - cx * 0.4} cy={h * 0.17} r={w * 0.06} fill="#333" opacity={0.7} /></g>)}</>}
         {env === 'room' && <>
           <rect x={0} y={0} width={w} height={hz} fill="#000" opacity={0.12} />
           {[0.12, 0.62].map((fx, i) => <g key={i} transform={`translate(${w * fx - cx * 0.3} ${h * 0.1})`}><rect width={w * 0.26} height={h * 0.3} rx={14} fill={pal[3]} opacity={0.5} /><path d={`M${w * 0.13} 0V${h * 0.3}M0 ${h * 0.15}H${w * 0.26}`} stroke={pal[2]} strokeWidth={10} /><polygon points={`0,${h * 0.3} ${w * 0.26},${h * 0.3} ${w * 0.4},${hz - h * 0.1} ${w * 0.1},${hz - h * 0.1}`} fill={pal[3]} opacity={0.1} /></g>)}
@@ -56,9 +71,9 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
         {env === 'abstract' && <>{Array.from({length: 7}, (_, i) => <circle key={i} cx={rnd(i + 90) * w - cx * 0.3} cy={hz * (0.15 + rnd(i + 99) * 0.6)} r={h * (0.05 + rnd(i) * 0.12)} fill="#fff" opacity={0.05 + rnd(i + 7) * 0.05} />)}{Array.from({length: 12}, (_, i) => <line key={i} x1={i * w / 11 - cx * 0.4} y1={0} x2={i * w / 11 - cx * 0.4 - 80} y2={hz} stroke="#fff" strokeOpacity={0.05} strokeWidth={3} />)}</>}
         <rect x={0} y={hz} width={w} height={h - hz} fill={env === 'room' ? '#5a3a24' : pal[2]} opacity={env === 'room' ? 0.9 : 0.92} />
         <rect x={0} y={hz} width={w} height={h * 0.012} fill={pal[3]} opacity={0.25} />
-        {env === 'room' ? Array.from({length: 9}, (_, i) => { const y = hz + (h - hz) * Math.pow(i / 9, 1.6); return <line key={i} x1={0} y1={y} x2={w} y2={y} stroke="#000" strokeOpacity={0.22} strokeWidth={3} />; })
+        {env === 'room' || env === 'office' || env === 'kitchen' ? Array.from({length: 9}, (_, i) => { const y = hz + (h - hz) * Math.pow(i / 9, 1.6); return <line key={i} x1={0} y1={y} x2={w} y2={y} stroke="#000" strokeOpacity={0.22} strokeWidth={3} />; })
           : Array.from({length: 11}, (_, i) => <line key={i} x1={w / 2 + (i - 5) * w * 0.04} y1={hz} x2={w / 2 + (i - 5) * w * 0.5 - cx * 1.2} y2={h} stroke="#fff" strokeOpacity={0.09} strokeWidth={3} />)}
-        {env === 'city' && Array.from({length: 4}, (_, i) => { const u = ((t * 0.4 + i / 4) % 1); return <rect key={i} x={w / 2 - 14 * (0.3 + u) - cx * 0.4} y={hz + (h - hz) * u * u} width={28 * (0.3 + u * 2)} height={6 + u * 18} fill="#fff" opacity={0.25} />; })}
+        {(env === 'city' || env === 'street') && Array.from({length: 4}, (_, i) => { const u = ((t * 0.4 + i / 4) % 1); return <rect key={i} x={w / 2 - 14 * (0.3 + u) - cx * 0.4} y={hz + (h - hz) * u * u} width={28 * (0.3 + u * 2)} height={6 + u * 18} fill="#fff" opacity={0.25} />; })}
         <rect x={0} y={hz} width={w} height={h - hz} fill="url(#fb-groundfade)" />
       </svg>
       <svg width={w} height={h} style={{position: 'absolute', inset: 0, filter: `blur(${tall ? 14 : 10}px)`, opacity: 0.5, pointerEvents: 'none'}}>
@@ -176,26 +191,28 @@ const ChartBars: React.FC<{labels: string[]; values: number[]; t: number}> = ({l
   );
 };
 
-export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0}) => {
+export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0, plan: planIn}) => {
   const f = frame + preroll, t = f / fps, dur = Math.max(1, dec.durSec), p = clamp(t / dur);
   const tall = h > w;
-  const shots = planShots(scene as any, words, dur, {seed: index, skip: prevKind});
+  const plan = planIn ?? planEpisode([scene], [words], [dur])[0];
+  const shots = plan.shots;
   const active = Math.max(0, shots.reduce((a, s, i) => (t >= s.at ? i : a), 0));
   const kindAt = (tt: number) => shots[Math.max(0, shots.reduce((a, s, i) => (tt >= s.at ? i : a), 0))].kind;
-  const env = envFor(shots[0].kind), pal = PALETTES_BY_ENV[env][index % 4];
+  const env = plan.env as Env, pal = PALETTES_BY_ENV[env][plan.pal % 4];
+  void prevKind;
 
-  // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage
-  const mv = (index + (scene.type === 'big_number' ? 1 : 0)) % 4;
-  const push = 1.02 + 0.2 * p, panX = mv === 1 ? (p - 0.5) * -0.12 * w : mv === 2 ? (p - 0.5) * 0.12 * w : Math.sin(t * 0.7) * 0.012 * w;
+  // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage. Close scenes sit tighter than wide ones.
+  const mv = plan.camera, close = plan.zoom === 'close' ? 0.12 : 0;
+  const push = 1.02 + close + 0.2 * p, panX = mv === 1 ? (p - 0.5) * -0.12 * w : mv === 2 ? (p - 0.5) * 0.12 * w : Math.sin(t * 0.7) * 0.012 * w;
   const rot = mv === 3 ? (p - 0.5) * 3.6 : Math.sin(t * 0.5) * 0.5, tiltY = mv === 0 ? (0.5 - p) * 0.03 * h : Math.cos(t * 0.6) * 0.008 * h;
-  const sc = mv === 3 ? 1.08 + 0.1 * p : push;
+  const sc = mv === 3 ? 1.08 + close + 0.1 * p : push;
   const stage = `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})`;
 
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // hero stands on the ground plane (y = 68% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.3 : h * 1.05;
-  const scale = hasCallouts ? (tall ? 0.6 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : 1;
+  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' ? 0.5 : lay === 'broll' ? 0.85 : 1;
   const hs = base * scale, groundY = tall ? h * 0.62 : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
@@ -212,19 +229,39 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           if (local < 0 || out >= 1 || !Obj) return null;
           const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * hs * 0.008, over = 0.8 + 0.2 * pop(local, 0, 0.5);
           const isChart = scene.type === 'chart' && i === 0;
-          return (
-            <React.Fragment key={i}>
-              <svg viewBox="0 0 400 400" width={hs} height={hs} style={{position: 'absolute', left: hx - hs / 2, top: cy - hs / 2 + bob, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5), transform: `scale(${over * (1 + 0.12 * easeInOut(out))}) rotate(${Math.sin(t * 0.9 + i) * 1.2}deg) translateX(${out * -w * 0.06}px)`, filter: 'drop-shadow(0 18px 24px rgba(0,0,0,0.35))'}}>
-                {isChart && scene.type === 'chart' ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={local} /> : <Obj t={local} accent={accent} value={scene.type === 'big_number' && i === 0 ? scene.value : undefined} />}
-              </svg>
-              <svg viewBox="0 0 400 400" width={hs} height={hs} style={{position: 'absolute', left: hx - hs / 2, top: cy - hs / 2 + bob + 0.65 * hs, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5) * 0.22, transform: `scaleY(-1) scale(${over})`, WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', maskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', filter: 'blur(2px)', pointerEvents: 'none'}}>
-                {isChart && scene.type === 'chart' ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={local} /> : <Obj t={local} accent={accent} value={scene.type === 'big_number' && i === 0 ? scene.value : undefined} />}
-              </svg>
-              <div style={{position: 'absolute', inset: 0, opacity: 1 - out}}><Particles t={local} w={w} h={h} cx={hx} cy={cy} money={MONEY.has(s.kind)} accent={accent} seed={index * 7 + i} /></div>
-            </React.Fragment>
-          );
+          // layout slots: x centre, hero-size factor, feet line, optional other subject, entry delay
+          type Slot = {x: number; s: number; feet: number; kind: string; delay: number; main: boolean};
+          const feet = groundY, Cmp = plan.companion ?? s.kind;
+          const slots: Slot[] = lay === 'split' && !hasCallouts && !versus ? [{x: w * 0.27, s: 0.44, feet, kind: s.kind, delay: 0, main: true}, {x: w * 0.73, s: 0.44, feet, kind: Cmp, delay: 0.25, main: false}]
+            : lay === 'grid' && !hasCallouts && !versus ? Array.from({length: 6}, (_, k) => ({x: w * (0.19 + (k % 3) * 0.31), s: 0.28, feet: feet - Math.floor(k / 3) * hs * 0.3 * 0.62 - (k % 3 === 1 ? 14 : 0), kind: s.kind, delay: k * 0.12, main: k === 1}))
+            : lay === 'pip' ? [{x: w * 0.74, s: 1, feet: tall ? h * 0.58 : h * 0.74, kind: s.kind, delay: 0, main: true}]
+            : [{x: hx, s: 1, feet, kind: s.kind, delay: 0, main: true}];
+          return slots.map((sl, si) => {
+            const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
+            if (lt < 0) return null;
+            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), sx0 = sl.x, sy0 = sl.feet - 0.325 * size;
+            const ac = actionCopies(sl.main ? s.action : 'pop_in', lt);
+            return (
+              <React.Fragment key={`${i}-${si}`}>
+                {ac.copies.map((cp, ci) => {
+                  const st: React.CSSProperties = {position: 'absolute', left: sx0 - size / 2 + cp.tx * size, top: sy0 - size / 2 + bob + cp.ty * size, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(Math.min(inE, easeOut(lt / 0.3)) * 1.5) * cp.op, transform: `scale(${over * (1 + 0.12 * easeInOut(out)) * cp.sc * (cp.sx ?? 1)}, ${over * (1 + 0.12 * easeInOut(out)) * cp.sc * (cp.scY ?? 1)}) rotate(${cp.rot + Math.sin(t * 0.9 + i) * 1.2}deg) translateX(${out * -w * 0.06}px)`, filter: 'drop-shadow(0 18px 24px rgba(0,0,0,0.35))', clipPath: cp.clip === 'left' ? 'inset(0 50% 0 0)' : cp.clip === 'right' ? 'inset(0 0 0 50%)' : undefined};
+                  return (
+                    <svg key={ci} viewBox="0 0 400 400" width={size} height={size} style={st}>
+                      {isChart && scene.type === 'chart' && sl.main ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={lt} /> : <O t={lt} accent={accent} value={scene.type === 'big_number' && i === 0 && sl.main ? scene.value : undefined} />}
+                    </svg>
+                  );
+                })}
+                {sl.main && ac.overlay && <div style={{position: 'absolute', left: sx0 - size / 2, top: sy0 - size / 2, width: size, height: size, opacity: 1 - out}}><ActionOverlay kind={ac.overlay} u={lt} size={size} /></div>}
+                <svg viewBox="0 0 400 400" width={size} height={size} style={{position: 'absolute', left: sx0 - size / 2, top: sy0 - size / 2 + bob + 0.65 * size, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5) * 0.22, transform: `scaleY(-1) scale(${over})`, WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', maskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', filter: 'blur(2px)', pointerEvents: 'none'}}>
+                  {isChart && scene.type === 'chart' && sl.main ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={lt} /> : <O t={lt} accent={accent} value={undefined} />}
+                </svg>
+                {sl.main && <div style={{position: 'absolute', inset: 0, opacity: 1 - out}}><Particles t={lt} w={w} h={h} cx={sx0} cy={sy0} money={MONEY.has(sl.kind)} accent={accent} seed={index * 7 + i} /></div>}
+              </React.Fragment>
+            );
+          });
         })}
       </div>
+      {lay === 'kinetic' && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.1) / 0.3), fs = Math.min(w * (kw.length > 12 ? 0.13 : 0.18), 220); return <div style={{position: 'absolute', left: w * 0.04, width: w * 0.92, top: tall ? h * 0.09 : h * 0.08, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{kw}</div>; })()}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} words={words} />}

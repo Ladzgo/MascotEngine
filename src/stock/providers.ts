@@ -7,7 +7,22 @@ export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export type Query = {query: string; kind: 'photo' | 'video'; orientation: 'portrait' | 'landscape'};
 type Env = Record<string, string | undefined>;
 
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+/** Pixabay terms: API responses are cached for 24 h (set by fetchStock to <cache>/api). */
+let apiCache: string | undefined;
+export const setApiCacheDir = (d: string | undefined) => { apiCache = d; };
+const TTL = 24 * 3600 * 1000;
+const cacheKey = (url: string) => crypto.createHash('sha1').update(url.replace(/([?&])key=[^&]*/, '$1')).digest('hex').slice(0, 20);
 const j = async (f: Fetcher, url: string, init?: RequestInit): Promise<any> => {
+  const file = apiCache && /pixabay\.com/.test(url) ? path.join(apiCache, `${cacheKey(url)}.json`) : undefined;
+  if (file) { try { if (Date.now() - fs.statSync(file).mtimeMs < TTL) return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* miss */ } }
+  const d = await jFetch(f, url, init);
+  if (file) { try { fs.mkdirSync(apiCache!, {recursive: true}); fs.writeFileSync(file, JSON.stringify(d)); } catch { /* cache is best effort */ } }
+  return d;
+};
+const jFetch = async (f: Fetcher, url: string, init?: RequestInit): Promise<any> => {
   const r = await f(url, {...init, signal: init?.signal ?? AbortSignal.timeout(15000)});
   if (!r.ok) throw new Error(`HTTP ${r.status} from ${new URL(url).hostname}`);
   return r.json();
@@ -60,7 +75,8 @@ export async function pixabay(f: Fetcher, a: Query, env: Env): Promise<StockHit[
   if (a.kind === 'video') {
     await pixabayGate();
     const d = await j(f, `https://pixabay.com/api/videos/?${q({key, q: a.query, per_page: 12, video_type: 'film', safesearch: 'true'})}`);
-    return (d.hits ?? []).flatMap((v: any) => { const x = v.videos?.large?.url ? v.videos.large : v.videos?.medium; return x?.url ? [{id: `pixabay-v${v.id}`, provider: 'pixabay', kind: 'video', url: x.url, width: x.width, height: x.height, pageUrl: v.pageURL, author: v.user ?? 'Pixabay', license: 'Pixabay License', title: strip(v.tags), tags: v.tags} as StockHit] : []; });
+    // medium (1080p) is plenty for a 1080-wide frame and about 4x smaller than the 4K file
+    return (d.hits ?? []).flatMap((v: any) => { const x = v.videos?.medium?.url ? v.videos.medium : v.videos?.large; return x?.url ? [{id: `pixabay-v${v.id}`, provider: 'pixabay', kind: 'video', url: x.url, width: x.width, height: x.height, pageUrl: v.pageURL, author: v.user ?? 'Pixabay', license: 'Pixabay License', title: strip(v.tags), tags: v.tags} as StockHit] : []; });
   }
   await pixabayGate();
   const d = await j(f, `https://pixabay.com/api/?${q({key, q: a.query, image_type: 'photo', orientation: o, per_page: 15, safesearch: 'true'})}`);

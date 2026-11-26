@@ -46,3 +46,28 @@ test('debt object only for debt narration; generic objects need literal words', 
   const d = 'You owe a lot on that loan.';
   assert.equal(planShots(sc(d), words(d), 5)[0].kind, 'debt_counter');
 });
+
+import {SUBJECTS, ACTIONS, GROUPS} from './catalog.js';
+import {OBJECTS} from './objects.js';
+import {actionCopies} from './actions.js';
+test('catalog stays in sync with the renderer; 60+ subjects, 30+ actions; groups only name real subjects', () => {
+  assert.ok(SUBJECTS.length >= 60 && ACTIONS.length >= 30, `${SUBJECTS.length} subjects, ${ACTIONS.length} actions`);
+  for (const s of SUBJECTS) assert.ok(OBJECTS[s], `no renderer for subject ${s}`);
+  for (const g of Object.values(GROUPS)) for (const s of g) assert.ok((SUBJECTS as readonly string[]).includes(s), `group names unknown subject ${s}`);
+  for (const a of ACTIONS) { const r = actionCopies(a, 1.3); assert.ok(r.copies.length >= 1 && r.copies.every(c => Number.isFinite(c.tx + c.ty + c.sc + c.rot + c.op)), a); }
+});
+
+import {planEpisode} from './episodePlan.js';
+test('variety engine: no subject within 6 beats, no setting/camera/layout twice in a row, explicit shot wins', () => {
+  const texts = ['You pay interest on a loan every month.', 'Savings grow when you wait.', 'Rates rise and prices follow.', 'Your card balance keeps growing.', 'Stocks can drop fast.', 'A budget keeps spending in check.', 'Interest on debt snowballs quickly.', 'Savings in a bank are safe.', 'The loan has fees.', 'Inflation eats savings.'];
+  const scenes = texts.map(n => ({type: 'talk', narration: n, emphasis: [], emotion: 'neutral'})) as any[];
+  scenes[3].shot = {subject: 'anchor', action: 'sink', setting: 'street'};
+  const plan = planEpisode(scenes, scenes.map(s => words(s.narration)), scenes.map(() => 4));
+  assert.equal(plan[3].shots[0].kind, 'anchor'); assert.equal(plan[3].shots[0].action, 'sink'); assert.equal(plan[3].env, 'street');
+  plan.forEach((p, i) => {
+    if (i) { assert.notEqual(p.env, plan[i - 1].env, `env repeats at ${i}`); assert.notEqual(p.camera, plan[i - 1].camera); assert.notEqual(p.layout, plan[i - 1].layout, `layout repeats at ${i}`); assert.notEqual(p.pal, plan[i - 1].pal); }
+    const prior = plan.slice(Math.max(0, i - 6), i).flatMap(q => q.shots.map(x => x.kind));
+    p.shots.forEach(sh => { if (i !== 3) assert.ok(!prior.includes(sh.kind), `${sh.kind} repeats within 6 beats at ${i}`); });
+  });
+  assert.ok(new Set(plan.map(p => p.layout)).size >= 3);
+});

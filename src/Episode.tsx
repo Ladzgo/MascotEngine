@@ -12,7 +12,7 @@ import {SceneView} from './scenes/SceneView';
 import {ChapterTag, SourceCard} from './fx/overlays';
 import {Camera, Living, ProgressBar, Vignette} from './fx/life';
 import {FullBleedScene} from './fullbleed/FullBleedScene';
-import {pickFbKind} from './fullbleed/shots';
+import {planEpisode} from './fullbleed/episodePlan';
 import {PunchCaptions, buildPunchPhrases} from './fx/punch';
 import {DISPLAY, INK, SANS, loadFonts, easeOut, spring, clamp} from './theme';
 
@@ -58,6 +58,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     return tm.words.map(w => ({w: w.w, start: w.start - tm.start + d.speechStart, end: w.end - tm.start + d.speechStart}));
   }), [decisions, timings]);
 
+  const fbPlan = useMemo(() => (fullbleed ? planEpisode(episode.scenes, sceneWordsRel, decisions.scenes.map(d => d.durSec)) : []), [fullbleed, episode, sceneWordsRel, decisions]);
   const phrases = useMemo(() => (fullbleed ? buildPunchPhrases : buildPhrases)(
     decisions.scenes.map((d, i): CaptionWord[] => sceneWordsRel[i].map(w => ({w: w.w, start: d.startSec + w.start, end: d.startSec + w.end}))),
   ), [decisions, sceneWordsRel, fullbleed]);
@@ -70,7 +71,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
   const host0 = (() => { try { return new URL(episode.sources[0]).hostname.replace(/^www\./, ''); } catch { return ''; } })();
   const acc = (i: number) => (decisions.accent === '' ? (episode.look === 'fullbleed' ? '#ff5a36' : INK) : accentHex(decisions.accent));
   const view = (i: number, frame: number, preroll = 0) => fullbleed ? (
-    <FullBleedScene scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} fps={fps} accent={acc(i)} w={width} h={height} words={sceneWordsRel[i]} index={i} episodeTitle={episode.title} prevKind={i > 0 ? pickFbKind(episode.scenes[i - 1], sceneWordsRel[i - 1], decisions.scenes[i - 1].durSec, i - 1) : undefined} preroll={preroll} />
+    <FullBleedScene scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} fps={fps} accent={acc(i)} w={width} h={height} words={sceneWordsRel[i]} index={i} episodeTitle={episode.title} plan={fbPlan[i]} preroll={preroll} />
   ) : (
     <>
     <Living frame={frame + preroll} seed={i} accent={acc(i)} />

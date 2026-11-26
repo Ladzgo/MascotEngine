@@ -6,6 +6,17 @@ const MIN_GAP = 1.5, MAX_SHOTS = 4;
 
 /** Narration word -> candidate objects, most specific first. A word can point at several (money -> coins, cash, wallet): the planner takes the first one not just shown. */
 const RULES: [string, RegExp][] = [
+  ['person_atm', /^(atm|withdraw\w*)$/], ['atm', /^(atm|withdraw\w*|machine)$/], ['paycheck', /^(paychecks?|salary|wages?|income|earn\w*|paid|payday)$/], ['bills', /^(bills?|utilit\w+|invoices?|statements?)$/],
+  ['person_bills', /^(stress\w*|worr\w*|anxious|anxiety|panic\w*|overwhelm\w*)$/], ['person_celebrate', /^(celebrat\w+|freedom|joy\w*|thrilled|happy|party)$/], ['person_shocked', /^(shock\w*|surpris\w*|wow|unbelievable|stunned)$/],
+  ['person_thinking', /^(think\w*|decid\w+|decision|consider\w*|wonder\w*|choos\w+)$/], ['person_walking', /^(walk\w*|journey|begin\w*|beginner\w*|first)$/],
+  ['shopping_bag', /^(shopp\w+|retail|purchas\w+|buy\w*|bought|spree|spend\w*|splurg\w+)$/], ['keys', /^(keys?|landlord|tenants?|lease|renter|renting|rent)$/], ['tax_form', /^(tax\w*|irs|deduct\w*|filing|returns?)$/],
+  ['ticker', /^(stocks?|shares?|ticker|trad(e|es|ing|er|ers)|dividends?|nasdaq|s&p)$/], ['rocket', /^(skyrocket\w*|rocket\w*|soar\w*|moon|boom\w*|surg\w+)$/], ['ladder', /^(ladder|climb\w*|steps?|rungs?|career|promotion)$/],
+  ['safe', /^(safe|stash\w*|savings|secure\w*)$/], ['hourglass', /^(wait\w*|patien\w*|years?|decades?|eventually|slowly|deadline|forever|retire\w*|long-term)$/], ['thermometer', /^(inflation|heat\w*|hot|overheat\w*|temperature|prices)$/],
+  ['gas_pump', /^(gas|fuel|petrol|gasoline)$/], ['groceries', /^(grocer\w*|food|supermarket|meals?|eggs|milk|bread)$/], ['coffee', /^(coffee|latte|lattes|cafe|espresso)$/], ['subscriptions', /^(subscri\w+|streaming|netflix|memberships?|recurring)$/],
+  ['trophy', /^(win\w*|winners?|champion\w*|goals?|achiev\w+|success\w*|best)$/], ['tree', /^(tree|seeds?|plant\w*|compound\w*|decades)$/], ['anchor', /^(anchor\w*|burden\w*|drag\w*|heavy|weigh\w*)$/], ['hole', /^(hole|pit|spiral\w*|drain\w*|sink\w*|trapped)$/],
+  ['flame', /^(burn\w*|wast\w+|fire|blow\w*|squander\w*)$/], ['dice', /^(risks?|risky|gambl\w*|luck\w*|chance|odds|bets?|volatil\w*)$/], ['umbrella', /^(rainy|emergenc\w+|cushion|buffer|unexpected)$/],
+  ['calculator', /^(calculat\w+|math\w*|maths|compute\w*|totals?|sum|add\w*)$/], ['map_route', /^(route|path|roadmap|map|road)$/], ['donut', /^(breakdown|portion|percentage|slices?|allocat\w+)$/], ['line_chart', /^(trend\w*|history|historical\w*|curve|chart\w*)$/],
+  ['stacked_bars', /^(mix|categor\w+|budgets?)$/], ['clipboard', /^(checklist|steps|list|plan\w*|tasks?)$/], ['coin_spin', /^(coin|penny|dollar)$/],
   ['debt_counter', /^(debts?|owe[sd]?|owing|loans?|borrow\w*)$/], ['card_swipe', /^(credit|cards?|swipe[sd]?)$/], ['gauge', /^(rates?|apr|interest|yield)$/], ['snowball', /^(compound\w*|snowball\w*|grow\w*|accumulat\w*)$/],
   ['jar_fill', /^(savings?|saved?|saving|savers?|jar)$/], ['price_up', /^(prices?|inflation|costs?|fees?|expensive|pricey)$/], ['bars_arrow', /^(invest\w*|stocks?|markets?|returns?|index|portfolio|profits?|growth)$/], ['pie', /^(share|split|portion|most|half|majority)$/],
   ['card', /^(credit|cards?|swipe[sd]?|apr|balances?)$/], ['receipts', /^(minimum\w*|bills?|receipts?|statements?|invoices?|owe[sd]?|debts?|expenses?|payments?)$/],

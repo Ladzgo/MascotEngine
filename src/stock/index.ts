@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {openverse, pexels, pixabay, wikimedia, type Fetcher, type Query, type StockHit} from './providers.js';
+import {spawnSync} from 'node:child_process';
+import {openverse, pexels, pixabay, setApiCacheDir, wikimedia, type Fetcher, type Query, type StockHit} from './providers.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 export const CACHE_DIR = `${ROOT}assets/stock-cache/`;
@@ -14,14 +15,17 @@ const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face
 /** Rank hits: right orientation, enough pixels, no faces/logos/text, then bigger. Hits below the minimum size are dropped. */
 export function rank(hits: StockHit[], a: Query, format: Format): StockHit[] {
   const minW = format === 'short' ? 720 : 1280, minH = format === 'short' ? 1280 : 720;
-  return hits
-    .filter(h => h.url && (!h.width || !h.height || (h.width >= minW * 0.9 && h.height >= minH * 0.9)))
-    .map(h => ({h, s: ((h.height >= h.width) === (a.orientation === 'portrait') ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2))}))
-    .sort((x, y) => y.s - x.s).map(x => x.h);
+  const words = a.query.toLowerCase().split(/\W+/).filter(x => x.length > 2).map(x => x.replace(/(ing|es|s)$/, ''));
+  const overlap = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase(); return words.filter(x => t.includes(x)).length; };
+  const sized = hits.filter(h => h.url && (!h.width || !h.height || (h.kind === 'video' ? Math.max(h.width, h.height) >= 1280 : h.width >= minW * 0.9 && h.height >= minH * 0.9)));
+  const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
+  // a hit that shares no word with the query is only used when nothing relevant exists (providers' own relevance order is kept as a tie-break)
+  const relevant = scored.filter(x => x.ov > 0 || !words.length);
+  return (relevant.length ? relevant : scored).sort((x, y) => y.s - x.s).map(x => x.h);
 }
 
-/** Provider registry, in order of preference. Adding a source = one file exporting `(fetcher, query, env) => StockHit[]` plus one line here.
- *  Keyless defaults (Openverse, Wikimedia Commons) work with no setup; Pixabay (PIXABAY_API_KEY) is the better optional source; Pexels only when a key already exists. */
+/** Provider registry, in order of preference. Adding a source = one function `(fetcher, query, env) => StockHit[]` plus one line here.
+ *  Pixabay (PIXABAY_API_KEY, photos + videos) is primary; Openverse and Wikimedia Commons are the keyless fallback; Pexels only when a key already exists (new keys paused). */
 export const PROVIDERS: {name: string; needsKey?: string; search: (f: Fetcher, a: Query, env: Env) => Promise<StockHit[]>}[] = [
   {name: 'pixabay', needsKey: 'PIXABAY_API_KEY', search: pixabay},
   {name: 'openverse', search: (f, a) => openverse(f, a)},
@@ -29,10 +33,22 @@ export const PROVIDERS: {name: string; needsKey?: string; search: (f: Fetcher, a
   {name: 'pexels', needsKey: 'PEXELS_API_KEY', search: pexels},
 ];
 
+/** Muted, cropped to the frame, looped to 20 s: a beat never outlasts its clip and Remotion decodes a small file. Falls back to the raw download. */
+export function prepVideo(raw: string, format: Format, dir: string): string {
+  const out = path.join(dir, `${path.basename(raw, '.mp4')}-${format}.mp4`);
+  if (fs.existsSync(out)) return out;
+  const [w, h] = format === 'short' ? [1080, 1920] : [1920, 1080];
+  const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-stream_loop', '-1', '-i', raw, '-t', '20', '-an', '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=30`, '-c:v', 'libx264', '-crf', '24', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', `${out}.part.mp4`]);
+  if (r.status !== 0) { fs.rmSync(`${out}.part.mp4`, {force: true}); return raw; }
+  fs.renameSync(`${out}.part.mp4`, out);
+  return out;
+}
+
 export type Fetched = {file: string; hit: StockHit};
 /** Best licensed match for one query. Provider order: Pexels, Pixabay (when keyed), then Openverse, Wikimedia Commons. Downloads once into assets/stock-cache/<sha1>.<ext>. */
 export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string}): Promise<Fetched | null> {
   const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR;
+  setApiCacheDir(path.join(dir, 'api'));
   const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
   for (const kinds of o.kind === 'video' ? [a, {...a, kind: 'photo' as const}] : [a]) { // a video query falls back to a photo when no keyed provider has one
     for (const p of PROVIDERS) {
@@ -52,7 +68,7 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
             fs.renameSync(`${file}.part`, file);
           } catch { continue; }
         }
-        return {file, hit};
+        return {file: hit.kind === 'video' ? prepVideo(file, o.format, dir) : file, hit};
       }
     }
   }
