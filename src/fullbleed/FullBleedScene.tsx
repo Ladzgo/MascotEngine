@@ -89,9 +89,11 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
   );
 };
 
-/** Licensed b-roll fills the frame: photo gets a Ken Burns move, video plays muted; both are graded toward the scene palette with a vignette and a darker floor so captions stay readable. */
+/** Licensed b-roll fills the frame: photo gets a gentle Ken Burns move, video plays muted and still-framed; both are graded toward the scene palette with a vignette and a darker floor so captions stay readable. */
 const StockLayer: React.FC<{file: string; p: number; mv: number; w: number; h: number; pal: [string, string, string, string]}> = ({file, p, mv, w, h, pal}) => {
-  const video = /\.mp4$/i.test(file), sc = 1.08 + 0.17 * p, tx = (mv % 2 ? -1 : 1) * (p - 0.5) * w * 0.08;
+  // footage already moves: a clip gets a static cover crop (1.02 hides edges); a photo gets ONE slow move of <= 4.5% (in, out or a slow pan, alternating), never stacked
+  const video = /\.mp4$/i.test(file), e = easeInOut(p), k = mv % 3;
+  const sc = video ? 1.02 : k === 0 ? 1 + 0.045 * e : k === 1 ? 1.045 - 0.045 * e : 1.045, tx = video || k !== 2 ? 0 : (e - 0.5) * w * 0.04 * (mv % 2 ? -1 : 1);
   const style: React.CSSProperties = {position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', transform: `translateX(${tx}px) scale(${sc})`, filter: 'saturate(1.15) contrast(1.05)'};
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: pal[2]}}>
@@ -147,7 +149,7 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
 };
 
 /** Sub-shot framings [zoom, x shift (share of width), y shift (share of height)]: tight punch-in, wide pull-back, off-centre left/right. */
-export const SUB_FRAMES: [number, number, number][] = [[1.1, 0, -0.03], [0.88, 0, -0.02], [0.96, 0.06, -0.01], [0.96, -0.06, -0.01]]; // gentle, and never downwards: a bigger punch-in cut the hero off, a lower one ran it into the captions
+export const SUB_FRAMES: [number, number, number][] = [[1, 0.05, -0.01], [1.04, 0, -0.02], [1, -0.05, -0.01], [0.97, 0, -0.01]]; // gentle, and never downwards: a bigger punch-in cut the hero off, a lower one ran it into the captions
 /** How many 2-3 s sub-shots a beat of `dur` seconds gets (one per started 2.8 s). */
 export const subShots = (dur: number) => Math.max(1, Math.ceil(dur / 2.8));
 const CHARTY = new Set(['line_chart', 'bars3d', 'bars_arrow', 'chart', 'pie', 'gauge']);
@@ -214,10 +216,12 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   void prevKind;
 
   // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage. Close scenes sit tighter than wide ones.
-  const mv = plan.camera, close = plan.zoom === 'close' ? 0.12 : 0;
-  const push = 1.02 + close + 0.2 * p, panX = mv === 1 ? (p - 0.5) * -0.12 * w : mv === 2 ? (p - 0.5) * 0.12 * w : Math.sin(t * 0.7) * 0.012 * w;
-  const rot = mv === 3 ? (p - 0.5) * 3.6 : Math.sin(t * 0.5) * 0.5, tiltY = mv === 0 ? (0.5 - p) * 0.03 * h : Math.cos(t * 0.6) * 0.008 * h;
-  const sc = mv === 3 ? 1.08 + close + 0.1 * p : push;
+  // ONE visible move per beat, like an editor: 0 = push in 6%, 1/2 = slow pan (no zoom), 3 = slow drift-rotate (no zoom); every 3rd beat just holds.
+  // 'close' is a static framing (+4%), not added zoom. Over stock footage the drawn accent never moves the camera (the clip is the motion).
+  const mv = plan.camera, close = plan.zoom === 'close' ? 0.04 : 0, hold = index % 3 === 2 || !!scene.stockFile, e = easeInOut(p);
+  const panX = hold ? 0 : mv === 1 ? (e - 0.5) * -0.08 * w : mv === 2 ? (e - 0.5) * 0.08 * w : 0;
+  const rot = !hold && mv === 3 ? (e - 0.5) * 1.6 : 0, tiltY = 0;
+  const sc = 1.02 + close + (!hold && mv === 0 ? 0.06 * e : 0);
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // sub-shots: a long beat is cut into 2-3 s pieces, each a new framing (hard punch-in/out, like an editor's cut), so no picture holds > 3 s.
@@ -237,8 +241,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
-      {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: `scale(${Math.max(1, subZ) * (subX ? 1.15 : 1)}) translate(${subX * w * 0.5}px, ${subY * h * 0.5}px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /></div> : (
-      <div style={{position: 'absolute', inset: 0, transform: `scale(${(1.06 + 0.1 * p) * Math.max(1, subZ) * (subX ? 1.1 : 1)}) translateX(${panX * 0.5 + subX * w * 0.4}px)`, transformOrigin: '50% 60%', filter: `blur(${tall ? 3 : 2}px)`}}>
+      {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: /\.mp4$/i.test(scene.stockFile) ? undefined : `scale(${1.05 * Math.max(1, subZ)}) translate(${subX * w * 0.4}px, 0px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /></div> : (
+      <div style={{position: 'absolute', inset: 0, transform: `scale(${1.12 * Math.max(1, subZ)}) translateX(${panX * 0.4 + subX * w * 0.3}px)`, transformOrigin: '50% 60%', filter: `blur(${tall ? 3 : 2}px)`}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
       </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
