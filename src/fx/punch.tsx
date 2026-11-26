@@ -44,7 +44,9 @@ function chunkClause(c: CaptionWord[]): CaptionWord[][] {
 
 const isKey = (w: string) => /\d|%|\$/.test(w) || !isFunctionWord(w);
 /** A phrase deserves a punch word when it carries a number or a long content word; only every 4th such phrase gets one so it stays special. */
-export const punchWord = (p: Phrase, n: number): CaptionWord | undefined => (n % 4 === 0 ? [...p.words].sort((a, b) => (/\d|%|\$/.test(b.w) ? 99 : b.w.length) - (/\d|%|\$/.test(a.w) ? 99 : a.w.length)).find(w => (/\d|%|\$/.test(w.w) || w.w.replace(/\W/g, '').length >= 6) && isKey(w.w)) : undefined);
+export const punchWord = (p: Phrase, n: number): CaptionWord | undefined => (n % 4 === 0 ? [...p.words].sort((a, b) => (/\d|%|\$/.test(b.w) ? 99 : b.w.length) - (/\d|%|\$/.test(a.w) ? 99 : a.w.length)).find(w => (/\d|%|\$/.test(w.w) || w.w.replace(/\W/g, '').length >= 6) && isKey(w.w) && !NO_PUNCH.test(w.w)) : undefined);
+// framing words ("The takeaway: ...") say nothing about the sentence: never the big punch word
+const NO_PUNCH = /^(takeaways?|yourself|insights?|follow|basically|actually|remember)\W*$/i;
 
 export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: string; w: number; h: number; punch?: boolean}> = ({phrases, t, accent, w, h, punch = true}) => {
   let idx = -1;
