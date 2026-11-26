@@ -65,7 +65,7 @@ export const TitleScene: React.FC<SceneProps> = ({frame, fps, accent, box, intro
 // ------------------------------------------------------------ talk
 export const TalkScene: React.FC<SceneProps> = ({scene, dec, frame, fps, accent, box, keyword}) => {
   if (scene.type === 'talk' && scene.quote && box.w > 0) return <QuoteCard text={scene.quote.text} by={scene.quote.by} t={frame / fps} at={dec.speechStart + 0.2} accent={accent} width={box.w} x={box.x} y={box.y} />;
-  const {hero, support} = pickVisuals(scene);
+  const {hero, support} = pickVisuals(scene, '', dec.index);
   const t = frame / fps - (dec.speechStart + 0.05);
   const labelT = Math.max(0.3, (dec.punchIns[0]?.t ?? dec.speechStart + 0.6) - (dec.speechStart + 0.05));
   const label = scene.visual?.label ?? keyword;
@@ -373,7 +373,7 @@ const sceneText = (s: Scene) => (s.type === 'big_number' ? s.label : s.type === 
 const WithArt: React.FC<{props: SceneProps; children: (box: Box) => React.ReactNode}> = ({props, children}) => {
   const {box, frame, fps, scene, accent} = props;
   if (box.w < 1000) return <>{children(box)}</>;
-  const right = box.x > 500, {hero} = pickVisuals(scene, sceneText(scene));
+  const right = box.x > 500, {hero} = pickVisuals(scene, sceneText(scene), props.dec.index);
   const inner = {...box, x: right ? box.x : box.x + ART_W + 10, w: box.w - ART_W - 10};
   return (
     <>
@@ -390,7 +390,7 @@ const Flank: React.FC<{props: SceneProps}> = ({props}) => {
   const f = FLANK[`${scene.type}:${dec.layout}`];
   if (!f || box.w < 1400) return null;
   const extra = scene.type === 'title' ? episodeTitle : scene.type === 'timeline' ? scene.events.map(e => e.what).join(' ') : scene.type === 'table' ? scene.rows.flat().join(' ') : scene.type === 'stats' ? scene.stats.map(x => x.label).join(' ') : scene.type === 'compare' ? `${scene.left.title} ${scene.right.title}` : scene.type === 'before_after' ? `${scene.before.title} ${scene.after.title}` : '';
-  const {hero, support} = pickVisuals(scene, extra);
+  const {hero, support} = pickVisuals(scene, extra, dec.index);
   const t = frame / fps - (scene.type === 'title' ? 0.5 : 0.35), w = 520;
   return (
     <>
