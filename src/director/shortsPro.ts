@@ -19,5 +19,18 @@ export function spreadVisuals(ep: Episode): {ep: Episode; fixed: number} {
   return {ep: {...ep, scenes: scenes as Episode['scenes']}, fixed};
 }
 
+/** Drop the longest plain talk beats (never the hook or the last two) until the estimated read fits `maxSec`. */
+export function fitDuration(ep: Episode, maxSec = 52): {ep: Episode; dropped: number} {
+  const scenes = [...ep.scenes];
+  let dropped = 0;
+  const total = () => scenes.reduce((a, s) => a + estSec(s) + 0.2, 0);
+  while (total() > maxSec && scenes.length > 8) {
+    const cand = scenes.map((s, i) => ({s, i})).filter(({s, i}) => s.type === 'talk' && !(s as {quote?: unknown}).quote && i >= 2 && i < scenes.length - 2).sort((a, b) => estSec(b.s) - estSec(a.s))[0];
+    if (!cand) break;
+    scenes.splice(cand.i, 1); dropped++;
+  }
+  return {ep: {...ep, scenes: scenes as Episode['scenes']}, dropped};
+}
+
 /** Estimated spoken seconds of a scene at 160 wpm (scene-length cap check before TTS exists). */
 export const estSec = (s: {narration: string}, wpm = 160) => s.narration.trim().split(/\s+/).filter(Boolean).length * 60 / wpm;

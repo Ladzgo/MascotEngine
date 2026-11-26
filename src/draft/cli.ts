@@ -9,7 +9,7 @@ import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
 import {sourceFlags} from './lint.js';
 import {draftByOutline} from './outline.js';
-import {spreadVisuals} from '../director/shortsPro.js';
+import {fitDuration, spreadVisuals} from '../director/shortsPro.js';
 import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
@@ -55,7 +55,9 @@ try {
   }
   const split = splitBeats(ensurePayoff(fixEpisode(ep4, lang), lang), values.short ? {max: 12, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a new visual idea under ~5 s
   const spread = values.short ? spreadVisuals(split) : {ep: split, fixed: 0};
-  const ep = spread.ep;
+  const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
+  const ep = fit.ep;
+  if (fit.dropped) console.log(`DRAFT_NOTE ${fit.dropped} beats dropped to fit a 52 s Short`);
   if (spread.fixed) console.log(`DRAFT_NOTE ${spread.fixed} repeated visual kinds changed`);
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);

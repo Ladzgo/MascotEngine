@@ -21,3 +21,12 @@ test('spreadVisuals never repeats a kind in neighbouring beats', () => {
   const v = o.scenes.map((s: any) => s.visuals ?? []);
   assert.notEqual(v[0][0].kind, v[1][0].kind); assert.notEqual(v[1].at(-1).kind, v[2][0].kind);
 });
+
+import {fitDuration} from './shortsPro.js';
+test('fitDuration drops the longest middle talk beats but keeps hook and ending', () => {
+  const long = 'one two three four five six seven eight nine ten eleven twelve';
+  const ep = mk(Array.from({length: 14}, (_, i) => sc(i % 2 ? long : 'short beat here now')));
+  const {ep: o, dropped} = fitDuration(ep, 30);
+  assert.ok(dropped > 0 && o.scenes.length >= 8);
+  assert.equal(o.scenes[0].narration, 'short beat here now'); assert.equal(o.scenes.at(-1)!.narration, ep.scenes.at(-1)!.narration);
+});
