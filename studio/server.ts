@@ -12,7 +12,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {createServer as createVite} from 'vite';
 import {deletePreset, listPresets, savePreset} from '../src/channel/userPresets.js';
@@ -230,9 +230,27 @@ const nextId = (topic: string) => {
   const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 4).join('-');
   return `ep${String(n).padStart(3, '0')}${slug ? '-' + slug : ''}`;
 };
+// Draft children run in their own process group (npm -> tsx -> node), tracked in a pid file so a restart can reap orphans.
+const PID_FILE = process.env.STUDIO_PID_FILE || `${ROOT}data/draft-pids.json`;
+const kids = new Set<number>();
+const savePids = () => { try { fs.mkdirSync(path.dirname(PID_FILE), {recursive: true}); fs.writeFileSync(PID_FILE, JSON.stringify([...kids])); } catch { /* best effort */ } };
+const killGroup = (pid: number) => { try { process.kill(-pid, 'SIGTERM'); } catch { try { process.kill(pid, 'SIGTERM'); } catch { /* gone */ } } };
+/** At start: kill draft processes a previous Studio left behind (only ones whose command line still says draft). */
+function reapOrphans(): number {
+  let n = 0;
+  try {
+    for (const pid of JSON.parse(fs.readFileSync(PID_FILE, 'utf8')) as number[]) {
+      const cmd = spawnSync('ps', ['-p', String(pid), '-o', 'command='], {encoding: 'utf8'}).stdout;
+      if (/draft/.test(cmd)) { killGroup(pid); n++; }
+    }
+  } catch { /* no pid file */ }
+  fs.rmSync(PID_FILE, {force: true}); return n;
+}
+function shutdown() { for (const pid of kids) killGroup(pid); for (const j of jobs.values()) j.child?.kill(); fs.rmSync(PID_FILE, {force: true}); process.exit(0); }
 function runNpm(args: string[], onLine?: (l: string) => void, env: Record<string, string> = {}) {
   return new Promise<{code: number | null; out: string[]}>(ok => {
-    const child = spawn('npm', ['run', ...args], {cwd: ROOT, env: {...process.env, ...env}});
+    const child = spawn('npm', ['run', ...args], {cwd: ROOT, env: {...process.env, ...env}, detached: true});
+    if (child.pid) { kids.add(child.pid); savePids(); child.on('close', () => { kids.delete(child.pid!); savePids(); }); }
     const out: string[] = [];
     const onData = (b: Buffer) => { const ls = b.toString().split('\n').filter(l => l.trim()); out.push(...ls); ls.forEach(l => onLine?.(l)); };
     child.stdout.on('data', onData); child.stderr.on('data', onData);
@@ -257,7 +275,7 @@ const runDraft = (topic: string, id: string, angle: string, channel: string, sho
   }, model ? {OLLAMA_MODEL: model, DRAFT_MODEL: model} : {}).finally(() => { draftProgress = null; });
 };
 /** Background drafts: the HTTP call returns at once, the browser polls GET /api/drafts/:id (progress, errors, and the render run that follows a "make"). */
-type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; jobId?: string; startedAt: number; topic: string};
+type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; warning?: string; jobId?: string; startedAt: number; topic: string};
 const drafts = new Map<string, DraftJob>();
 function startDraft(o: {device?: string; topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}}) {
   needAi('draft');
@@ -266,11 +284,16 @@ function startDraft(o: {device?: string; topic: string; angle: string; channel: 
   if (fs.existsSync(epDir(id)) || drafts.get(id)?.state === 'running') throw new HttpError(409, `Episode ${id} already exists.`);
   const release = lockAi();
   const job: DraftJob = {id, state: 'running', progress: {done: 0, total: 0, label: 'Planning the outline'}, startedAt: Date.now(), topic: o.topic};
+  const gb = os.totalmem() / 2 ** 30, big = Number(/(\d+)b\b/i.exec(o.model || process.env.OLLAMA_MODEL || 'qwen2.5:14b')?.[1] ?? 0), local = (process.env.LLM_PROVIDER || 'ollama') === 'ollama';
+  if (local && big >= 12 && gb <= 18) job.warning = `This Mac has ${Math.round(gb)} GB of memory and a ${big}B model needs about 10 GB: the draft will be slow and the browser may stall. A 7B model or a cloud provider (Settings) is lighter.`;
   drafts.set(id, job);
   void (async () => {
     try {
       const {code, out} = await runDraft(o.topic, id, o.angle, o.channel, o.short, o.model, o.device, p => { job.progress = p; });
-      if (!(code === 0 && out.some(l => l.startsWith('DRAFT_OK')) && fs.existsSync(`${EPISODES}${id}/episode.json`))) throw new Error(cliMessage(out, code));
+      const finished = !!readJson(`${EPISODES}${id}/episode.json`);
+      // EEXIST = another (leftover) draft already wrote a complete script for this id: keep it instead of failing
+      const ok = finished && (code === 0 && out.some(l => l.startsWith('DRAFT_OK')) || out.some(l => /EEXIST/.test(l)));
+      if (!ok) throw new Error(cliMessage(out, code));
       if (o.ideaId) { const f = readIdeas(o.channel), idea = f.ideas.find(i => i.id === o.ideaId); if (idea) { idea.status = 'drafted'; idea.episodeId = id; writeIdeas(o.channel, f); } }
       if (o.make) job.jobId = enqueue(id, {stages: o.make.stages, engine: o.make.engine}).jobId;
       job.state = 'done';
@@ -965,6 +988,8 @@ const server = http.createServer((req, res) => {
 });
 process.on('uncaughtException', e => logLine(ROOT, 'uncaught', e.stack ?? String(e)));
 process.on('unhandledRejection', e => logLine(ROOT, 'unhandled', String(e instanceof Error ? e.stack : e)));
+if (!process.env.STUDIO_TEST) { const n = reapOrphans(); if (n) logLine(ROOT, 'orphans', `stopped ${n} leftover draft process(es) from the previous run`); }
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(sig, shutdown);
 ensureDefaultChannel();
 loadJobs(); pump();
 server.listen(PORT, '127.0.0.1', () => { console.log(`Mascot Engine Studio: http://localhost:${PORT}`); if (!process.env.STUDIO_TEST) void ensureOllama().catch(e => console.log(`Local AI: ${(e as Error).message}`)); });
