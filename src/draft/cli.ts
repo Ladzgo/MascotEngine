@@ -12,7 +12,7 @@ import {sourceFlags} from './lint.js';
 import {draftByOutline} from './outline.js';
 import {rewriteWeak, scoreScript, SCORE_REWRITE_BELOW} from './score.js';
 import {storyboard} from './storyboard.js';
-import {fitDuration, spreadVisuals} from '../director/shortsPro.js';
+import {estSec, fitDuration, SCENE_PAD, spreadVisuals} from '../director/shortsPro.js';
 import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
@@ -46,6 +46,8 @@ try {
   const legacy = () => draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model});
   // outline first, then one call per section (progress lines feed the Studio); the one-shot storyboard prompt is the fallback
   const ep0 = values.legacy && !values.short ? await legacy() : await draftByOutline({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model, log, short: values.short, device: values.device, epsRoot: path.join(root, 'episodes'), progress: (d, n, label) => console.log(`DRAFT_PROGRESS ${d}/${n} ${label}`)}).catch(e => { log(`outline draft failed (${(e as Error).message.split('\n')[0]}); using the one-shot prompt`); return legacy(); });
+  // the opening part call sometimes rewrites beat 1; the judged hook is the one that ships
+  if (lastHookPick && ep0.scenes[0] && ep0.scenes[0].narration.trim() !== lastHookPick.hook) { log(`beat 1 reset to the judged hook (was: ${ep0.scenes[0].narration})`); ep0.scenes[0] = {...ep0.scenes[0], narration: lastHookPick.hook}; }
   const ep1 = (values['no-expand'] || values.short) ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const ep1b = (values['no-expand'] || values.short) ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const storyOn = !values.legacy && !values.device?.startsWith('none');
@@ -62,7 +64,11 @@ try {
   // the last line loops back to the hook; the stock closer is only the fallback
   const closer = storyOn ? await closeLoop({client, hook: fixed.scenes[0]?.narration ?? '', topic, lang, model, log}) : null;
   const closed = closer ? {...fixed, scenes: [...fixed.scenes, {type: 'talk', emotion: 'neutral', emphasis: [], narration: closer}] as typeof fixed.scenes} : ensurePayoff(fixed, lang);
-  const split = splitBeats(closed, values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
+  // Shorts come back from the part calls at 25-35 s; below 40 s estimated, add plain beats (no new numbers) before recap + CTA up to ~48 s
+  const secs = (e: typeof closed) => e.scenes.reduce((a, s) => a + estSec(s) + SCENE_PAD, 0);
+  const padded = values.short && secs(closed) < 40 ? await addScenes(client, closed, {model, lang, log, minWords: closed.scenes.reduce((n, s) => n + s.narration.split(/\s+/).length, 0) + Math.round((46 - secs(closed)) * 2.3), max: 3, before: 2}) : closed;
+  if (padded !== closed) log(`short length: est ${secs(closed).toFixed(1)} s -> ${secs(padded).toFixed(1)} s`);
+  const split = splitBeats(padded, values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
   const spread = values.short ? spreadVisuals(split) : {ep: split, fixed: 0};
   const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
   let ep = fit.ep;
@@ -76,7 +82,7 @@ try {
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);
-  const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted});
+  const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted, ...(lastHookPick?.overlay ? {hookOverlay: lastHookPick.overlay} : {})} as typeof ep); // 5-7 word on-screen line for muted viewers (renderer: beat 1)
   fs.writeFileSync(path.join(path.dirname(file), 'script-score.json'), JSON.stringify({...sc, hook: lastHookPick, concreteGaps: concreteGaps(ep.scenes.map(s => s.narration))}, null, 2));
   if (Object.keys(flags.notes).length) fs.writeFileSync(path.join(path.dirname(file), 'notes.json'), JSON.stringify({notes: flags.notes}, null, 2));
   for (const n of Object.values(flags.notes).flat()) console.log(`DRAFT_WARN ${n}`);

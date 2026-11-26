@@ -229,7 +229,7 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
  * Last resort for very short drafts: ask (one narrow call each) for extra talk scenes that explain the topic further.
  * Kept only if 25+ words, no new numbers, no banned wording and no repeated phrase; inserted before the closing scene.
  */
-export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void; lang?: string} = {}): Promise<Episode> {
+export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void; lang?: string; /** insert before the last N beats (Shorts keep recap + CTA last) */ before?: number} = {}): Promise<Episode> {
   const scenes = [...ep.scenes];
   const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
   const asks = ['a concrete everyday example (no new numbers)', 'the most common mistake people make', 'what a sensible person does about it (no advice phrasing)', 'why it feels different from what people expect'];
@@ -245,7 +245,7 @@ export async function addScenes(client: Client, ep: Episode, o: {model?: string;
       const emo = EMOTIONS.includes(String(j.emotion)) ? String(j.emotion) : 'explaining';
       const fixed = autoFixEpisode({...ep, scenes: [{...scenes[0], narration: 'x'}, {type: 'talk', emotion: emo, emphasis: [], narration: cand}] as Episode['scenes']}).scenes[1].narration;
       if (cand.split(/\s+/).length < 12 || cand.split(/\s+/).length > 70 || numsIn(cand).some(n => !known.has(n)) || fixed !== cand || repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length) { o.log?.(`addScenes: rejected candidate ${k + 1} (${cand.split(/\s+/).length}w${fixed !== cand ? ', banned wording' : ''}${numsIn(cand).some(n => !known.has(n)) ? ', new number' : ''}${repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length ? ', repeat' : ''}): ${cand.slice(0, 80)}`); continue; }
-      scenes.splice(scenes.length - 1, 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
+      scenes.splice(scenes.length - (o.before ?? 1), 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
     } catch { /* skip */ }
   }
   return {...ep, scenes: scenes as Episode['scenes']};

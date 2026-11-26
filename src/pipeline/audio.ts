@@ -3,6 +3,7 @@ import {execFileSync, spawnSync} from 'node:child_process';
 import type {Episode} from '../schema.js';
 import type {EpisodeDecisions, SfxKind} from '../director/types.js';
 import type {Timings} from './tts.js';
+import {CATALOG} from '../assets/catalog.js';
 
 const SR = 44100;
 
@@ -70,6 +71,32 @@ export function synth(kind: SfxKind, variant: number): Float32Array {
     out[i] = v;
   }
   return out;
+}
+
+/** CC0 recorded cues (Kenney packs in the asset catalog) per kind; the synth stays the fallback when the library is not fetched (CI) or SFX_SAMPLES=0. */
+const SAMPLE_PREFIX: Partial<Record<SfxKind, string[]>> = {
+  coin: ['sfx-casino-chips-collide', 'sfx-casino-chips-stack', 'sfx-rpg-handle-coins', 'sfx-casino-chip-lay'],
+  click: ['sfx-interface-click', 'sfx-ui-click', 'sfx-interface-select', 'sfx-interface-toggle'],
+  thud: ['sfx-rpg-book-place', 'sfx-rpg-drop-leather', 'sfx-casino-card-place'],
+  tick: ['sfx-interface-tick'],
+  ding: ['sfx-interface-confirmation', 'sfx-interface-bong'],
+};
+const ASSETS = new URL('../../assets/', import.meta.url).pathname;
+export function sampleFile(kind: SfxKind, variant: number, catalog: {id: string; file: string; kind: string}[] = CATALOG): string | null {
+  if (process.env.SFX_SAMPLES === '0') return null;
+  const pre = SAMPLE_PREFIX[kind];
+  if (!pre) return null;
+  const pool = catalog.filter(a => a.kind === 'sfx' && pre.some(p => a.id === p || a.id.startsWith(`${p}-`)) && fs.existsSync(ASSETS + a.file));
+  return pool.length ? ASSETS + pool[((variant % pool.length) + pool.length) % pool.length].file : null;
+}
+/** The recorded cue scaled to the synth's peak for the same kind, so the gains tuned by scripts/qa/sfxAudit.ts still hold. */
+function cue(kind: SfxKind, variant: number): Float32Array {
+  const syn = synth(kind, variant), f = sampleFile(kind, variant);
+  if (!f) return syn;
+  try {
+    const x = readWav16(f), peak = (a: Float32Array) => a.reduce((m, v) => Math.max(m, Math.abs(v)), 0), g = peak(syn) / Math.max(1e-4, peak(x));
+    return x.map(v => v * g);
+  } catch { return syn; }
 }
 
 function readWav16(file: string): Float32Array {
@@ -143,7 +170,7 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   dec.scenes.forEach((d, i) => {
     for (const c of d.sfx) {
       const k = `${c.kind}${c.variant}`;
-      if (!cache.has(k)) cache.set(k, synth(c.kind, c.variant));
+      if (!cache.has(k)) cache.set(k, cue(c.kind, c.variant));
       add(sfx, cache.get(k)!, d.startSec + c.t, sfxGain(c.kind));
     }
     if (takes[i]) { hasVoice = true; add(voice, takes[i]!, d.startSec + d.speechStart, gains[i]); }

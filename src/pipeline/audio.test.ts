@@ -65,3 +65,11 @@ test('sceneGains levels scenes to the median, clamps at 6 dB, respects peaks and
   assert.deepEqual(sceneGains([tone(0.5)]), [1]);
   assert.ok(sceneGains([tone(0.5), tone(0.5), tone(0.2)])[2] * 0.2 <= 1 && sceneGains([tone(0.9), tone(0.9), tone(0.3)])[2] * 0.3 <= 0.945); // no clipping
 });
+
+test('recorded CC0 cues: picked per kind and variant from the catalog, synth fallback when absent', async () => {
+  const {sampleFile} = await import('./audio.js');
+  const cat = [{id: 'sfx-interface-click-001', file: 'lib/sfx/none-a.ogg', kind: 'sfx'}];
+  assert.equal(sampleFile('click', 0, cat), null); // file not on disk -> synth
+  assert.equal(sampleFile('whoosh', 0, cat), null); // no recorded whoosh
+  process.env.SFX_SAMPLES = '0'; assert.equal(sampleFile('click', 0), null); delete process.env.SFX_SAMPLES;
+});

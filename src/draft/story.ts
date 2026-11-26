@@ -117,7 +117,7 @@ export async function judgeHooks(client: Client, lines: string[], model?: string
 /** 5 hook candidates, one per formula, judged; below HOOK_TARGET one more round gets the judge's best as the bar to beat. Numbers must pass `allowedOk`. */
 export async function pickHook(o: {client: Client; topic: string; outlineHook: string; stakes: string; device?: Device; lang?: string; model?: string; allowedOk: (h: string) => boolean; log?: (m: string) => void}): Promise<string> {
   const formulas = Object.entries(HOOK_FORMULAS).map(([k, v]) => `${k}: ${v}`).join('\n');
-  const sys = `You write the first spoken line of a vertical Short.${isHu(o.lang) ? `\n${LANG_RULES.hu}` : ''} It must stop a scroll in 3 seconds: under 12 words, a specific claim (a number or an everyday first-name person; never a real celebrity or public figure), opens a question the video answers, signal first: no greeting, no "in this video", no "did you know", no backstory, no hollow shock. Use only numbers that appear in the given facts. Write 5 lines, each from a DIFFERENT formula:\n${formulas}\nAlso give a 5-7 word on-screen overlay per line that says the same promise in different words. Output ONLY JSON: {"hooks": [{"formula": "curiosity_gap", "line": "...", "overlay": "..."}, ... 5 items]}`;
+  const sys = `You write the first spoken line of a vertical Short.${isHu(o.lang) ? `\n${LANG_RULES.hu}` : ''} It must stop a scroll in 3 seconds: under 12 words, a specific claim (a number or an everyday first-name person; never a real celebrity or public figure), opens a question the video answers, signal first: no greeting, no "in this video", no "did you know", no backstory, no hollow shock, no symbols like = or + (it is spoken). Use only numbers that appear in the given facts. Write 5 lines, each from a DIFFERENT formula:\n${formulas}\nAlso give a 5-7 word on-screen overlay per line that says the same promise in different words. Output ONLY JSON: {"hooks": [{"formula": "curiosity_gap", "line": "...", "overlay": "..."}, ... 5 items]}`;
   let pool: (Cand & {s: number})[] = [], tried = 0, bar = '';
   for (let round = 0; round < 2; round++) {
     let cands: Cand[] = [];
@@ -126,7 +126,7 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
       cands = (Array.isArray(j.hooks) ? j.hooks : []).map(x => typeof x === 'string' ? {h: x} : {h: String((x as {line?: unknown}).line ?? ''), formula: String((x as {formula?: unknown}).formula ?? '') || undefined, overlay: String((x as {overlay?: unknown}).overlay ?? '') || undefined}).map(c => ({...c, h: c.h.trim()})).filter(c => c.h);
     } catch (e) { o.log?.(`hook candidates failed (${(e as Error).message.slice(0, 60)})`); }
     if (round === 0) cands.unshift({h: o.outlineHook});
-    cands = cands.filter((c, i, a) => wcount(c.h) <= 14 && o.allowedOk(c.h) && !fullName(c.h) && !pool.some(p => p.h === c.h) && a.findIndex(x => x.h === c.h) === i);
+    cands = cands.filter((c, i, a) => wcount(c.h) <= 14 && !/[=+→<>|]/.test(c.h) && o.allowedOk(c.h) && !fullName(c.h) && !pool.some(p => p.h === c.h) && a.findIndex(x => x.h === c.h) === i);
     tried += cands.length;
     if (cands.length) { const s = await judgeHooks(o.client, cands.map(c => c.h), o.model); pool.push(...cands.map((c, i) => ({...c, s: s[i]}))); }
     pool.sort((a, b) => b.s - a.s);
@@ -169,7 +169,8 @@ export async function fillConcrete(client: Client, ep: Episode, o: {model?: stri
     for (const w of j.rewrites ?? []) {
       if (!targets.includes(w.i) || typeof w.narration !== 'string') continue;
       const t = w.narration.trim();
-      if (wcount(t) > max || !concrete(t) || !spokenNumbers(t).every(x => heard.includes(x)) || slopHits(t).length) continue;
+      const why = wcount(t) > max ? `${wcount(t)} words` : !concrete(t) ? 'still no number or name' : !spokenNumbers(t).every(x => heard.includes(x)) ? 'new number' : slopHits(t).length ? 'stock phrase' : '';
+      if (why) { o.log?.(`concrete: beat ${w.i + 1} rewrite rejected (${why}): ${t}`); continue; }
       scenes[w.i].narration = t; n++;
     }
     o.log?.(`concrete: ${gaps.length} beat pairs without a number or name, ${n} lines rewritten`);
