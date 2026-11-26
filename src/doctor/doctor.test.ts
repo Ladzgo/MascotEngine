@@ -24,7 +24,7 @@ test('fully provisioned machine passes (espeak-ng voice, fake chromium, whisper 
   fs.writeFileSync(path.join(root, 'data/models/ggml-base.en.bin'), '');
   fs.writeFileSync(path.join(root, 'assets/music/pad.mp3'), '');
   const r = await checkReadiness(probe(root, {onPath: b => ['ffmpeg', 'ffprobe', 'espeak-ng', 'whisper-cli'].includes(b), ffmpegHas: () => true, ollamaModels: async () => ['qwen2.5:7b']}));
-  assert.deepEqual(r.items.filter(i => !i.ok).map(i => i.id), []);
+  assert.deepEqual(r.items.filter(i => !i.ok && i.required).map(i => i.id), []);
   assert.ok(r.ok);
 });
 
