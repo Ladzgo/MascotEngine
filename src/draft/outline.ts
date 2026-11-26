@@ -146,6 +146,11 @@ function parseBeats(out: string): Sc[] | string {
   const list = raw?.beats ?? raw?.scenes;
   if (!Array.isArray(list) || !list.length) return 'Expected {"beats":[...]}.';
   const fixed = repairDraft({scenes: list.map(inferType)}).scenes as any[];
+  const thou = (v: unknown) => (typeof v === 'string' && /^\d{4,}$/.test(v) ? Number(v).toLocaleString('en-US') : v);
+  for (const b of fixed) { // tidy what small models get wrong on screen: long big-number labels (shrink to unreadable), bare 1000000
+    if (b.type === 'big_number' && String(b.label).length > 40) b.label = String(b.label).split(/[.,:;]| - /)[0].slice(0, 40).trim() || 'The number';
+    for (const k of ['left', 'right', 'before', 'after']) if (b[k] && typeof b[k] === 'object') b[k].value = thou(b[k].value);
+  }
   const ok = fixed.filter(b => typeof b.narration === 'string' && !/\d\s*[*=\/]\s*\d|=\s*\d/.test(b.narration) && Episode.shape.scenes.element.safeParse(b).success); // raw formulas are not narration
   return ok.length ? ok : 'No beat matched the scene schema.';
 }
