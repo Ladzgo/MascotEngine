@@ -27,6 +27,15 @@ test('storyboard repair: subjects not repeated within 5 beats, 4+ actions, inven
   assert.deepEqual(checkShots(out), []);
   assert.equal(out.scenes[2].shot!.number, undefined);
 });
+test('stock spec: 40-55% of beats, English queries only, no repeat within 8 beats, data beats stay drawn', () => {
+  const ep = mk(Array.from({length: 12}, (_, i) => `Beat ${i} about running in the park.`));
+  const raw = Object.fromEntries(ep.scenes.map((_, i) => [i, {stock: {query: i % 3 === 0 ? 'runner morning park' : 'nem angol szöveg', kind: i === 3 ? 'video' : 'photo'}}]));
+  const out = repairShots(ep, raw), n = out.scenes.filter(s => s.stock).length;
+  assert.ok(n >= 5 && n <= 6, `got ${n}`);
+  const q = out.scenes.flatMap((s, i) => s.stock ? [[i, s.stock.query] as const] : []);
+  assert.ok(q.every(([, t]) => /^[a-z0-9 '-]+$/.test(t)));
+  for (const [i, t] of q) assert.ok(!q.some(([j, u]) => j < i && i - j < 8 && u === t), `repeat ${t}`);
+});
 test('script score: stock phrases and flat lines score lower than a concrete conversational script', () => {
   const good = ['Anna, 28, owes $4,200 on one card.', "She's paying $85 a month and it barely moves.", "Here's why: 22 percent interest eats $77 of it.", 'Twelve months later she owes $4,100.', "You'd think that's progress. It isn't.", "So you're stuck unless you pay more.", 'Check your own card, because Anna did.'];
   const bad = ["In today's fast-paced world, money matters.", 'It is important to note that interest exists.', 'Let us delve into the topic of finance.', 'Basically the economy is complex and varied.', 'Well, banks do things with money.', 'In conclusion, finance is a game-changer.'];

@@ -12,6 +12,11 @@ export const CAMERAS = ['push', 'pull', 'pan_left', 'pan_right', 'tilt_up', 'til
 export const SUBJECT_GAP = 5, MIN_ACTIONS = 4;
 type Sc = Episode['scenes'][number];
 type Shot = NonNullable<Sc['shot']>;
+type Stock = NonNullable<Sc['stock']>;
+export const STOCK_MIN = 0.4, STOCK_MAX = 0.55, STOCK_GAP = 8;
+// data beats stay procedural (the number/chart IS the picture); everything else may carry real footage
+const NO_STOCK = new Set(['big_number', 'chart']);
+const cleanQuery = (q: unknown): string | null => { const t = String(q ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); return /^[a-z0-9 '-]{3,60}$/.test(t) ? t : null; };
 const near = (a: number, b: number) => Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b), 1e-9);
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 const subjectOf = (k: unknown): string | null => { const s = String(k ?? '').toLowerCase().replace(/\s+/g, '_'); return FB_KINDS.includes(s) ? s : FB_FOR[s] ?? null; };
@@ -37,7 +42,7 @@ export function checkShots(ep: Pick<Episode, 'scenes'>): string[] {
 }
 
 /** Fill gaps and fix violations deterministically. Never invents a number. */
-export function repairShots(ep: Episode, raw: Record<number, Partial<Shot>> = {}): Episode {
+export function repairShots(ep: Episode, raw: Record<number, Partial<Shot> & {stock?: unknown}> = {}): Episode {
   const facts = scriptFacts(ep), out: Shot[] = [];
   const recent = () => out.slice(-(SUBJECT_GAP - 1)).map(s => s.subject);
   ep.scenes.forEach((s, i) => {
@@ -63,24 +68,47 @@ export function repairShots(ep: Episode, raw: Record<number, Partial<Shot>> = {}
     const a = ACTIONS.find(x => !used().has(x) && x !== out[i - 1]?.action && x !== out[i + 1]?.action);
     if (a) out[i] = {...out[i], action: a};
   }
-  const scenes = ep.scenes.map((s, i) => ({...s, shot: out[i], ...(ep.look === 'fullbleed' && !(s as Sc).visuals?.length && !(s as Sc).visual ? {visuals: [{kind: out[i].subject}]} : {})}));
+  const stock = pickStock(ep, raw, out);
+  const scenes = ep.scenes.map((s, i) => ({...s, shot: out[i], ...(stock[i] ? {stock: stock[i]} : {}), ...(ep.look === 'fullbleed' && !(s as Sc).visuals?.length && !(s as Sc).visual ? {visuals: [{kind: out[i].subject}]} : {})}));
   return {...ep, scenes: scenes as Episode['scenes']};
 }
 
+/** Choose which beats carry stock footage: 40-55% of beats, never the same query within 8 beats, LLM queries first, setting+subject fallbacks to reach the minimum. */
+export function pickStock(ep: Episode, raw: Record<number, {stock?: unknown}>, shots: Shot[]): (Stock | undefined)[] {
+  const cand = ep.scenes.map((s, i): {st: Stock; llm: boolean} | null => {
+    if (NO_STOCK.has(s.type)) return null;
+    const r = (raw[i]?.stock ?? s.stock) as {query?: unknown; kind?: unknown} | null | undefined, q = cleanQuery(r?.query);
+    if (q) return {st: {query: q, kind: r?.kind === 'video' ? 'video' : 'photo'}, llm: true};
+    const fb = cleanQuery(`${shots[i].setting ?? ''} ${shots[i].subject.replace(/_/g, ' ')}`);
+    return fb ? {st: {query: fb, kind: 'photo'}, llm: false} : null;
+  });
+  const n = ep.scenes.length, chosen = new Set<number>(), lastQ = new Map<string, number>();
+  const take = (i: number) => { const c = cand[i]; if (!c || chosen.has(i) || (lastQ.get(c.st.query) ?? -99) > i - STOCK_GAP) return; chosen.add(i); lastQ.set(c.st.query, i); };
+  cand.forEach((c, i) => { if (c?.llm) take(i); });
+  const max = Math.floor(n * STOCK_MAX), min = Math.ceil(n * STOCK_MIN);
+  for (let i = 0; i < n && chosen.size < min; i += 2) take(i); // fallbacks fill gaps on alternate beats first
+  for (let i = 1; i < n && chosen.size < min; i += 2) take(i);
+  // too many: drop every other neighbouring pair first so the video alternates real / drawn
+  for (let i = 1; i < n && chosen.size > max; i++) if (chosen.has(i) && chosen.has(i - 1)) chosen.delete(i);
+  for (let i = n - 1; i >= 0 && chosen.size > max; i--) chosen.delete(i);
+  return cand.map((c, i) => (chosen.has(i) ? c!.st : undefined));
+}
+
 const sys = `You are the storyboard artist of a short explainer video. For every numbered beat decide what the picture shows at that exact moment.
-Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "setting": "3-5 words", "label": "text to show on screen, max 4 words, optional", "number": a number that appears in the beat (optional), "mood": ..., "camera": ...}]}
+Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "setting": "3-5 words", "label": "text to show on screen, max 4 words, optional", "number": a number that appears in the beat (optional), "mood": ..., "camera": ..., "stock": {"query": "2-4 plain English words for a real photo or stock video of what is said (a place, activity or object, no brands, no text, no people's faces), e.g. \"runner morning park\"", "kind": "photo" or "video"} or null}]}
 subject = ONE concrete thing named or implied by the sentence, exactly one of: ${FB_KINDS.join(', ')}.
 action = what happens to it, one of: ${ACTIONS.join(', ')}.
 mood one of: ${MOODS.join(', ')}. camera one of: ${CAMERAS.join(', ')}.
+stock: about half of the beats should have one (always English, even if the script is not); null for pure numbers/charts. Real footage for places, activities, objects; the drawn subject covers abstract ideas.
 Rules: never reuse a subject within 5 beats; use at least 4 different actions across the video; the picture must make sense for what is said right then; a number may only be one that is spoken in that beat.`;
 
 export async function storyboard(client: Client, ep: Episode, o: {model?: string; log?: (m: string) => void} = {}): Promise<Episode> {
-  const raw: Record<number, Partial<Shot>> = {};
+  const raw: Record<number, Partial<Shot> & {stock?: unknown}> = {};
   for (let from = 0; from < ep.scenes.length; from += 8) {
     const batch = ep.scenes.slice(from, from + 8).map((s, k) => `${from + k + 1}. [${s.type}] ${s.narration}`).join('\n');
     try {
       const r = await client.messages.create({model: o.model ?? 'claude-sonnet-5-5', max_tokens: 1800, system: sys, messages: [{role: 'user', content: `Beats:\n${batch}\n\nSubjects already used just before: ${Object.values(raw).slice(-4).map(x => x.subject).join(', ') || 'none'}`}]});
-      const j = extractJson(r.content.filter(c => c.type === 'text').map(c => (c as {text?: string}).text ?? '').join('')) as {shots?: (Partial<Shot> & {i?: number})[]};
+      const j = extractJson(r.content.filter(c => c.type === 'text').map(c => (c as {text?: string}).text ?? '').join('')) as {shots?: (Partial<Shot> & {i?: number; stock?: unknown})[]};
       for (const x of j.shots ?? []) if (typeof x.i === 'number' && x.i >= 1 && x.i <= ep.scenes.length) raw[x.i - 1] = x;
     } catch (e) { o.log?.(`storyboard batch ${from / 8 + 1} failed (${(e as Error).message.slice(0, 60)}); using keyword shots`); }
   }

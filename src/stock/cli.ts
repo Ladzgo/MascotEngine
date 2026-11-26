@@ -4,5 +4,5 @@ import {episodeDir, loadEpisode} from '../schema.js';
 import {stockForEpisode} from './index.js';
 
 const ep = loadEpisode(process.argv[2] ?? '');
-const items = await stockForEpisode(episodeDir(ep.id), ep.scenes, ep.format, {log: m => console.warn(m)});
+const items = await stockForEpisode(episodeDir(ep.id), ep.scenes, ep.format, {log: m => console.warn(m), progress: (d, n, q) => console.log(`STOCK_PROGRESS ${d}/${n} ${q}`)});
 console.log(`stock: ${items.length} of ${ep.scenes.filter(s => s.stock).length} beats have licensed footage (episodes/${ep.id}/stock.json)`);

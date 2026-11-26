@@ -23,6 +23,17 @@ async function allShorts() {
   console.log(`shorts batch: ${n} episode(s) done, ${ids.length - n} skipped`);
 }
 
+/** Licensed b-roll between voice and preview: cached, live progress lines for the Studio, never fatal (a failure leaves the procedural visuals). */
+async function stockStep(id: string) {
+  const ep = loadEpisode(id);
+  if (!ep.scenes.some(s => s.stock) || process.env.STOCK === '0') return;
+  try {
+    const {stockForEpisode} = await import('../stock/index.js');
+    const items = await stockForEpisode(episodeDir(id), ep.scenes, ep.format, {log: m => console.warn(m), progress: (d, n, q) => console.log(`STOCK_PROGRESS ${d}/${n} ${q}`)});
+    console.log(`stock: ${items.length} of ${ep.scenes.filter(s => s.stock).length} beats have licensed footage`);
+  } catch (e) { console.warn(`stock skipped: ${(e as Error).message.split('\n')[0]}`); }
+}
+
 async function main() {
   if (cmd === 'shorts' && id === '--all') return allShorts();
   if (!cmd || !id) {
@@ -55,7 +66,9 @@ async function main() {
       console.log(`${ep.id}: ${timings.scenes.length} scenes, ${timings.total.toFixed(1)}s (${engine.name})`);
       break;
     }
+    case 'stock': { await stockStep(id); break; }
     case 'direct': {
+      await stockStep(id);
       const {direct} = await import('../director/direct.js');
       await direct(id, {final: rest.includes('--final')});
       break;

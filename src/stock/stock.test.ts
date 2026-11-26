@@ -65,6 +65,10 @@ test('stockForEpisode writes stock.json with credit lines, skips beats without s
   const j = JSON.parse(fs.readFileSync(path.join(ep, 'stock.json'), 'utf8'));
   assert.match(j.credits[0], /by Jane \(CC BY 4\.0\) https:\/\/commons\.wikimedia\.org/);
   assert.equal(creditLines([...items, ...items]).length, 1);
+  // second run: same query and file present -> no network at all, progress still reported
+  let calls = 0, prog = 0;
+  const again = await stockForEpisode(ep, [{}, {stock: {query: 'coins', kind: 'photo'}}], 'short', {env: {}, fetcher: async () => { calls++; throw new Error('offline'); }, cacheDir: dir, progress: () => { prog++; }});
+  assert.equal(calls, 0); assert.equal(prog, 1); assert.equal(again.length, 1);
 });
 
 import {pixabayGateForTests, resetPixabayGate, testPixabayKey} from './providers.js';

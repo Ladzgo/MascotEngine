@@ -82,12 +82,18 @@ export function creditLines(items: StockRecord[]): string[] {
   return items.flatMap(i => { const l = `${i.title ? `"${i.title.slice(0, 60)}" ` : ''}by ${i.author} (${i.license}) ${i.pageUrl}`; return seen.has(l) ? [] : (seen.add(l), [l]); });
 }
 
-/** Fetch stock for every scene with `stock`, write episodes/<id>/stock.json and return the records. */
-export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void} = {}): Promise<StockRecord[]> {
-  const items: StockRecord[] = [];
+/** Fetch stock for every scene with `stock`, write episodes/<id>/stock.json and return the records.
+ *  Idempotent: a beat whose query is unchanged and whose file still exists keeps its record (so a "Swap image" choice survives re-runs).
+ *  A beat without a result is skipped silently (procedural visuals stay). Progress goes to `o.progress(done, total, query)`. */
+export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void; progress?: (done: number, total: number, query: string) => void} = {}): Promise<StockRecord[]> {
+  const items: StockRecord[] = [], prev = readStock(epDir).items, total = scenes.filter(s => s.stock).length, cache = o.cacheDir ?? CACHE_DIR;
+  let done = 0;
   for (const [i, s] of scenes.entries()) {
     if (!s.stock) continue;
-    const got = await fetchStock({query: s.stock.query, kind: s.stock.kind, format, ...o});
+    const keep = prev.find(x => x.scene === i && x.query === s.stock!.query && x.kind === s.stock!.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
+    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir});
+    o.progress?.(++done, total, s.stock.query);
+    if (keep) { items.push(keep); continue; }
     if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
     items.push({scene: i, query: s.stock.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind});
   }
