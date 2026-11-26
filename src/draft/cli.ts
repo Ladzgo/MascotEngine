@@ -4,6 +4,7 @@ import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
 import {splitBeats} from './beats.js';
+import {closeLoop} from './story.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
@@ -57,11 +58,15 @@ try {
     const r = await editPass(client, ep3, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
     ep4 = r.ep; console.log(`DRAFT_NOTE editor pass: ${r.changed}/${r.tried} scenes rewritten`);
   }
-  const split = splitBeats(ensurePayoff(fixEpisode(ep4, lang), lang), values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
+  const fixed = fixEpisode(ep4, lang);
+  // the last line loops back to the hook; the stock closer is only the fallback
+  const closer = storyOn ? await closeLoop({client, hook: fixed.scenes[0]?.narration ?? '', topic, lang, model, log}) : null;
+  const closed = closer ? {...fixed, scenes: [...fixed.scenes, {type: 'talk', emotion: 'neutral', emphasis: [], narration: closer}] as typeof fixed.scenes} : ensurePayoff(fixed, lang);
+  const split = splitBeats(closed, values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
   const spread = values.short ? spreadVisuals(split) : {ep: split, fixed: 0};
   const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
   let ep = fit.ep;
-  if (!values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW) ep = await rewriteWeak(client, ep, {model, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  for (let round = 0; round < 2 && !values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW; round++) { const next = await rewriteWeak(client, ep, {model, lang, log}); if (next === ep) break; ep = next; } // up to 2 rounds while under 75
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const sc = scoreScript(ep);
   console.log(`DRAFT_NOTE script score ${sc.total}/100 (${sc.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`);

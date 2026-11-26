@@ -15,7 +15,8 @@ export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {
   const last = ep.scenes.length - 1;
   const out: Sc[] = [];
   ep.scenes.forEach((s, i) => {
-    let sents = s.narration.match(/[^.!?]+[.!?]+["')]*|[^.!?]+$/g)?.map(x => x.trim()).filter(Boolean) ?? [];
+    const real = s.narration.match(/[^.!?]+[.!?]+["')]*|[^.!?]+$/g)?.map(x => x.trim()).filter(Boolean) ?? [];
+    let sents = real;
     // shorts-pro: a sentence longer than the cap is cut after a comma/semicolon near its middle
     if (o.clauses) sents = sents.flatMap(x => {
       if (wc(x) <= MAX) return [x];
@@ -23,13 +24,14 @@ export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {
       if (parts.length < 2) return [x];
       let best = 1, bestD = Infinity, acc = 0;
       for (let k = 1; k < parts.length; k++) { acc += wc(parts[k - 1]); const d = Math.abs(acc - wc(x) / 2); if (d < bestD) { bestD = d; best = k; } }
-      return [parts.slice(0, best).join(' '), parts.slice(best).join(' ')];
+      const a = parts.slice(0, best).join(' '), b = parts.slice(best).join(' ');
+      return wc(a) >= 4 && wc(b) >= 4 ? [a, b] : [x]; // no 2-word fragments as beats of their own
     });
     // shorts-pro: a long data scene keeps its first sentence(s); the rest becomes a talk beat after it (a list or compare is never cut mid-sentence)
-    if (o.clauses && s.type !== 'talk' && s.type !== 'title' && i > 0 && sents.length >= 2 && wc(s.narration) > MAX) {
+    if (o.clauses && s.type !== 'talk' && s.type !== 'title' && i > 0 && real.length >= 2 && wc(s.narration) > MAX) {
       let k = 1;
-      while (k < sents.length - 1 && wc(sents.slice(0, k + 1).join(' ')) <= MAX) k++;
-      const head = sents.slice(0, k).join(' '), tail = sents.slice(k).join(' ');
+      while (k < real.length - 1 && wc(real.slice(0, k + 1).join(' ')) <= MAX) k++;
+      const head = real.slice(0, k).join(' '), tail = real.slice(k).join(' ');
       const em = (t: string) => ((s as {emphasis?: string[]}).emphasis ?? []).filter(e => t.toLowerCase().includes(e.toLowerCase()));
       out.push({...s, narration: head, ...('emphasis' in s ? {emphasis: em(head)} : {})} as Sc);
       out.push({type: 'talk', emotion: (s as {emotion?: string}).emotion ?? 'neutral', emphasis: em(tail), narration: tail} as Sc);

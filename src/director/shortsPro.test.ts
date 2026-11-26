@@ -36,3 +36,10 @@ test('splitBeats: a long two-sentence Short data scene keeps its first sentence,
   const out = splitBeats(ep, {max: 11, clauses: true});
   assert.deepEqual(out.scenes.map(s => [s.type, s.narration]), [['talk', 'Hook.'], ['list', 'Mortality risk drops 30% at 7,500 steps.'], ['talk', 'Then it plateaus for good.'], ['talk', 'Bye.']]);
 });
+
+test('splitBeats: a one-sentence data scene is never cut at a comma; tiny clause fragments stay attached', () => {
+  const ep = mk([sc('Hook.'), {type: 'compare', emotion: 'explaining', narration: 'On a 5,000 balance, that equals a $100 payment.', emphasis: [], left: {title: 'a', value: '1'}, right: {title: 'b', value: '2'}}, sc('Pay it off, done, and the interest stops piling up month after month for good.'), sc('Bye.')]);
+  const out = splitBeats(ep, {max: 11, clauses: true});
+  assert.equal(out.scenes[1].narration, 'On a 5,000 balance, that equals a $100 payment.');
+  assert.ok(out.scenes.every(s => s.narration.split(/\s+/).length >= 3 || /^(Hook|Bye)/.test(s.narration)), out.scenes.map(s => s.narration).join(' | '));
+});

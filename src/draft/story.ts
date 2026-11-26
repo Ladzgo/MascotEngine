@@ -70,6 +70,9 @@ export function extraNumbers(x: unknown): number[] {
   walk(x); return out;
 }
 
+/** "Elon Musk noticed...": a first + last name in a hook is a claim about a real person the facts do not support. */
+export const fullName = (h: string) => /\b[A-Z][a-z]+ [A-Z][a-z]{2,}\b/.test(h);
+
 const NUMW = /\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand|million|billion|half|double|egy|kettő|két|három|négy|öt|hat|hét|nyolc|kilenc|tíz|száz|ezer|millió)\b/i;
 const wcount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
 /** Deterministic part of the hook rubric (0-10): length, a number, no stock phrases, no throat-clearing opener, a person or a stake. */
@@ -85,10 +88,10 @@ export function hookHeuristic(h: string): number {
 /** 5 hook candidates, rubric-judged by the model (specificity, curiosity gap, stakes, number, <= 12 words), blended with the heuristic. Numbers must be in `allowed`. */
 export async function pickHook(o: {client: Client; topic: string; outlineHook: string; stakes: string; device?: Device; lang?: string; model?: string; allowedOk: (h: string) => boolean; log?: (m: string) => void}): Promise<string> {
   const text = (r: {content: Array<{type: string; text?: string}>}) => r.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
-  const sys = `You write opening lines for short explainer videos.${isHu(o.lang) ? `\n${LANG_RULES.hu}` : ''} The first spoken sentence must stop a scroll: specific, concrete, one number or a named person, 12 words or fewer, plain spoken, no hype words, no "Did you know". Use only numbers that appear in the given facts. Output ONLY JSON: {"hooks": [5 different strings, each built differently: a number first, a person first, a contradiction, a question that implies a number, a flat claim]}`;
+  const sys = `You write opening lines for short explainer videos.${isHu(o.lang) ? `\n${LANG_RULES.hu}` : ''} The first spoken sentence must stop a scroll: specific, concrete, one number or an everyday first-name person (never a real celebrity or public figure), 12 words or fewer, plain spoken, no hype words, no "Did you know". Use only numbers that appear in the given facts. Output ONLY JSON: {"hooks": [5 different strings, each built differently: a number first, a person first, a contradiction, a question that implies a number, a flat claim]}`;
   let cands: string[] = [];
   try { const j = extractJson(text(await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 600, system: sys, messages: [{role: 'user', content: `Topic: ${o.topic}\nDevice: ${o.device?.name ?? 'any'}\nCurrent hook: ${o.outlineHook}\nStakes: ${o.stakes}`}]}))) as {hooks?: unknown}; cands = (Array.isArray(j.hooks) ? j.hooks : []).map(x => String(x).trim()).filter(Boolean); } catch (e) { o.log?.(`hook candidates failed (${(e as Error).message.slice(0, 60)}); keeping the outline hook`); return o.outlineHook; }
-  cands = [...new Set([o.outlineHook, ...cands])].filter(h => wcount(h) <= 15 && o.allowedOk(h));
+  cands = [...new Set([o.outlineHook, ...cands])].filter(h => wcount(h) <= 15 && o.allowedOk(h) && !fullName(h));
   if (cands.length < 2) return cands[0] ?? o.outlineHook;
   let judged: number[] = cands.map(() => 5);
   try {
@@ -99,4 +102,18 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
   total.sort((a, b) => b.s - a.s);
   o.log?.(`hook chosen from ${cands.length}: "${total[0].h}"`);
   return total[0].h;
+}
+
+const keyWords = (t: string) => t.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^(that|this|with|your|from|they|have|what|when|will|about|than|then|into|were|been|does|more|most|every|there|their|which|would|could|should)$/.test(w));
+/** Closing line that loops back to the hook (reuses one of its key words) instead of a stock closer; null when the model cannot give a valid one. */
+export async function closeLoop(o: {client: Client; hook: string; topic: string; lang?: string; model?: string; log?: (m: string) => void}): Promise<string | null> {
+  if (isHu(o.lang)) return null; // shortcut: English only (the product is English-only now), Hungarian keeps the stock closer
+  const hookKeys = keyWords(o.hook);
+  try {
+    const r = await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 300, system: 'You write the last spoken line of a short explainer video. 12 words or fewer, plain spoken English, starts with "So" or "Next time", reuses one key word from the opening line so the video loops, lands the one thing to remember. No advice or guarantee wording, no new numbers, no "follow" or "subscribe". Output ONLY JSON: {"lines": [3 different lines]}', messages: [{role: 'user', content: `Topic: ${o.topic}\nOpening line: ${o.hook}`}]});
+    const j = extractJson(r.content.filter(c => c.type === 'text').map(c => (c as {text?: string}).text ?? '').join('')) as {lines?: unknown};
+    const ok = (Array.isArray(j.lines) ? j.lines : []).map(x => String(x).trim()).find(l => wcount(l) <= 14 && !/\d/.test(l) && !slopHits(l).length && !/follow|subscribe/i.test(l) && keyWords(l).some(w => hookKeys.includes(w)));
+    o.log?.(ok ? `closing line loops to the hook: "${ok}"` : 'no closing line reused the hook; keeping the stock closer');
+    return ok ?? null;
+  } catch (e) { o.log?.(`closing line skipped (${(e as Error).message.slice(0, 60)})`); return null; }
 }

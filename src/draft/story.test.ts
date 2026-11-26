@@ -41,3 +41,17 @@ test('script score: stock phrases and flat lines score lower than a concrete con
   const bad = ["In today's fast-paced world, money matters.", 'It is important to note that interest exists.', 'Let us delve into the topic of finance.', 'Basically the economy is complex and varied.', 'Well, banks do things with money.', 'In conclusion, finance is a game-changer.'];
   assert.ok(scoreScript(mk(good)).total > scoreScript(mk(bad)).total + 20);
 });
+
+test('closeLoop keeps a line that reuses a hook word and drops numbers, follow-asks and unrelated lines; full names never reach the hook', async () => {
+  const {closeLoop, fullName} = await import('./story.js');
+  const client = (lines: string[]) => ({messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({lines})}]})}}) as any;
+  const hook = 'Your phone battery dies faster in the cold.';
+  assert.equal(await closeLoop({client: client(['Follow for more battery tips.', 'So it costs 20% more.', 'So next time, keep your battery warm in a pocket.']), hook, topic: 't'}), 'So next time, keep your battery warm in a pocket.');
+  assert.equal(await closeLoop({client: client(['So remember this one simple thing.']), hook, topic: 't'}), null);
+  assert.ok(fullName('Elon Musk noticed his phone dies faster.') && !fullName('Alex, 35, sits ten hours a day.'));
+});
+
+test('score: too few short sentences marks plain mid beats for a punchy rewrite', () => {
+  const s = scoreScript(mk(['Hook with 5 dollars here.', 'This sentence runs on for quite a few words in a row.', 'Another sentence that also runs on for many plain words.', 'Yet another long plain sentence with a lot of words in it.', 'One more long sentence here with plenty of words in it too.', 'So next time remember the hook.']));
+  assert.ok(s.weak.some(w => /rhythm/.test(w.why)));
+});

@@ -33,7 +33,7 @@ test('ensurePayoff adds one closing line only when missing, in the channel langu
   assert.match(fixed.scenes.at(-1)!.narration, /A tanulság/);
   assert.deepEqual(arcGaps(fixed).filter(g => /takeaway/.test(g)), []);
   assert.equal(ensurePayoff(mk('Szóval kezdd ma.'), 'hu').scenes.at(-1)!.narration, 'Szóval kezdd ma.');
-  assert.match(ensurePayoff(mk('That is it.'), 'en').scenes.at(-1)!.narration, /The takeaway/);
+  assert.match(ensurePayoff(mk('That is it.'), 'en').scenes.at(-1)!.narration, /So next time/);
 });
 
 test('buildSystem switches prompt and few-shot to Hungarian', () => {
