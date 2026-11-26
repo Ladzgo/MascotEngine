@@ -4,6 +4,8 @@ import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {BOIL_STYLE} from '../fx/boil';
 import {QuoteCard} from '../fx/overlays';
+import {VisualStage} from '../visuals/Stage';
+import {pickVisuals} from '../visuals/pick';
 import {DISPLAY, INK, SANS, backOut, onAccent, clamp, easeInOut, easeOut} from '../theme';
 
 export type Box = {x: number; y: number; w: number; h: number};
@@ -62,17 +64,19 @@ export const TitleScene: React.FC<SceneProps> = ({frame, fps, accent, box, intro
 
 // ------------------------------------------------------------ talk
 export const TalkScene: React.FC<SceneProps> = ({scene, dec, frame, fps, accent, box, keyword}) => {
-  if (!['keyword_side', 'over_shoulder'].includes(dec.layout)) return null;
-  const t0 = dec.punchIns[0]?.t ?? dec.speechStart + 0.6;
-  if (scene.type === 'talk' && scene.quote) return <QuoteCard text={scene.quote.text} by={scene.quote.by} t={frame / fps} at={dec.speechStart + 0.2} accent={accent} width={box.w} x={box.x} y={box.y} />;
-  const p = pop(t0, frame, fps, 0.45);
+  if (scene.type === 'talk' && scene.quote && ['keyword_side', 'over_shoulder'].includes(dec.layout)) return <QuoteCard text={scene.quote.text} by={scene.quote.by} t={frame / fps} at={dec.speechStart + 0.2} accent={accent} width={box.w} x={box.x} y={box.y} />;
+  const {hero, support} = pickVisuals(scene);
+  const t = frame / fps - (dec.speechStart + 0.05);
+  const labelT = Math.max(0.3, (dec.punchIns[0]?.t ?? dec.speechStart + 0.6) - (dec.speechStart + 0.05));
+  const label = scene.visual?.label ?? keyword;
+  if (['keyword_side', 'over_shoulder'].includes(dec.layout)) return <VisualStage box={box} hero={hero} support={support} label={label} t={t} labelT={labelT} accent={accent} />;
+  // centre / close-up: the mascot owns the middle, so props float in the free space on either side
+  const room = dec.layout === 'closeup' ? 440 : 520;
   return (
-    <Frame box={box}>
-      <div style={{position: 'relative', transform: `scale(${0.5 + 0.5 * p}) rotate(${(1 - p) * -4}deg)`, opacity: fade(t0, frame, fps, 0.1)}}>
-        <div style={{fontFamily: DISPLAY, fontSize: Math.min(130, /\s/.test(keyword) ? Math.floor(Math.sqrt((box.w * box.h * 0.55) / (Math.max(keyword.length, 1) * 0.65))) : Math.floor(box.w / (Math.max(keyword.length, 1) * 0.62))), lineHeight: 1.05, color: accent, textTransform: 'uppercase', maxWidth: box.w}}>{keyword}</div>
-        <div style={{position: 'relative', height: 30, margin: '10px auto 0', width: 640}}><Underline w={640} progress={easeInOut((frame / fps - t0 - 0.2) / 0.5)} color={INK} /></div>
-      </div>
-    </Frame>
+    <>
+      <VisualStage box={{x: 90, y: 190, w: room, h: 520}} hero={hero} support={[]} t={t} accent={accent} />
+      {support[0] && <VisualStage box={{x: 1920 - 90 - room, y: 250, w: room, h: 440}} hero={support[0]} support={[]} t={t - 0.35} accent={accent} />}
+    </>
   );
 };
 

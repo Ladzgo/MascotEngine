@@ -1,0 +1,2 @@
+/** Illustration library kinds (browser-safe: no imports). */
+export const VISUAL_KINDS = ['credit_card', 'coins', 'jar', 'house', 'car', 'bank', 'piggy', 'calendar', 'clock', 'percent', 'shield', 'magnifier', 'receipt', 'document', 'arrow_up', 'arrow_down', 'scale', 'people', 'phone', 'chart_up', 'chart_down', 'bulb', 'wallet', 'cash', 'lock', 'question', 'warning', 'check', 'target', 'hourglass'] as const;

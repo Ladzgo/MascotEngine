@@ -18,9 +18,9 @@ export function placement(layout: string, type: string): Place {
     case 'title:center': return {char: {cx: 960, h: 500}, content: c(260, 70, 1400, 380)};
     case 'title:closeup': return {char: {cx: 1400, h: 960}, content: c(140, 200, 1000, 520)};
     case 'talk:center': return {char: {cx: 960, h: 780}, content: c(0, 0, 0, 0)};
-    case 'talk:keyword_side': return {char: {cx: 460, h: 740}, content: c(900, 240, 900, 420)};
+    case 'talk:keyword_side': return {char: {cx: 460, h: 740}, content: c(860, 110, 1000, 770)};
     case 'talk:closeup': return {char: {cx: 960, h: 960}, content: c(0, 0, 0, 0)};
-    case 'talk:over_shoulder': return {char: {cx: 1450, h: 960}, content: c(110, 260, 900, 420)};
+    case 'talk:over_shoulder': return {char: {cx: 1450, h: 960}, content: c(90, 110, 940, 770)};
     case 'big_number:center': return {char: {cx: 1640, h: 480}, content: c(100, 90, 1340, 780)};
     case 'big_number:char_left': return {char: {cx: 360, h: 660}, content: c(660, 90, 1160, 790)};
     case 'big_number:char_right': return {char: {cx: 1560, h: 660}, content: c(100, 90, 1160, 790)};

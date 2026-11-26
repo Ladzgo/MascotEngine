@@ -7,8 +7,8 @@ export const Emotion = z.enum([
 ]);
 export type Emotion = z.infer<typeof Emotion>;
 
-/** Illustration library kinds (src/visuals). Keep in sync with VISUAL_KINDS there. */
-export const VISUAL_KINDS = ['credit_card', 'coins', 'jar', 'house', 'car', 'bank', 'piggy', 'calendar', 'clock', 'percent', 'shield', 'magnifier', 'receipt', 'document', 'arrow_up', 'arrow_down', 'scale', 'people', 'phone', 'chart_up', 'chart_down', 'bulb', 'wallet', 'cash', 'lock', 'question', 'warning', 'check', 'target', 'hourglass'] as const;
+import {VISUAL_KINDS} from './visuals/kinds';
+export {VISUAL_KINDS};
 export const VisualKind = z.enum(VISUAL_KINDS);
 export type VisualKind = z.infer<typeof VisualKind>;
 
