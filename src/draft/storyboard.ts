@@ -111,7 +111,9 @@ export function pickStock(ep: Episode, raw: Record<number, {stock?: unknown}>, s
   // too many: drop every other neighbouring pair first so the video alternates real / drawn
   for (let i = 1; i < n && chosen.size > max; i++) if (chosen.has(i) && chosen.has(i - 1)) chosen.delete(i);
   for (let i = n - 1; i >= 0 && chosen.size > max; i--) chosen.delete(i);
-  return cand.map((c, i) => (chosen.has(i) ? c!.st : undefined));
+  // every other stock beat asks for footage (moving b-roll reads as filmed, not a slideshow); fetch falls back to a photo when no clip matches
+  let k = 0;
+  return cand.map((c, i) => (chosen.has(i) ? {...c!.st, kind: c!.st.kind === 'video' || k++ % 2 === 1 ? 'video' as const : 'photo' as const} : undefined));
 }
 
 const sys = `You are the storyboard artist of a short explainer video. For every numbered beat decide what the picture shows at that exact moment.
