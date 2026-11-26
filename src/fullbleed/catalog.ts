@@ -16,6 +16,8 @@ export const SUBJECTS = [
   'shopping_bag', 'groceries', 'coffee', 'cart', 'pricetag', 'price_up', 'subscriptions', 'phone',
   // ideas and people
   'bulb', 'magnifier', 'gears', 'handshake', 'gradcap', 'people',
+  // theme packs: sport, health, travel, tech, food, science (src/fullbleed/objects5.tsx)
+  'shoe', 'dumbbell', 'stopwatch', 'medal', 'heart', 'apple', 'pill', 'drop', 'plane', 'globe', 'suitcase', 'mountain', 'laptop', 'chip', 'book', 'flask', 'atom', 'sprout', 'sun', 'burger',
   'person_atm', 'person_bills', 'person_celebrate', 'person_shocked', 'person_thinking', 'person_walking',
 ] as const;
 
@@ -52,5 +54,11 @@ export const GROUPS: Record<string, string[]> = {
   compare: ['scale', 'donut', 'pie', 'stacked_bars'],
   fall: ['arrow_down', 'hole', 'anchor', 'flame', 'person_shocked'],
   people: ['person_celebrate', 'person_thinking', 'person_walking', 'people', 'person_shocked'],
+  sport: ['shoe', 'dumbbell', 'stopwatch', 'medal', 'trophy', 'person_walking', 'mountain'],
+  health: ['heart', 'apple', 'pill', 'drop', 'thermometer', 'sprout'],
+  travel: ['plane', 'globe', 'suitcase', 'mountain', 'map_route', 'pin', 'sun'],
+  tech: ['laptop', 'chip', 'phone', 'gears', 'bulb', 'ticker'],
+  food: ['burger', 'apple', 'groceries', 'coffee', 'drop'],
+  science: ['flask', 'atom', 'sprout', 'book', 'globe', 'sun', 'gradcap'],
   ideas: ['bulb', 'magnifier', 'gears', 'handshake', 'gradcap', 'dice', 'ticker'],
 };

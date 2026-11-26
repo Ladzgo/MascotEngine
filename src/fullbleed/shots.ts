@@ -6,6 +6,11 @@ const MIN_GAP = 1.5, MAX_SHOTS = 4;
 
 /** Narration word -> candidate objects, most specific first. A word can point at several (money -> coins, cash, wallet): the planner takes the first one not just shown. */
 const RULES: [string, RegExp][] = [
+  ['shoe', /^(run\w*|jog\w*|sneakers?|shoes?|marathon|sprint\w*|stride|footwear)$/], ['dumbbell', /^(gym|lift\w*|workouts?|strength|muscles?|weights?|train\w*|exercis\w+)$/], ['stopwatch', /^(pace|stopwatch|timer|speed|laps?|seconds)$/], ['medal', /^(medals?|race|podium|finish\w*)$/],
+  ['heart', /^(heart|health\w*|cardio|pulse|wellness|healthy)$/], ['apple', /^(apples?|fruits?|vegetables?|nutrition|diet|fiber|vitamins?)$/], ['pill', /^(pills?|medicine|medic\w+|drugs?|supplements?|doctor)$/], ['drop', /^(water|hydrat\w+|drink\w*|sweat\w*)$/],
+  ['plane', /^(fl(y|ight|ights|ying)|plane|airline|airport|travel\w*|trip|vacation|abroad)$/], ['globe', /^(world\w*|global\w*|countries|country|planet|earth|international)$/], ['suitcase', /^(luggage|suitcase|pack\w*|hotel|tourist\w*)$/], ['mountain', /^(mountains?|hik\w+|summit|peak|trail|climb\w*|nature)$/],
+  ['laptop', /^(laptops?|computers?|software|code|coding|programm\w+|developer\w*|websites?)$/], ['chip', /^(chips?|ai|processor|hardware|algorithms?|robots?|semiconductors?)$/], ['flask', /^(science|experiments?|chemic\w+|lab|research\w*|study|studies)$/], ['atom', /^(atoms?|physics|energy|quantum|molecul\w+)$/],
+  ['sprout', /^(sprout\w*|garden\w*|green|organic|environment\w*|sustainab\w+|plants?)$/], ['sun', /^(sun\w*|summer|morning|daylight|solar|weather)$/], ['burger', /^(burgers?|fast|junk|restaurants?|cook\w*|recipes?|meals?|dinner|lunch|breakfast)$/], ['book', /^(books?|read\w*|learn\w*|lessons?|courses?|knowledge|study)$/],
   ['person_atm', /^(atm|withdraw\w*)$/], ['atm', /^(atm|withdraw\w*|machine)$/], ['paycheck', /^(paychecks?|salary|wages?|income|earn\w*|paid|payday)$/], ['bills', /^(bills?|utilit\w+|invoices?|statements?)$/],
   ['person_bills', /^(stress\w*|worr\w*|anxious|anxiety|panic\w*|overwhelm\w*)$/], ['person_celebrate', /^(celebrat\w+|freedom|joy\w*|thrilled|happy|party)$/], ['person_shocked', /^(shock\w*|surpris\w*|wow|unbelievable|stunned)$/],
   ['person_thinking', /^(think\w*|decid\w+|decision|consider\w*|wonder\w*|choos\w+)$/], ['person_walking', /^(walk\w*|journey|begin\w*|beginner\w*|first)$/],
