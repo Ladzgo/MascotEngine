@@ -33,3 +33,9 @@ test('edgeSilence reads pre-roll and an unterminated outro; sceneLevels gates si
   const v = new Float32Array(1000).map((_, i) => (i < 500 ? 0.2 * Math.sin(i) : 0));
   assert.equal(sceneLevels(v, 100, [{startSec: 0, durSec: 5}, {startSec: 5, durSec: 5}]).length, 1);
 });
+
+import {audit} from './sfxAudit.js';
+test('every SFX cue peaks under -3 dBFS and sits at least 8 dB below a typical voice level', () => {
+  const bad = audit(-15).filter(r => !r.ok).map(r => r.cue);
+  assert.deepEqual(bad, []);
+});

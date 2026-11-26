@@ -13,6 +13,10 @@ function lcg(seed: number) { let s = seed >>> 0; return () => ((s = (Math.imul(s
 const PENTA = [1, 1.122, 1.26, 1.498, 1.682, 1.888];
 
 /** Synthesised SFX (no sample files needed). Variants 0-5 change pitch, sweep direction and character so neighbouring cues never sound identical. */
+/** Per-kind mix gain applied to a synthesised cue (scripts/qa/sfxAudit.ts measures the result against the voice). */
+export const SFX_GAIN: Partial<Record<SfxKind, number>> = {tick: 0.3, chime: 0.55, whoosh: 0.34, pop: 0.4, ding: 0.45};
+export const sfxGain = (k: SfxKind) => SFX_GAIN[k] ?? 0.5;
+
 export function synth(kind: SfxKind, variant: number): Float32Array {
   const dur = {pop: 0.16, whoosh: 0.5, tick: 0.035, ding: 1.0, chime: 1.3}[kind];
   const n = Math.floor(dur * SR);
@@ -127,7 +131,7 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
     for (const c of d.sfx) {
       const k = `${c.kind}${c.variant}`;
       if (!cache.has(k)) cache.set(k, synth(c.kind, c.variant));
-      add(sfx, cache.get(k)!, d.startSec + c.t, ({tick: 0.3, chime: 0.55, whoosh: 0.42} as Partial<Record<SfxKind, number>>)[c.kind] ?? 0.5);
+      add(sfx, cache.get(k)!, d.startSec + c.t, sfxGain(c.kind));
     }
     if (takes[i]) { hasVoice = true; add(voice, takes[i]!, d.startSec + d.speechStart, gains[i]); }
   });
