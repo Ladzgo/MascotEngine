@@ -9,21 +9,29 @@ export const CACHE_DIR = `${ROOT}assets/stock-cache/`;
 type Env = Record<string, string | undefined>;
 export type Format = 'short' | 'wide';
 
-// b-roll should not show faces, logos, brands or text: in an episode (topic known) such hits are dropped, the drawn subject is better;
-// in the Studio's Swap grid (no topic) they only rank last, the user decides
+// b-roll should not show faces, logos, brands or text: such hits rank last. In an episode (topic known) logos/text/posed fashion shots are
+// dropped outright (the drawn subject is better); people stay possible (a sleep video needs a sleeping person), only ranked lower
 const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face|selfie|model|lady|fashion|cigarette|logo|brand|sign|text|poster|banner|screenshot|advert\w*)\b/i;
+const HARD = /\b(selfie|model|fashion|cigarette|logo|brand|text|poster|banner|screenshot|advert\w*)\b/i;
+// a cat or a baby matches "sleep" but not "person taking a nap": in an episode such hits need the query to ask for them
+const OFF_SUBJECT = /\b(cats?|kitten|kitty|dogs?|puppy|pets?|animals?|baby|newborn|child|children|kids?|toys?|fantasy|cartoon|illustration)\b/i;
+const VAGUE = new Set(['person', 'people', 'someone', 'man', 'woman']); // query filler: never counts as a matching word
 
 /** Rank hits: right orientation, enough pixels, no faces/logos/text, then bigger. Hits below the minimum size are dropped. */
 export function rank(hits: StockHit[], a: Query, format: Format, topic: string[] = []): StockHit[] {
   const minW = format === 'short' ? 720 : 1280, minH = format === 'short' ? 1280 : 720;
-  const words = a.query.toLowerCase().split(/\W+/).filter(x => x.length > 2).map(x => x.replace(/(ing|es|s)$/, ''));
+  const words = a.query.toLowerCase().split(/\W+/).filter(x => x.length > 2 && !VAGUE.has(x)).map(x => x.replace(/(ing|es|s)$/, ''));
+  const wantsPeople = /\b(person|people|someone|man|woman|runner|worker|student|sleeping)\b/i.test(a.query); // "sleeping person bedroom" should find a person, not a cat
   const stem = (x: string) => x.replace(/(ing|es|s)$/, ''), overlap = (h: StockHit) => { const t = new Set(`${h.title} ${h.provider === 'pixabay' || h.provider === 'pexels' ? h.tags ?? '' : ''}`.toLowerCase().split(/\W+/).map(stem)); return words.filter(x => t.has(x)).length; }; // whole words only: 'sign' must not match 'design'
   const sized = hits.filter(h => h.url && (!h.width || !h.height || (h.kind === 'video' ? Math.max(h.width, h.height) >= 1280 : h.width >= minW * 0.9 && h.height >= minH * 0.9)));
-  const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
+  const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) && !wantsPeople ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
   // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
   // and it must name the video's topic ("sleep", "credit"): a hand with a pen matches "hands writing" but says nothing about sleep (en-sleep)
-  const tw = topic.map(stem), onTopic = (h: StockHit) => !tw.length || (tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w)) && !AVOID.test(`${h.title} ${h.tags ?? ''}`));
-  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => (x.ov >= need || !words.length) && onTopic(x.h));
+  const tw = topic.map(stem), onTopic = (h: StockHit) => !tw.length || (tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w)) && !HARD.test(`${h.title} ${h.tags ?? ''}`) && (!OFF_SUBJECT.test(`${h.title} ${h.tags ?? ''}`) || OFF_SUBJECT.test(a.query)));
+  // with a topic, the match must come from the non-topic words: "sleep couch" -> a sailboat tagged "sleep" is not a couch
+  // (prefix match both ways, 3+ letters: "bedroom" ~ "bed", "night" ~ "nightstand")
+  const subj = words.filter(x => !tw.includes(x)), subjOv = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).filter(x => x.length >= 3).map(stem); return subj.filter(x => t.some(y => y.startsWith(x) || x.startsWith(y))).length; };
+  const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => onTopic(x.h) && (tw.length && subj.length ? subjOv(x.h) >= (subj.length >= 3 ? 2 : 1) : x.ov >= need || !words.length));
   return relevant.sort((x, y) => y.s - x.s).map(x => x.h);
 }
 
@@ -87,20 +95,24 @@ export async function chooseStock(epDir: string, scene: number, stock: {query: s
   return rec;
 }
 /** Best licensed match for one query. Provider order: Pexels, Pixabay (when keyed), then Openverse, Wikimedia Commons. Downloads once into assets/stock-cache/<sha1>.<ext>. */
-export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]}): Promise<Fetched | null> {
+export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]; exclude?: Set<string>}): Promise<Fetched | null> {
   const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR, topic = o.topic ?? [];
   setApiCacheDir(path.join(dir, 'api'));
   const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
-  // second try puts the topic word in front, so "open book" becomes "sleep open book" when the plain query found nothing on topic
-  const anchored = topic[0] && !o.query.includes(topic[0]) ? {...a, query: `${topic[0]} ${o.query.split(' ').slice(0, 2).join(' ')}`} : null;
-  const tries = [a, ...(anchored ? [anchored] : [])].flatMap(x => (o.kind === 'video' ? [x, {...x, kind: 'photo' as const}] : [x])); // a video query falls back to a photo
+  // later tries narrow toward the topic: "person taking nap couch" -> "woman nap couch" -> "sleep nap couch" -> "sleep couch" (Pixabay ANDs words;
+  // its people photos are tagged woman/man, not person; helper verbs like "taking"/"using" only shrink the result)
+  const who = o.query.length % 2 ? 'woman' : 'man', core = o.query.split(' ').filter(w => w && !VAGUE.has(w) && !topic.includes(w) && !/^(taking|using|doing|having|getting|making|holding)$/.test(w));
+  const qs = topic[0] ? [o.query, ...(/\b(person|people|someone)\b/.test(o.query) ? [`${who} ${core.join(' ')}`] : []), `${topic[0]} ${core.slice(0, 2).join(' ')}`, `${topic[0]} ${core.at(-1) ?? ''}`] : [o.query];
+  const tries = [...new Set(qs.map(x => x.trim()))].map(query => ({...a, query})).flatMap(x => (o.kind === 'video' ? [x, {...x, kind: 'photo' as const}] : [x])); // a video query falls back to a photo
+  const keyed = PROVIDERS.some(p => p.needsKey && env[p.needsKey]);
   for (const kinds of tries) {
     for (const p of PROVIDERS) {
       if (p.needsKey && !env[p.needsKey]) continue;
+      if (topic.length && keyed && !p.needsKey) continue; // with a Pixabay key the keyless archives only add paintings and plaques (en-sleep)
       const t = () => p.search(f, kinds, env);
       let hits: StockHit[] = [];
       try { hits = await t(); } catch { continue; } // a provider being down is never an error
-      for (const hit of rank(hits, kinds, o.format, topic).slice(0, 3)) {
+      for (const hit of rank(hits, kinds, o.format, topic).filter(h => !o.exclude?.has(h.pageUrl)).slice(0, 3)) { // one picture once per video
         const file = await downloadHit(hit, f, dir, o.format);
         if (file) return {file, hit};
       }
@@ -125,7 +137,7 @@ export async function stockForEpisode(epDir: string, scenes: {stock?: {query: st
   for (const [i, s] of scenes.entries()) {
     if (!s.stock) continue;
     const keep = prev.find(x => x.scene === i && x.query === s.stock!.query && x.kind === s.stock!.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
-    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic});
+    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic, exclude: new Set(items.map(x => x.pageUrl))});
     o.progress?.(++done, total, s.stock.query);
     if (keep) { items.push(keep); continue; }
     if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
