@@ -35,7 +35,7 @@ const envFor = (kind: string): Env => ENV_OF[kind] ?? 'abstract';
 /** Three-depth environment with a ground plane for the hero to stand on. cx = camera pan px; layers parallax at 0.2 / 0.5 / 0.9; blurred foreground shapes at 1.6 (depth of field). */
 const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, string, string]; cx: number; t: number; seed: number}> = ({w, h, env, pal, cx, t, seed}) => {
   const rnd = (i: number) => { const x = Math.sin((i + 1) * 91.7 + seed * 13.1) * 43758.5453; return x - Math.floor(x); };
-  const hz = h * 0.6, tall = h > w;
+  const tall = h > w, hz = h * (tall ? 0.67 : 0.6); // tall: lower horizon so the picture fills the frame down to the captions (no empty floor band)
   const bld = (layer: number, n: number, par: number, minH: number, maxH: number, col: string, op: number, lights: boolean) => Array.from({length: n}, (_, i) => {
     const bw = (w / n) * (1.05 + rnd(i + layer * 50) * 0.5), x = i * (w / n) * 1.0 - cx * par - 80 + rnd(i + layer * 70) * 40, bh = minH + rnd(i + layer * 30) * (maxH - minH);
     return (
@@ -210,10 +210,10 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
 
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
-  // hero stands on the ground plane (y = 68% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
-  const base = tall ? w * 1.3 : h * 1.05;
+  // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
+  const base = tall ? w * 1.4 : h * 1.05;
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
-  const hs = base * scale, groundY = tall ? h * 0.67 : h * 0.8, cy = groundY - 0.325 * hs;
+  const hs = base * scale, groundY = tall ? h * 0.75 : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (
@@ -234,7 +234,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           const feet = groundY, Cmp = plan.companion ?? s.kind;
           const slots: Slot[] = lay === 'split' && !hasCallouts && !versus ? [{x: w * 0.27, s: 0.44, feet, kind: s.kind, delay: 0, main: true}, {x: w * 0.73, s: 0.44, feet, kind: Cmp, delay: 0.25, main: false}]
             : lay === 'grid' && !hasCallouts && !versus ? Array.from({length: 6}, (_, k) => ({x: w * (0.19 + (k % 3) * 0.31), s: 0.28, feet: feet - Math.floor(k / 3) * hs * 0.3 * 0.62 - (k % 3 === 1 ? 14 : 0), kind: s.kind, delay: k * 0.12, main: k === 1}))
-            : lay === 'pip' || lay === 'broll' ? [{x: w * (lay === 'pip' ? 0.74 : 0.26), s: 1, feet: tall ? h * 0.66 : h * 0.74, kind: s.kind, delay: 0, main: true}]
+            : lay === 'pip' || lay === 'broll' ? [{x: w * (lay === 'pip' ? 0.74 : 0.26), s: 1, feet: tall ? h * 0.74 : h * 0.74, kind: s.kind, delay: 0, main: true}]
             : [{x: hx, s: 1, feet, kind: s.kind, delay: 0, main: true}];
           return slots.map((sl, si) => {
             const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
@@ -261,7 +261,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           });
         })}
       </div>
-      {lay === 'kinetic' && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.1) / 0.3), fs = Math.min(w * (kw.length > 12 ? 0.13 : 0.18), 220); return <div style={{position: 'absolute', left: w * 0.04, width: w * 0.92, top: tall ? h * 0.09 : h * 0.08, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{kw}</div>; })()}
+      {lay === 'kinetic' && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.1) / 0.3), fs = Math.min(w * 0.18, (w * 0.88) / (Math.max(...kw.split(/\s+/).map(x => x.length)) * 0.68), 220); return <div style={{position: 'absolute', left: w * 0.04, width: w * 0.92, top: tall ? h * 0.09 : h * 0.08, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{kw}</div>; })()}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} words={words} />}

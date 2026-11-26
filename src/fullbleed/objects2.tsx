@@ -31,7 +31,7 @@ export const Phone: Obj = ({t, accent}) => {
         <rect x={110} y={30} width={180} height={310} rx={30} fill={url('navy')} /><rect x={120} y={44} width={160} height={282} rx={20} fill={url('glass', true)} />
         <rect x={170} y={34} width={60} height={8} rx={4} fill="#0b1020" />
         {[0, 1, 2, 3, 4, 5].map(i => <rect key={i} x={134 + (i % 3) * 50} y={84 + Math.floor(i / 3) * 56} width={40} height={40} rx={11} fill={i === 1 ? accent : PALETTES[['gold', 'green', 'red', 'blue', 'wall', 'grey'][i]][1]} transform={`scale(${pop(t, 0.3 + i * 0.1, 0.4)})`} style={{transformOrigin: `${154 + (i % 3) * 50}px ${104 + Math.floor(i / 3) * 56}px`}} />)}
-        <rect x={134} y={226} width={132} height={60} rx={12} fill="#fff" opacity={0.9} /><Txt x={200} y={266} size={30} fill="#16182a">$ 1,240</Txt>
+        <rect x={134} y={226} width={132} height={60} rx={12} fill="#fff" opacity={0.9} /><Txt x={200} y={266} size={30} fill="#16182a">9:41</Txt>
         <circle cx={278} cy={64} r={16 * badge} fill="#e4572e" />
       </g>
     </g>

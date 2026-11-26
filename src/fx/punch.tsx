@@ -45,14 +45,14 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
   phrases.forEach((p, i) => { if (t >= p.start - 0.04 && t <= p.end + 0.3) idx = i; });
   if (idx < 0) return null;
   const phrase = phrases[idx], enter = clamp((t - (phrase.start - 0.04)) / 0.12), tall = h > w;
-  const size = tall ? 76 : 68, pw = punch ? punchWord(phrase, idx) : undefined;
-  const stroke = `${size * 0.15}px #000`;
+  const size = tall ? 70 : 64, pw = punch ? punchWord(phrase, idx) : undefined;
+  const stroke = `${size * 0.11}px #000`; // the stroke paints outside the glyph box, so the gap below must cover it plus the active-word scale
   return (
     <>
-      <div style={{position: 'absolute', left: 0, right: 0, top: tall ? h * 0.7 : h * 0.78, display: 'flex', justifyContent: 'center', gap: size * 0.42, flexWrap: 'wrap', padding: `0 ${w * 0.08}px`, opacity: Math.min(1, enter * 2), transform: `scale(${0.88 + 0.12 * spring(enter)})`}}>
+      <div style={{position: 'absolute', left: 0, right: 0, top: tall ? h * 0.7 : h * 0.78, display: 'flex', justifyContent: 'center', columnGap: size * 0.62, rowGap: size * 0.1, flexWrap: 'wrap', padding: `0 ${w * 0.08}px`, opacity: Math.min(1, enter * 2), transform: `scale(${0.88 + 0.12 * spring(enter)})`}}>
         {phrase.words.map((x, i) => {
           const active = t >= x.start - 0.02 && t < x.end + 0.1 && isKey(x.w);
-          return <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 1.05, textTransform: 'uppercase', color: active ? '#ffe033' : '#fff', WebkitTextStroke: stroke, paintOrder: 'stroke fill', textShadow: '0 5px 0 rgba(0,0,0,0.5)', transform: `scale(${active ? 1.07 : 1})`, display: 'inline-block'}}>{x.w.replace(/[.,;:!?]+$/, '')}</span>;
+          return <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 1.05, textTransform: 'uppercase', color: active ? '#ffe033' : '#fff', WebkitTextStroke: stroke, paintOrder: 'stroke fill', textShadow: '0 5px 0 rgba(0,0,0,0.5)', transform: `scale(${active ? 1.04 : 1})`, display: 'inline-block'}}>{x.w.replace(/[.,;:!?]+$/, '')}</span>;
         })}
       </div>
       {pw && (() => { const e = easeOut(clamp((t - pw.start) / 0.14)), ps = Math.min(tall ? 210 : 170, (w * 0.86) / (Math.max(3, pw.w.replace(/\W/g, '').length) * 0.78)); return (
