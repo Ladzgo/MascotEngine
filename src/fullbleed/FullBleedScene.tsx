@@ -144,6 +144,7 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
 export const SUB_FRAMES: [number, number, number][] = [[1.22, 0, 0.05], [0.9, 0, -0.02], [1.12, 0.07, 0.02], [1.12, -0.07, 0.02]];
 /** How many 2-3 s sub-shots a beat of `dur` seconds gets (one per started 2.8 s). */
 export const subShots = (dur: number) => Math.max(1, Math.ceil(dur / 2.8));
+const CHARTY = new Set(['line_chart', 'bars3d', 'bars_arrow', 'chart', 'pie', 'gauge']);
 
 const calloutTexts = (s: Scene): string[] => {
   switch (s.type) {
@@ -222,7 +223,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.25 : h * 1.05; // wider objects (scale, bars) span the whole 400 box: above ~1.25 w they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
-  const hs = base * scale, groundY = tall ? h * 0.75 : h * 0.8, cy = groundY - 0.325 * hs;
+  // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
+  const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
+  const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.75) : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (
@@ -249,7 +252,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           return slots.map((sl, si) => {
             const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
             if (lt < 0) return null;
-            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), sx0 = sl.x, sy0 = sl.feet - 0.325 * size;
+            const size = hs * sl.s * (lay === 'pip' ? 1 : 1) / (lay === 'split' || lay === 'grid' ? scale : 1), sx0 = Math.min(w - size * 0.4, Math.max(size * 0.4, sl.x)), sy0 = sl.feet - 0.325 * size;
             const ac = actionCopies(sl.main ? s.action : 'pop_in', lt);
             return (
               <React.Fragment key={`${i}-${si}`}>

@@ -27,10 +27,12 @@ export function rank(hits: StockHit[], a: Query, format: Format, topic: string[]
   const scored = sized.map((h, idx) => ({h, ov: overlap(h), s: ((h.height >= h.width) === (a.orientation === 'portrait') || h.kind === 'video' ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) && !wantsPeople ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2)) + overlap(h) * 2.5 - idx * 0.15}));
   // a hit must share enough words with the query (half, at least one): an off-topic picture is worse than the drawn subject, so no match = no stock
   // and it must name the video's topic ("sleep", "credit"): a hand with a pen matches "hands writing" but says nothing about sleep (en-sleep)
-  const tw = topic.map(stem), onTopic = (h: StockHit) => !tw.length || (tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w)) && !HARD.test(`${h.title} ${h.tags ?? ''}`) && (!OFF_SUBJECT.test(`${h.title} ${h.tags ?? ''}`) || OFF_SUBJECT.test(a.query)));
   // with a topic, the match must come from the non-topic words: "sleep couch" -> a sailboat tagged "sleep" is not a couch
   // (prefix match both ways, 3+ letters: "bedroom" ~ "bed", "night" ~ "nightstand")
-  const subj = words.filter(x => !tw.includes(x)), subjOv = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).filter(x => x.length >= 3).map(stem); return subj.filter(x => t.some(y => y.startsWith(x) || x.startsWith(y))).length; };
+  const tw = topic.map(stem), subj = words.filter(x => !tw.includes(x)), subjOv = (h: StockHit) => { const t = `${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).filter(x => x.length >= 3).map(stem); return subj.filter(x => t.some(y => y.startsWith(x) || x.startsWith(y))).length; };
+  // an idea beat ("if you invested") may leave the topic: a hit naming EVERY word of a 2+ word concept query ("stock market screen") passes without the topic word
+  const clean = (h: StockHit) => !HARD.test(`${h.title} ${h.tags ?? ''}`) && (!OFF_SUBJECT.test(`${h.title} ${h.tags ?? ''}`) || OFF_SUBJECT.test(a.query));
+  const onTopic = (h: StockHit) => !tw.length || (clean(h) && (tw.some(w => new Set(`${h.title} ${h.tags ?? ''}`.toLowerCase().split(/\W+/).map(stem)).has(w)) || (subj.length >= 2 && subjOv(h) === subj.length)));
   // plain topic b-roll ("sleep"): the topic must be among the photo's first 3 tags (Pixabay orders tags by weight; a sailboat tagged "..., sleep" 5th is not sleep)
   const lead = (h: StockHit) => (h.tags ?? h.title).toLowerCase().split(',').slice(0, 3).some(x => tw.some(w => x.trim().split(/\s+/).map(stem).includes(w)));
   const need = words.length >= 3 ? 2 : 1, relevant = scored.filter(x => onTopic(x.h) && (tw.length && subj.length ? subjOv(x.h) >= (subj.length >= 3 ? 2 : 1) : (x.ov >= need || !words.length) && (!tw.length || lead(x.h))));

@@ -97,11 +97,13 @@ test('Swap image: searchStock lists ranked candidates, chooseStock rewrites that
 
 test('topic gate: a hit must name the video topic; the retry anchors the query on it (en-sleep: "hands writing" for a sleep video)', async () => {
   const h = (id: string, tags: string): StockHit => ({id, provider: 'pixabay', kind: 'photo', url: `https://x/img/${id}.jpg`, width: 1080, height: 1920, pageUrl: 'p', author: 'a', license: 'l', title: tags, tags});
-  const a = {query: 'hands writing', kind: 'photo' as const, orientation: 'portrait' as const};
+  const a = {query: 'hands writing diary', kind: 'photo' as const, orientation: 'portrait' as const};
   assert.deepEqual(rank([h('pen', 'hand, writing, pen'), h('bed', 'sleep, hands, writing, diary, bed')], a, 'short', ['sleep']).map(x => x.id), ['bed']);
+  // an idea beat may leave the topic when the hit names every word of the concept ("if you invested" -> stock market screen in a coffee video)
+  assert.deepEqual(rank([h('mkt', 'stock market, screen, trading')], {...a, query: 'stock market screen'}, 'short', ['coffee']).map(x => x.id), ['mkt']);
   assert.equal(rank([h('pen', 'hand, writing, pen')], a, 'short').length, 1); // no topic = old behaviour
   const seen: string[] = [];
-  const {fetcher} = net({'pixabay.com': (u: string) => { const q = new URL(u).searchParams.get('q')!; seen.push(q); return {hits: q.startsWith('sleep') ? [{id: 9, largeImageURL: 'https://x/img/b.jpg', imageWidth: 1080, imageHeight: 1920, pageURL: 'p', user: 'u', tags: 'sleep, open, book'}] : [{id: 1, largeImageURL: 'https://x/img/a.jpg', imageWidth: 1080, imageHeight: 1920, pageURL: 'p', user: 'u', tags: 'open, book, desk'}]}; }});
+  const {fetcher} = net({'pixabay.com': (u: string) => { const q = new URL(u).searchParams.get('q')!; seen.push(q); return {hits: q.startsWith('sleep') ? [{id: 9, largeImageURL: 'https://x/img/b.jpg', imageWidth: 1080, imageHeight: 1920, pageURL: 'p', user: 'u', tags: 'sleep, open, book'}] : [{id: 1, largeImageURL: 'https://x/img/a.jpg', imageWidth: 1080, imageHeight: 1920, pageURL: 'p', user: 'u', tags: 'open, book, library'}]}; }}); // names 2 of 3 words, no topic: rejected
   const got = await fetchStock({query: 'open book desk', kind: 'photo', format: 'short', env: {PIXABAY_API_KEY: 'k'}, fetcher, cacheDir: tmp(), topic: ['sleep', 'memory']});
   assert.equal(got?.hit.id, 'pixabay-9');
   assert.deepEqual(seen, ['open book desk', 'sleep open book']);
