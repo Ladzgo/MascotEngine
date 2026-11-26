@@ -111,11 +111,10 @@ export const Piggy: I = ({t, accent}) => {
         <path d="M156 126c14-2 24-12 16-24-4 8-12 8-16 6" fill="none" stroke={INK} strokeWidth={5} strokeLinecap="round" />
         <rect x={64} y={142} width={20} height={30} rx={8} fill={soft(accent, 0.7)} stroke={INK} strokeWidth={4.5} /><rect x={118} y={142} width={20} height={30} rx={8} fill={soft(accent, 0.7)} stroke={INK} strokeWidth={4.5} />
         <ellipse cx={104} cy={116} rx={64} ry={50} fill={soft(accent, 0.55)} stroke={INK} strokeWidth={5} />
-        <path d="M84 78q20-8 40 0" stroke={INK} strokeWidth={5} strokeLinecap="round" fill="none" />
-        <ellipse cx={168} cy={116} rx={16} ry={20} transform="translate(-30 0)" fill={soft(accent, 0.8)} stroke={INK} strokeWidth={4.5} />
-        <circle cx={132} cy={112} r={3.4} fill={INK} /><circle cx={140} cy={112} r={3.4} fill={INK} />
-        <circle cx={118} cy={96} r={5} fill={INK} /><circle cx={118} cy={94.5} r={1.6} fill={PAPER2} />
-        <path d="M96 79h20" stroke={INK} strokeWidth={5} strokeLinecap="round" />
+        <ellipse cx={166} cy={118} rx={13} ry={17} fill={soft(accent, 0.85)} stroke={INK} strokeWidth={4.5} />
+        <circle cx={164} cy={111} r={3} fill={INK} /><circle cx={164} cy={125} r={3} fill={INK} />
+        <circle cx={134} cy={102} r={4.5} fill={INK} /><circle cx={135.5} cy={100.5} r={1.5} fill={PAPER2} />
+        <path d="M92 69h24" stroke={INK} strokeWidth={6} strokeLinecap="round" />
       </Pop>
       {t > 0.8 && <g opacity={drop < 0.55 ? 1 : 0}><Coin x={106} y={-6 + drop * 1.8 * 62} r={12} spin={t * 8} /></g>}
       <Sparkle x={32} y={60} t={t} a={1.2} />

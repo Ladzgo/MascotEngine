@@ -187,7 +187,7 @@ export const Warning: I = ({t, accent}) => {
 
 export const Check: I = ({t, accent}) => (
   <g>
-    {Array.from({length: 8}).map((_, i) => { const a = (i / 8) * Math.PI * 2, s = seg(t, 0.9, 1.5); return <circle key={i} cx={100 + Math.cos(a) * (60 + 34 * s)} cy={100 + Math.sin(a) * (60 + 34 * s)} r={5 * (1 - s) + 1.5} fill={[GOLD, accent, GREEN][i % 3]} opacity={s > 0 ? 1 : 0} />; })}
+    {Array.from({length: 8}).map((_, i) => { const a = (i / 8) * Math.PI * 2, s = seg(t, 0.9, 1.5); return <circle key={i} cx={100 + Math.cos(a) * (60 + 34 * s)} cy={100 + Math.sin(a) * (60 + 34 * s)} r={5 * (1 - s) + 3.5} fill={[GOLD, accent, GREEN][i % 3]} opacity={s > 0 ? 1 : 0} />; })}
     <Pop t={t} cx={100} cy={100}><circle cx={100} cy={100} r={62} fill={GREEN} stroke={INK} strokeWidth={6} /><circle cx={100} cy={100} r={50} fill="none" stroke={PAPER2} strokeWidth={3} opacity={0.5} strokeDasharray="2 9" strokeLinecap="round" /></Pop>
     <D d="M70 102l22 22 40-46" t={t} a={0.45} b={0.95} w={14} stroke={PAPER2} />
   </g>

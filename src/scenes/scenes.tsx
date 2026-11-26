@@ -64,12 +64,12 @@ export const TitleScene: React.FC<SceneProps> = ({frame, fps, accent, box, intro
 
 // ------------------------------------------------------------ talk
 export const TalkScene: React.FC<SceneProps> = ({scene, dec, frame, fps, accent, box, keyword}) => {
-  if (scene.type === 'talk' && scene.quote && ['keyword_side', 'over_shoulder'].includes(dec.layout)) return <QuoteCard text={scene.quote.text} by={scene.quote.by} t={frame / fps} at={dec.speechStart + 0.2} accent={accent} width={box.w} x={box.x} y={box.y} />;
+  if (scene.type === 'talk' && scene.quote && box.w > 0) return <QuoteCard text={scene.quote.text} by={scene.quote.by} t={frame / fps} at={dec.speechStart + 0.2} accent={accent} width={box.w} x={box.x} y={box.y} />;
   const {hero, support} = pickVisuals(scene);
   const t = frame / fps - (dec.speechStart + 0.05);
   const labelT = Math.max(0.3, (dec.punchIns[0]?.t ?? dec.speechStart + 0.6) - (dec.speechStart + 0.05));
   const label = scene.visual?.label ?? keyword;
-  if (['keyword_side', 'over_shoulder'].includes(dec.layout)) return <VisualStage box={box} hero={hero} support={support} label={label} t={t} labelT={labelT} accent={accent} />;
+  if (box.w > 0) return <VisualStage box={box} hero={hero} support={support} label={label} t={t} labelT={labelT} accent={accent} />;
   // centre / close-up: the mascot owns the middle, so props float in the free space on either side
   const room = dec.layout === 'closeup' ? 440 : 520;
   return (
@@ -259,7 +259,7 @@ export const ListScene: React.FC<SceneProps<Extract<Scene, {type: 'list'}>>> = (
   const dot = Math.min(96, Math.round(rowH - 30));
   const longest = Math.max(...scene.items.map(x => x.length), 1);
   // dense lists keep every item on one line: shrink the type to the available width (never below 34 px)
-  const fsize = rowH < 150 ? Math.max(34, Math.min(size, Math.floor((box.w - 76 - dot - 34 - 40) / (longest * 0.5)))) : size;
+  const fsize = true ? Math.max(34, Math.min(size, Math.floor((box.w - 76 - dot - 34 - 40) / (longest * 0.55)))) : size;
   return (
     <Frame box={box}>
       <div style={{display: 'flex', flexDirection: 'column', gap, alignItems: 'stretch', width: box.w}}>
@@ -316,7 +316,7 @@ export const ChecklistScene: React.FC<SceneProps<Extract<Scene, {type: 'checklis
   const n = scene.steps.length, t = frame / fps, gap = 22;
   const rowH = Math.min(150, (box.h - gap * (n - 1)) / n), bx = Math.min(96, Math.round(rowH - 28));
   const longest = Math.max(...scene.steps.map(x => x.length), 1);
-  const fsize = Math.max(34, Math.min(64, Math.floor((box.w - 76 - bx - 34) / (longest * 0.5))));
+  const fsize = Math.max(34, Math.min(64, Math.floor((box.w - 76 - bx - 34) / (longest * 0.55))));
   // the step currently being ticked is the last one whose time has come
   const current = dec.elements.reduce((c, e, k) => (t >= e ? k : c), -1);
   return (
@@ -383,7 +383,25 @@ const WithArt: React.FC<{props: SceneProps; children: (box: Box) => React.ReactN
   );
 };
 
-export const SceneContent: React.FC<SceneProps> = props => {
+/** Layouts with a free strip on either side of the mascot (wide 16:9 only): two illustrations stand there. y/h = the strip. */
+const FLANK: Record<string, {y: number; h: number}> = {'title:center': {y: 430, h: 400}, 'stats:center': {y: 590, h: 300}, 'compare:split': {y: 625, h: 270}, 'before_after:split': {y: 625, h: 270}, 'timeline:fullscreen': {y: 680, h: 215}, 'table:fullscreen': {y: 700, h: 195}};
+const Flank: React.FC<{props: SceneProps}> = ({props}) => {
+  const {scene, dec, frame, fps, accent, episodeTitle, box} = props;
+  const f = FLANK[`${scene.type}:${dec.layout}`];
+  if (!f || box.w < 1400) return null;
+  const extra = scene.type === 'title' ? episodeTitle : scene.type === 'timeline' ? scene.events.map(e => e.what).join(' ') : scene.type === 'table' ? scene.rows.flat().join(' ') : scene.type === 'stats' ? scene.stats.map(x => x.label).join(' ') : scene.type === 'compare' ? `${scene.left.title} ${scene.right.title}` : scene.type === 'before_after' ? `${scene.before.title} ${scene.after.title}` : '';
+  const {hero, support} = pickVisuals(scene, extra);
+  const t = frame / fps - (scene.type === 'title' ? 0.5 : 0.35), w = 520;
+  return (
+    <>
+      <VisualStage box={{x: 140, y: f.y, w, h: f.h}} hero={hero} support={[]} t={t} accent={accent} />
+      {support[0] && <VisualStage box={{x: 1920 - 140 - w, y: f.y, w, h: f.h}} hero={support[0]} support={[]} t={t - 0.3} accent={accent} />}
+    </>
+  );
+};
+
+export const SceneContent: React.FC<SceneProps> = props => <><Flank props={props} /><SceneBody {...props} /></>;
+const SceneBody: React.FC<SceneProps> = props => {
   const s = props.scene;
   switch (s.type) {
     case 'title': return <TitleScene {...props} />;
