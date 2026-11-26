@@ -214,10 +214,11 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // sub-shots: a long beat is cut into 2-3 s pieces, each a new framing (hard punch-in/out, like an editor's cut), so no picture holds > 3 s.
-  // Beats with callouts/cards keep one framing (their labels are laid out against the frame).
-  const nSub = hasCallouts || versus ? 1 : subShots(dur), sub = Math.min(nSub - 1, Math.floor(t / (dur / nSub)));
+  // Beats with callouts/cards cut only the background (their labels and the object they label are laid out against the frame).
+  const nSub = subShots(dur), sub = Math.min(nSub - 1, Math.floor(t / (dur / nSub)));
   const [subZ, subX, subY] = sub === 0 ? [1, 0, 0] : SUB_FRAMES[(sub + index) % SUB_FRAMES.length];
-  const stage = `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
+  const fixedStage = hasCallouts || versus;
+  const stage = fixedStage ? `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})` : `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
   // hero stands on the ground plane (y = 75% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.25 : h * 1.05; // wider objects (scale, bars) span the whole 400 box: above ~1.25 w they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
