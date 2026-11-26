@@ -1,4 +1,4 @@
-export type SfxKind = 'pop' | 'whoosh' | 'tick' | 'ding' | 'chime';
+export type SfxKind = 'pop' | 'whoosh' | 'tick' | 'ding' | 'chime' | 'coin' | 'click' | 'thud';
 export type SfxCue = {t: number; kind: SfxKind; variant: number}; // t = seconds from scene start
 
 export type HookKind = 'punch_in' | 'slow_open';

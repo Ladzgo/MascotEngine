@@ -16,7 +16,9 @@ type Stock = NonNullable<Sc['stock']>;
 export const STOCK_MIN = 0.4, STOCK_MAX = 0.55, STOCK_GAP = 8;
 // data beats stay procedural (the number/chart IS the picture); everything else may carry real footage
 const NO_STOCK = new Set(['big_number', 'chart']);
-const cleanQuery = (q: unknown): string | null => { const t = String(q ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); return /^[a-z0-9 '-]{3,60}$/.test(t) ? t : null; };
+// queries must describe something a camera filmed: charts, arrows, symbols and numbers are drawn by the engine, stock for them is always off-topic
+const NOT_FILMABLE = /\b(chart|graph|arrows?|bars?|icons?|symbols?|signs?|percent\w*|numbers?|infographics?|diagram|3d|logo|text|digital|abstract|concept)\b/;
+const cleanQuery = (q: unknown): string | null => { const t = String(q ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); return /^[a-z0-9 '-]{3,60}$/.test(t) && !NOT_FILMABLE.test(t) ? t : null; };
 /** The word of the sentence the picture should land on (must really occur in it; the renderer looks up its time in the voice). */
 const atWord = (w: unknown, narration: string): string | undefined => { const t = String(w ?? '').toLowerCase().replace(/[^\p{L}\p{N}%$'-]/gu, ''); return t && narration.toLowerCase().split(/\s+/).some(x => x.replace(/[^\p{L}\p{N}%$'-]/gu, '') === t) ? t : undefined; };
 const near = (a: number, b: number) => Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b), 1e-9);
@@ -102,7 +104,7 @@ Output ONLY JSON: {"shots": [{"i": beat number, "subject": ..., "action": ..., "
 subject = ONE concrete thing named or implied by the sentence, exactly one of: ${FB_KINDS.join(', ')}.
 action = what happens to it, one of: ${ACTIONS.join(', ')}.
 mood one of: ${MOODS.join(', ')}. camera one of: ${CAMERAS.join(', ')}.
-stock: about half of the beats should have one (always English, even if the script is not); null for pure numbers/charts. Real footage for places, activities, objects; the drawn subject covers abstract ideas.
+stock: about half of the beats should have one (always English, even if the script is not). It is a REAL camera shot of the situation in that sentence: a person doing something, a place, an object in use (e.g. "tired woman rubbing eyes at desk", "runner on forest trail", "hands counting banknotes"). Never charts, arrows, numbers, symbols or icons (those are drawn); null for such beats.
 Rules: never reuse a subject within 5 beats; use at least 4 different actions across the video; the picture must make sense for what is said right then; a number may only be one that is spoken in that beat.`;
 
 export async function storyboard(client: Client, ep: Episode, o: {model?: string; log?: (m: string) => void} = {}): Promise<Episode> {

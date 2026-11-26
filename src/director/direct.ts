@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {episodeDir, loadEpisode, type Scene} from '../schema.js';
 import type {Timings} from '../pipeline/tts.js';
+import {sfxForShot} from './sfxMap.js';
 import type {EpisodeDecisions, History, HistoryEntry, SceneDecision, SfxCue} from './types.js';
 
 import {ACCENT_HEX as ACCENTS} from '../accents.js';
@@ -224,7 +225,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
   const treat: {type: string; layout: string; camera: string}[] = [];
   const decided: SceneDecision[] = [];
   let cursor = 0;
-  let sfxVariantLast: Record<string, number[]> = {};
+  let sfxVariantLast: Record<string, number[]> = {}, lastObjSfx = -9;
   let prevPose = '';
 
   ep.scenes.forEach((s, i) => {
@@ -390,6 +391,13 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     }
     if (s.type === 'stats') elements.forEach(t => sfx.push({t, kind: 'ding', variant: variant('ding')}));
     if (s.type === 'chart') sfx.push({t: elements[0], kind: 'pop', variant: variant('pop')});
+
+    // object cue: what is drawn makes its sound when the voice names it; every other beat at most, never on top of another cue
+    const objKind = ep.look === 'fullbleed' ? sfxForShot(s.shot, s.type) : null;
+    if (objKind && i - lastObjSfx >= 2) {
+      const at = s.shot?.at ? words.find(x => norm(x.w) === norm(s.shot!.at!)) : undefined, t = round(Math.max(0.1, at?.start ?? lead + 0.1));
+      if (!sfx.some(c => Math.abs(c.t - t) < 0.35)) { sfx.push({t, kind: objKind, variant: variant(objKind)}); lastObjSfx = i; }
+    }
 
     decided.push({
       index: i, type: s.type, layout: combo.l, charSide, pose, camera: combo.c, transition,

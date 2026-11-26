@@ -14,11 +14,11 @@ const PENTA = [1, 1.122, 1.26, 1.498, 1.682, 1.888];
 
 /** Synthesised SFX (no sample files needed). Variants 0-5 change pitch, sweep direction and character so neighbouring cues never sound identical. */
 /** Per-kind mix gain applied to a synthesised cue (scripts/qa/sfxAudit.ts measures the result against the voice). */
-export const SFX_GAIN: Partial<Record<SfxKind, number>> = {tick: 0.3, chime: 0.55, whoosh: 0.34, pop: 0.4, ding: 0.45};
+export const SFX_GAIN: Partial<Record<SfxKind, number>> = {tick: 0.3, chime: 0.55, whoosh: 0.34, pop: 0.4, ding: 0.45, coin: 0.38, click: 0.35, thud: 0.5};
 export const sfxGain = (k: SfxKind) => SFX_GAIN[k] ?? 0.5;
 
 export function synth(kind: SfxKind, variant: number): Float32Array {
-  const dur = {pop: 0.16, whoosh: 0.5, tick: 0.035, ding: 1.0, chime: 1.3}[kind];
+  const dur = {pop: 0.16, whoosh: 0.5, tick: 0.035, ding: 1.0, chime: 1.3, coin: 0.5, click: 0.05, thud: 0.4}[kind];
   const n = Math.floor(dur * SR);
   const out = new Float32Array(n);
   const noise = lcg(1000 + variant);
@@ -46,6 +46,19 @@ export function synth(kind: SfxKind, variant: number): Float32Array {
       case 'ding': {
         const f = 880 * PENTA[v6] * 0.75;
         v = (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(2 * Math.PI * f * 2.01 * t) + 0.12 * Math.sin(2 * Math.PI * f * 3.97 * t)) * Math.exp(-t * (4.5 + v6 * 0.4)) * Math.min(1, t * 900) * 0.32;
+        break;
+      }
+      case 'coin': { // two quick metallic pings, the second a fifth up; variants shift the pitch
+        const f = 2400 * PENTA[v6] * 0.6, t2 = Math.max(0, t - 0.07);
+        v = (Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 22) + (t > 0.07 ? Math.sin(2 * Math.PI * f * 1.498 * t2) * Math.exp(-t2 * 18) : 0)) * Math.min(1, t * 1500) * 0.3;
+        break;
+      }
+      case 'click': // dry mouse click: short noise burst plus a low tap
+        v = (noise() * Math.exp(-t * 700) * 0.5 + Math.sin(2 * Math.PI * (900 + v6 * 60) * t) * Math.exp(-t * 260) * 0.4);
+        break;
+      case 'thud': { // soft low drop: falling sine with a damped body
+        const f = 110 - 50 * u - v6 * 4;
+        v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 11) * Math.min(1, t * 500) * 0.7 + noise() * Math.exp(-t * 300) * 0.08;
         break;
       }
       case 'chime': { // chapter start: two soft notes, a rising fifth
