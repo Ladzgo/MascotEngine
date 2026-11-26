@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 // Starts the real Studio server on a spare port (no Ollama auto-start) and checks guard, queue, readiness and clip endpoints.
-const PORT = 4197, BASE = `http://localhost:${PORT}`;
+const PORT = 4200 + (process.pid % 1500), BASE = `http://localhost:${PORT}`;
 const ROOT = new URL('../', import.meta.url).pathname;
 let child: ChildProcess;
 const JOBS_TMP = `${os.tmpdir()}/studio-test-jobs-${process.pid}.json`;
@@ -117,7 +117,7 @@ test('POST bodies are schema-validated: wrong types give 400', async () => {
 });
 
 test('queue: 20 active runs max (429), identical queued run is 409, cancel frees a slot (fake jobs)', async () => {
-  const ids = Array.from({length: 21}, (_, i) => `zz-qtest-${i}`);
+  const ids = Array.from({length: 21}, (_, i) => `zz-qtest-${process.pid}-${i}`);
   for (const id of ids) { fs.mkdirSync(`${ROOT}episodes/${id}`, {recursive: true}); fs.writeFileSync(`${ROOT}episodes/${id}/episode.json`, '{}'); }
   const enq = (episode: string) => fetch(`${BASE}/api/queue`, {method: 'POST', headers: J, body: JSON.stringify({episode, stages: ['preview']})});
   const jobIds: string[] = [];
@@ -136,7 +136,7 @@ test('queue: 20 active runs max (429), identical queued run is 409, cancel frees
 });
 
 test('interrupted job: after a restart a running run is an error with Retry text, queued runs resume', async () => {
-  const file = `${os.tmpdir()}/studio-test-jobs-restart-${process.pid}.json`, port = 4198;
+  const file = `${os.tmpdir()}/studio-test-jobs-restart-${process.pid}.json`, port = 5800 + (process.pid % 1500);
   const base = {stages: ['preview'], current: 'preview', done: [], log: [], engine: 'auto', progress: 0.4};
   fs.writeFileSync(file, JSON.stringify([{...base, id: 'j-run', episode: 'zz-x', status: 'running', createdAt: 1}, {...base, id: 'j-wait', episode: 'zz-y', status: 'queued', current: null, createdAt: 2}]));
   const c = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(port), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: file}, stdio: 'ignore'});

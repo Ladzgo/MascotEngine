@@ -9,26 +9,59 @@ import {planShots} from './shots';
 type Word = {w: string; start: number; end: number};
 export type FBProps = {scene: Scene; dec: SceneDecision; frame: number; fps: number; accent: string; w: number; h: number; words: Word[]; index: number; episodeTitle: string; prevKind?: string; preroll?: number};
 
-const THEMES: [string, string, string][] = [ // [top, bottom, ground]
-  ['#1d2b5e', '#6a4c93', '#241a3d'], ['#0e3b43', '#2a9d8f', '#0b2a30'], ['#3a1c71', '#d76d77', '#2a1346'], ['#12263f', '#3d7ea6', '#0c1b2e'], ['#42275a', '#734b6d', '#2b1738'], ['#0f4c5c', '#e36414', '#0b3540'],
-];
-const OBJ_THEME: Record<string, number[]> = {skyline: [0, 3], bank: [0, 4], vault: [3, 4], house: [5, 2], car: [5, 2], coin_stacks: [1, 3], cash: [1, 0], piggy: [1, 2], card: [2, 4], bars3d: [3, 0], arrow_up: [1, 3], arrow_down: [4, 2], percent: [2, 0], clock: [4, 3], calendar: [3, 1], scale: [4, 0], doc: [3, 4], shield: [3, 1], magnifier: [0, 5]};
+type Env = 'city' | 'room' | 'vault' | 'abstract';
+const ENV_OF: Record<string, Env> = {
+  skyline: 'city', car: 'city', house: 'city', bank: 'city', people: 'city', pin: 'city', handshake: 'city', gradcap: 'city',
+  card: 'room', card_swipe: 'room', phone: 'room', wallet: 'room', receipts: 'room', pricetag: 'room', price_up: 'room', cart: 'room', doc: 'room', debt_counter: 'room', magnifier: 'room', bulb: 'room', calendar: 'room',
+  coin_stacks: 'vault', jar_fill: 'vault', cash: 'vault', piggy: 'vault', vault: 'vault', lock: 'vault', shield: 'vault', snowball: 'vault',
+};
+/** Palette per mood: [sky top, horizon, ground, light]. Neighbouring scenes rotate through them, so consecutive scenes never share a background colour. */
+const PALETTES_BY_ENV: Record<Env, [string, string, string, string][]> = {
+  city: [['#1d2b5e', '#6a4c93', '#241a3d', '#ffd9a0'], ['#0f4c5c', '#e36414', '#0b3540', '#ffe0b0'], ['#3a1c71', '#d76d77', '#2a1346', '#ffc9d6'], ['#12263f', '#3d7ea6', '#0c1b2e', '#cfe9ff']],
+  room: [['#4a3b6b', '#9a6fb0', '#2f2243', '#ffe9c0'], ['#1f4e5f', '#5fa8a0', '#143540', '#e6fff7'], ['#6b2f3a', '#d9825b', '#3d1a22', '#ffd8bd'], ['#2b3a67', '#7d8fd0', '#1b2548', '#e3e9ff']],
+  vault: [['#0e3b43', '#2a9d8f', '#0b2a30', '#bfffee'], ['#2a1f12', '#8a6a2a', '#17110a', '#ffe9a8'], ['#1a2a1f', '#4f8f5b', '#0f1a13', '#d6ffdd'], ['#2c1b3d', '#7a4aa0', '#1a1025', '#e8d0ff']],
+  abstract: [['#1f2b6b', '#5c7cfa', '#141b45', '#dbe4ff'], ['#3b1c5a', '#c2559b', '#26103b', '#ffd6ee'], ['#0e4a3c', '#37b38a', '#09302a', '#d3ffee'], ['#4a2a12', '#e8913a', '#2f1a0b', '#fff0d6']],
+};
+const envFor = (kind: string): Env => ENV_OF[kind] ?? 'abstract';
 
-/** Layered backdrop with parallax: sky gradient, bokeh/stars, far and near silhouettes, lit ground. `cx` = camera pan in px, `p` = scene progress 0..1. */
-const Backdrop: React.FC<{w: number; h: number; theme: [string, string, string]; cx: number; t: number; seed: number}> = ({w, h, theme, cx, t, seed}) => {
+/** Three-depth environment with a ground plane for the hero to stand on. cx = camera pan px; layers parallax at 0.2 / 0.5 / 0.9; blurred foreground shapes at 1.6 (depth of field). */
+const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, string, string]; cx: number; t: number; seed: number}> = ({w, h, env, pal, cx, t, seed}) => {
   const rnd = (i: number) => { const x = Math.sin((i + 1) * 91.7 + seed * 13.1) * 43758.5453; return x - Math.floor(x); };
-  const horizon = h * 0.585;
+  const hz = h * 0.6, tall = h > w;
+  const bld = (layer: number, n: number, par: number, minH: number, maxH: number, col: string, op: number, lights: boolean) => Array.from({length: n}, (_, i) => {
+    const bw = (w / n) * (1.05 + rnd(i + layer * 50) * 0.5), x = i * (w / n) * 1.0 - cx * par - 80 + rnd(i + layer * 70) * 40, bh = minH + rnd(i + layer * 30) * (maxH - minH);
+    return (
+      <g key={`${layer}${i}`} opacity={op}>
+        <rect x={x} y={hz - bh} width={bw} height={bh + 6} fill={col} />
+        {lights && Array.from({length: Math.floor(bh / 46)}, (_, r) => Array.from({length: Math.floor(bw / 40)}, (_, c) => ((Math.floor(t * 0.8 + r * 3 + c * 7 + i) % 5) !== 0 ? <rect key={`${r}-${c}`} x={x + 12 + c * 40} y={hz - bh + 14 + r * 46} width={18} height={22} fill={pal[3]} opacity={0.55} /> : null)))}
+      </g>
+    );
+  });
   return (
-    <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: `linear-gradient(180deg, ${theme[0]}, ${theme[1]} ${Math.round((horizon / h) * 100)}%, ${theme[2]})`}}>
+    <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: `linear-gradient(180deg, ${pal[0]}, ${pal[1]} ${Math.round((hz / h) * 100)}%, ${pal[2]})`}}>
       <svg width={w} height={h} style={{position: 'absolute', inset: 0}}>
-        {Array.from({length: 26}, (_, i) => { const r = 5 + rnd(i) * 26, x = ((rnd(i + 40) * w * 1.4 - cx * 0.2 - t * (6 + r)) % (w * 1.4) + w * 1.4) % (w * 1.4) - w * 0.2, y = rnd(i + 80) * horizon;
-          return <circle key={i} cx={x} cy={y} r={r} fill="#fff" opacity={0.05 + rnd(i + 5) * 0.12} />; })}
-        <polygon points={Array.from({length: 14}, (_, i) => `${i * (w / 12) - cx * 0.35 - 40},${horizon - 60 - rnd(i + 200) * 150}`).join(' ') + ` ${w + 60},${horizon + 4} -60,${horizon + 4}`} fill="#000" opacity={0.2} />
-        <polygon points={Array.from({length: 10}, (_, i) => `${i * (w / 8) - cx * 0.7 - 60},${horizon - 20 - rnd(i + 300) * 90}`).join(' ') + ` ${w + 100},${horizon + 6} -100,${horizon + 6}`} fill="#000" opacity={0.28} />
-        <rect x={0} y={horizon} width={w} height={h - horizon} fill={theme[2]} opacity={0.85} />
-        {Array.from({length: 9}, (_, i) => <line key={i} x1={w / 2 + (i - 4) * w * 0.05} y1={horizon} x2={w / 2 + (i - 4) * w * 0.55 - cx * 1.4} y2={h} stroke="#fff" strokeOpacity={0.07} strokeWidth={2} />)}
-        {Array.from({length: 6}, (_, i) => { const k = ((i + (t * 0.35) % 1) / 6), y = horizon + (h - horizon) * k * k; return <line key={i} x1={0} y1={y} x2={w} y2={y} stroke="#fff" strokeOpacity={0.06 * k + 0.02} strokeWidth={2} />; })}
-        <ellipse cx={w / 2 - cx * 0.5} cy={horizon - 40} rx={w * 0.5} ry={h * 0.2} fill="url(#fb-glow)" opacity={0.3} />
+        <ellipse cx={w / 2 - cx * 0.3} cy={hz - h * 0.12} rx={w * 0.6} ry={h * 0.22} fill="url(#fb-glow)" opacity={0.35} />
+        {Array.from({length: 18}, (_, i) => { const r = 6 + rnd(i) * 22, x = ((rnd(i + 40) * w * 1.4 - cx * 0.15 - t * (5 + r * 0.5)) % (w * 1.4) + w * 1.4) % (w * 1.4) - w * 0.2; return <circle key={i} cx={x} cy={rnd(i + 80) * hz * 0.9} r={r} fill="#fff" opacity={0.04 + rnd(i + 5) * 0.1} />; })}
+        {env === 'city' && <>{bld(1, 12, 0.2, h * 0.08, h * 0.26, '#000', 0.22, false)}{bld(2, 8, 0.5, h * 0.1, h * 0.36, pal[2], 0.55, true)}{bld(3, 4, 0.9, h * 0.18, h * 0.5, '#000', 0.4, true)}</>}
+        {env === 'room' && <>
+          <rect x={0} y={0} width={w} height={hz} fill="#000" opacity={0.12} />
+          {[0.12, 0.62].map((fx, i) => <g key={i} transform={`translate(${w * fx - cx * 0.3} ${h * 0.1})`}><rect width={w * 0.26} height={h * 0.3} rx={14} fill={pal[3]} opacity={0.5} /><path d={`M${w * 0.13} 0V${h * 0.3}M0 ${h * 0.15}H${w * 0.26}`} stroke={pal[2]} strokeWidth={10} /><polygon points={`0,${h * 0.3} ${w * 0.26},${h * 0.3} ${w * 0.4},${hz - h * 0.1} ${w * 0.1},${hz - h * 0.1}`} fill={pal[3]} opacity={0.1} /></g>)}
+          {Array.from({length: 7}, (_, i) => <rect key={i} x={i * w * 0.16 - cx * 0.5} y={hz - h * 0.2 - (i % 3) * 20} width={w * 0.1} height={h * 0.04 + (i % 3) * 14} rx={6} fill="#000" opacity={0.2} />)}
+        </>}
+        {env === 'vault' && <>
+          {Array.from({length: 9}, (_, i) => <g key={i}><rect x={i * w * 0.14 - cx * 0.4} y={0} width={w * 0.13} height={hz} fill="#000" opacity={0.14 + (i % 2) * 0.1} />{[0.2, 0.5, 0.8].map(f => <circle key={f} cx={i * w * 0.14 - cx * 0.4 + 14} cy={hz * f} r={5} fill="#fff" opacity={0.25} />)}</g>)}
+          <polygon points={`${w * 0.3},0 ${w * 0.7},0 ${w * 0.95},${hz} ${w * 0.05},${hz}`} fill="#fff" opacity={0.07} />
+        </>}
+        {env === 'abstract' && <>{Array.from({length: 7}, (_, i) => <circle key={i} cx={rnd(i + 90) * w - cx * 0.3} cy={hz * (0.15 + rnd(i + 99) * 0.6)} r={h * (0.05 + rnd(i) * 0.12)} fill="#fff" opacity={0.05 + rnd(i + 7) * 0.05} />)}{Array.from({length: 12}, (_, i) => <line key={i} x1={i * w / 11 - cx * 0.4} y1={0} x2={i * w / 11 - cx * 0.4 - 80} y2={hz} stroke="#fff" strokeOpacity={0.05} strokeWidth={3} />)}</>}
+        <rect x={0} y={hz} width={w} height={h - hz} fill={env === 'room' ? '#5a3a24' : pal[2]} opacity={env === 'room' ? 0.9 : 0.92} />
+        <rect x={0} y={hz} width={w} height={h * 0.012} fill={pal[3]} opacity={0.25} />
+        {env === 'room' ? Array.from({length: 9}, (_, i) => { const y = hz + (h - hz) * Math.pow(i / 9, 1.6); return <line key={i} x1={0} y1={y} x2={w} y2={y} stroke="#000" strokeOpacity={0.22} strokeWidth={3} />; })
+          : Array.from({length: 11}, (_, i) => <line key={i} x1={w / 2 + (i - 5) * w * 0.04} y1={hz} x2={w / 2 + (i - 5) * w * 0.5 - cx * 1.2} y2={h} stroke="#fff" strokeOpacity={0.09} strokeWidth={3} />)}
+        {env === 'city' && Array.from({length: 4}, (_, i) => { const u = ((t * 0.4 + i / 4) % 1); return <rect key={i} x={w / 2 - 14 * (0.3 + u) - cx * 0.4} y={hz + (h - hz) * u * u} width={28 * (0.3 + u * 2)} height={6 + u * 18} fill="#fff" opacity={0.25} />; })}
+        <rect x={0} y={hz} width={w} height={h - hz} fill="url(#fb-groundfade)" />
+      </svg>
+      <svg width={w} height={h} style={{position: 'absolute', inset: 0, filter: `blur(${tall ? 14 : 10}px)`, opacity: 0.5, pointerEvents: 'none'}}>
+        {Array.from({length: 4}, (_, i) => <ellipse key={i} cx={((rnd(i + 200) * w * 1.3 - cx * 1.6 - t * 14) % (w * 1.3) + w * 1.3) % (w * 1.3) - w * 0.15} cy={h * (0.08 + rnd(i + 210) * 0.8)} rx={w * (0.05 + rnd(i + 220) * 0.07)} ry={w * (0.04 + rnd(i + 230) * 0.06)} fill={i % 2 ? pal[3] : '#fff'} opacity={0.35} />)}
       </svg>
     </div>
   );
@@ -63,15 +96,15 @@ const MONEY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'card', 'bars3d
 
 /** Callout label: pill with a leader line that draws to the hero. */
 const calloutWidth = (text: string, size: number, maxW: number) => Math.min(size * 0.6 * text.length + size * 1.8, maxW);
-const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right'; maxW: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW}) => {
+const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right' | 'down'; maxW: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW}) => {
   const e = easeOut((t - at) / 0.35);
   if (e <= 0) return null;
-  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : x;
+  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : align === 'down' ? x + wpx / 2 : x, ay0 = align === 'down' ? y + size * 1.9 : y + size * 0.8;
   return (
     <>
       <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
-        <line x1={ax} y1={y + size * 0.8} x2={ax + (tx - ax) * e} y2={y + size * 0.8 + (ty - y - size * 0.8) * e} stroke="#fff" strokeWidth={size * 0.07} strokeLinecap="round" strokeDasharray={`${size * 0.2} ${size * 0.16}`} opacity={0.85} />
-        <circle cx={tx} cy={ty} r={size * 0.16 * e} fill={accent} stroke="#fff" strokeWidth={size * 0.05} />
+        {[['#0b0d1e', size * 0.2], ['#fff', size * 0.11]].map(([c, sw], k) => <line key={k} x1={ax} y1={ay0} x2={ax + (tx - ax) * e} y2={ay0 + (ty - ay0) * e} stroke={String(c)} strokeWidth={Number(sw)} strokeLinecap="round" />)}
+        <circle cx={tx} cy={ty} r={size * 0.26 * e} fill={accent} stroke="#fff" strokeWidth={size * 0.09} /><circle cx={tx} cy={ty} r={size * 0.26 * e + size * 0.13} fill="none" stroke="#0b0d1e" strokeOpacity={0.5} strokeWidth={size * 0.05} />
       </svg>
       <div style={{position: 'absolute', left: x, top: y, width: wpx, opacity: e, transform: `translateY(${(1 - e) * 30}px) scale(${0.9 + 0.1 * e})`, background: 'rgba(255,255,255,0.96)', color: '#16182a', fontFamily: SANS, fontWeight: 800, fontSize: size, lineHeight: 1.1, padding: `${size * 0.32}px ${size * 0.5}px`, borderRadius: size * 0.7, boxShadow: '0 10px 30px rgba(0,0,0,0.35)', borderLeft: `${size * 0.22}px solid ${accent}`, textAlign: 'left'}}>{text}</div>
     </>
@@ -129,7 +162,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const shots = planShots(scene as any, words, dur, {seed: index, skip: prevKind});
   const active = Math.max(0, shots.reduce((a, s, i) => (t >= s.at ? i : a), 0));
   const kindAt = (tt: number) => shots[Math.max(0, shots.reduce((a, s, i) => (tt >= s.at ? i : a), 0))].kind;
-  const theme = THEMES[(OBJ_THEME[shots[0].kind] ?? [0, 1, 2, 3, 4, 5])[index % (OBJ_THEME[shots[0].kind]?.length ?? 6)] ?? 0];
+  const env = envFor(shots[0].kind), pal = PALETTES_BY_ENV[env][index % 4];
 
   // continuous camera: one move per scene, never eased to a stop (linear progress); backdrop layers parallax against the stage
   const mv = (index + (scene.type === 'big_number' ? 1 : 0)) % 4;
@@ -140,23 +173,23 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
 
   const ctxText = calloutTexts(scene).slice(0, tall ? 3 : 4), hasCallouts = ctxText.length > 0;
   const versus = scene.type === 'compare' || scene.type === 'before_after';
-  const base = tall ? w * 0.98 : h * 0.86;
-  const heroSize = base * (hasCallouts ? 0.82 : versus ? 0.56 : scene.type === 'title' ? 0.66 : scene.type === 'big_number' ? 0.74 : 1) * (versus && !tall ? 1.1 : 1);
-  const cx = w / 2, cy = tall ? h * (hasCallouts ? 0.31 : versus ? 0.52 : scene.type === 'title' ? 0.53 : scene.type === 'big_number' ? 0.45 : 0.385) : h * (versus ? 0.55 : scene.type === 'title' ? 0.58 : 0.47);
-  const hs = hasCallouts && !tall ? h * 0.72 : heroSize;
-  const hx = hasCallouts && !tall ? w * 0.68 : cx;
+  // hero stands on the ground plane (y = 68% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
+  const base = tall ? w * 1.2 : h * 1.0;
+  const scale = hasCallouts ? (tall ? 0.6 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : 1;
+  const hs = base * scale, groundY = tall ? h * 0.68 : h * 0.8, cy = groundY - 0.325 * hs;
+  const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.06 + 0.1 * p}) translateX(${panX * 0.5}px)`, transformOrigin: '50% 60%'}}>
-        <Backdrop w={w} h={h} theme={theme} cx={panX} t={t} seed={index} />
+        <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
       </div>
-      <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: `50% ${55}%`}}>
+      <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 68%'}}>
         {shots.map((s, i) => {
           const Obj = OBJECTS[s.kind], local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
           if (local < 0 || out >= 1 || !Obj) return null;
-          const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * heroSize * 0.008, over = 0.8 + 0.2 * pop(local, 0, 0.5);
+          const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * hs * 0.008, over = 0.8 + 0.2 * pop(local, 0, 0.5);
           const isChart = scene.type === 'chart' && i === 0;
           return (
             <React.Fragment key={i}>
@@ -173,12 +206,12 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} />}
       {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
       {hasCallouts && ctxText.map((txt, i) => {
-        const size = tall ? 48 : 44, left = i % 2 === 0, maxW = tall ? w * 0.82 : w * 0.4, wp = calloutWidth(txt, size, maxW);
-        const y = tall ? h * 0.455 + i * (size * 3.1) : h * 0.14 + i * (size * 3.3);
-        const x = tall ? (left ? w * 0.05 : w * 0.95 - wp) : w * 0.04;
+        const size = tall ? 48 : 44, maxW = tall ? w * 0.84 : w * 0.4, wp = calloutWidth(txt, size, maxW);
+        const y = tall ? h * 0.1 + i * (size * 2.7) : h * 0.14 + i * (size * 3.3);
+        const x = tall ? (w - wp) / 2 + (i % 2 ? w * 0.04 : -w * 0.04) : w * 0.04;
         const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
         const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move
-        return <Callout key={i} text={txt} t={t} at={at} x={x} y={y} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.55 + (py - h * 0.55) * sc + tiltY} size={size} accent={accent} align={left || !tall ? 'left' : 'right'} maxW={maxW} />;
+        return <Callout key={i} text={txt} t={t} at={at} x={x} y={y} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.68 + (py - h * 0.68) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} />;
       })}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
       {active < 0 && null}

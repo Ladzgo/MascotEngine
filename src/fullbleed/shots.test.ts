@@ -28,7 +28,7 @@ test('punch captions: at most three words, punch word only on every 4th number-i
 
 import {candidatesFor} from './shots.js';
 test('word -> object relevance: minimums are bills, not clocks; money words offer several objects', () => {
-  assert.equal(candidatesFor('minimums')[0], 'receipts');
+  assert.ok(candidatesFor('minimums').includes('receipts') && !candidatesFor('minimums').includes('clock'));
   assert.ok(candidatesFor('money').length >= 2);
   assert.deepEqual(candidatesFor('the'), []);
 });

@@ -6,6 +6,8 @@ const MIN_GAP = 1.5, MAX_SHOTS = 4;
 
 /** Narration word -> candidate objects, most specific first. A word can point at several (money -> coins, cash, wallet): the planner takes the first one not just shown. */
 const RULES: [string, RegExp][] = [
+  ['debt_counter', /^(debts?|owe[sd]?|balances?|minimum\w*)$/], ['card_swipe', /^(credit|cards?|swipe[sd]?)$/], ['gauge', /^(rates?|apr|interest|yield)$/], ['snowball', /^(compound\w*|snowball\w*|grow\w*|accumulat\w*)$/],
+  ['jar_fill', /^(savings?|saved?|saving|savers?|jar)$/], ['price_up', /^(prices?|inflation|costs?|fees?|expensive|pricey)$/], ['bars_arrow', /^(invest\w*|stocks?|markets?|returns?|index|portfolio|profits?|growth)$/], ['pie', /^(share|split|portion|most|half|majority)$/],
   ['card', /^(credit|cards?|swipe[sd]?|apr|balances?)$/], ['receipts', /^(minimum\w*|bills?|receipts?|statements?|invoices?|owe[sd]?|debts?|expenses?|payments?)$/],
   ['calendar', /^(months?|monthly|weeks?|dates?|schedule[sd]?|due|calendar|annual\w*)$/], ['clock', /^(time|hours?|minutes?|decades?|soon|late|early|wait\w*|fast|slowly|forever|long)$/],
   ['percent', /^(percent|%|rates?|interest|yield|fees?|tax\w*)$/], ['coin_stacks', /^(coins?|savings?|saved?|compound\w*|wealth|money|dollars?|thousands?|millions?)$/],

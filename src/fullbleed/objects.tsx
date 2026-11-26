@@ -1,6 +1,7 @@
 import React from 'react';
 import {clamp} from '../theme';
 import {EXTRA} from './objects2';
+import {ACTIONS} from './objects3';
 import {IsoBox, PALETTES, Shadow, Txt, pop, seg, segIO, wave} from './kit';
 
 export type Obj = React.FC<{t: number; accent: string; value?: number; label?: string}>;
@@ -262,7 +263,7 @@ export const Doc: Obj = ({t}) => (
   </g>
 );
 
-export const OBJECTS: Record<string, Obj> = {skyline: Skyline, house: House, car: Car, coin_stacks: CoinStacks, bars3d: Bars3d, vault: Vault, card: Card, piggy: Piggy, clock: Clock, calendar: Calendar, scale: Scale, arrow_up: ArrowUp, arrow_down: ArrowDown, percent: Percent, shield: Shield, cash: Cash, bank: Bank, magnifier: Magnifier, doc: Doc, ...EXTRA};
+export const OBJECTS: Record<string, Obj> = {skyline: Skyline, house: House, car: Car, coin_stacks: CoinStacks, bars3d: Bars3d, vault: Vault, card: Card, piggy: Piggy, clock: Clock, calendar: Calendar, scale: Scale, arrow_up: ArrowUp, arrow_down: ArrowDown, percent: Percent, shield: Shield, cash: Cash, bank: Bank, magnifier: Magnifier, doc: Doc, ...EXTRA, ...ACTIONS};
 export const FB_KINDS = Object.keys(OBJECTS);
 
 /** Paper-illustration kinds (and a few words) -> full-bleed object. */
