@@ -71,3 +71,11 @@ test('variety engine: no subject within 6 beats, no setting/camera/layout twice 
   });
   assert.ok(new Set(plan.map(p => p.layout)).size >= 3);
 });
+
+import {median, reselect} from './reselect.js';
+test('reselect: weak stock beat loses its stock, weak drawn beat gets another subject, good beats untouched; median', () => {
+  const ep = {scenes: [{narration: 'Run in the morning', stock: {query: 'x'}, shot: {subject: 'coin_stacks'}}, {narration: 'Your heart gets stronger', shot: {subject: 'coin_stacks'}}, {narration: 'fine', shot: {subject: 'trophy'}}]};
+  const r = reselect(ep, [{scene: 1, score: 2}, {scene: 2, score: 3}, {scene: 3, score: 9}]);
+  assert.equal(r.ep.scenes[0].stock, undefined); assert.equal(r.ep.scenes[1].shot!.subject, 'heart'); assert.equal(r.ep.scenes[2].shot!.subject, 'trophy');
+  assert.equal(median([1, 9, 5, 7]), 6);
+});

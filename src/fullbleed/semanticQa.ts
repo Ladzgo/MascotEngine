@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {episodeDir, loadEpisode} from '../schema.js';
+import {median, reselect} from './reselect.js';
 
 const arg = (n: string) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : undefined; };
 const id = process.argv[2];
@@ -39,5 +40,10 @@ for (const [i, d] of dec.scenes.entries()) {
 }
 fs.rmSync(tmp, {recursive: true, force: true});
 const mean = items.length ? items.reduce((a, x) => a + x.score, 0) / items.length : 0;
-fs.writeFileSync(`${b}semantic.json`, JSON.stringify({model, file: path.basename(file), mean: +mean.toFixed(2), items}, null, 2));
-console.log(`\nsemantic QA ${ep.id}: mean ${mean.toFixed(1)}/10 over ${items.length} beats; weakest: ${[...items].sort((a, b) => a.score - b.score).slice(0, 3).map(x => `#${x.scene} (${x.score})`).join(', ')}  (build/semantic.json)`);
+const med = median(items.map(x => x.score));
+fs.writeFileSync(`${b}semantic.json`, JSON.stringify({model, file: path.basename(file), mean: +mean.toFixed(2), median: med, items}, null, 2));
+if (process.argv.includes('--fix')) { // beats below the threshold get another stock query/subject; render again afterwards
+  const f = `${dir}episode.json`, r = reselect(JSON.parse(fs.readFileSync(f, 'utf8')), items, Number(arg('below') ?? 6));
+  if (r.log.length) { fs.writeFileSync(f, JSON.stringify(r.ep, null, 2)); console.log(`\nre-chosen:\n${r.log.join('\n')}\nnow: npm run direct -- ${ep.id} && npm run render -- ${ep.id}`); }
+}
+console.log(`\nsemantic QA ${ep.id}: median ${med}/10, mean ${mean.toFixed(1)}/10 over ${items.length} beats; weakest: ${[...items].sort((a, b) => a.score - b.score).slice(0, 3).map(x => `#${x.scene} (${x.score})`).join(', ')}  (build/semantic.json)`);

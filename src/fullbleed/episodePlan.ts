@@ -20,11 +20,11 @@ export const groupOf = (kind: string): string => Object.entries(GROUPS).find(([,
 
 /** Same group first, then anything unused: a picture is only repeated when nothing else fits. */
 const DEBT_TEXT = /\b(debts?|owe[sd]?|owing|loans?|borrow\w*)\b/i;
-function fresh(kind: string, recent: string[], also: string[] = [], text = ''): string {
+function fresh(kind: string, recent: string[], also: string[] = [], text = '', home: string[] = []): string {
   const bad = new Set([...recent, ...also]);
   if (!DEBT_TEXT.test(text)) bad.add('debt_counter'); // the red 'you owe' panel only illustrates owing
   if (!bad.has(kind)) return kind;
-  const pool = [...GROUPS[groupOf(kind)] ?? [], ...Object.values(GROUPS).flat()].filter(k => OBJECTS[k] && !bad.has(k));
+  const pool = [...GROUPS[groupOf(kind)] ?? [], ...home.flatMap(g => GROUPS[g] ?? []), ...Object.values(GROUPS).flat()].filter(k => OBJECTS[k] && !bad.has(k));
   return pool[0] ?? kind;
 }
 
@@ -36,6 +36,8 @@ const validSetting = (s: unknown): s is Setting => (SETTINGS as readonly string[
  */
 export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): ScenePlan[] {
   const perScene: string[][] = [], out: ScenePlan[] = [];
+  // the topic's own groups (what the storyboard's subjects belong to) are tried first when a picture must change: a running video never falls back to coins
+  const home = [...new Set(scenes.map(s => s.shot?.subject).filter((x): x is string => typeof x === 'string').map(groupOf))];
   const lastSix = () => perScene.slice(-6).flat(); // variety window = the last 6 beats (scenes), not 6 shots
   let prevEnv: Setting | undefined, prevLayout: Layout | undefined, prevCam = -1, talkN = 0;
   scenes.forEach((s, i) => {
@@ -45,7 +47,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     const shots: PlannedShot[] = [];
     for (const [k, r] of raw.entries()) {
       const explicit = !!r.why?.startsWith('shot.') || !!r.why?.startsWith('visual') ;
-      const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '');
+      const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home);
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
     perScene.push(shots.map(x => x.kind));
