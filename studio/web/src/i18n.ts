@@ -7,6 +7,8 @@ export const HU: Record<string, string> = {
   Today: 'Ma', Pipeline: 'Folyamat', Library: 'Könyvtár', Ideas: 'Ötletek', Clipper: 'Vágó', Analytics: 'Elemzés', Channels: 'Csatornák', Settings: 'Beállítások', Queue: 'Sor', Calendar: 'Naptár', Episode: 'Epizód', Menu: 'Menü', 'Main': 'Fő',
   Script: 'Script', Voice: 'Hang', Visuals: 'Képek', Render: 'Renderelés', Publish: 'Kiadás',
   'Skip to content': 'Ugrás a tartalomra', 'Loading…': 'Betöltés…', Language: 'Nyelv', 'UI language': 'Felület nyelve',
+  'Stopped.': 'Leállítva.', 'Start over': 'Újrakezdés', 'Running for': 'Fut már', about: 'körülbelül', left: 'van hátra', 'usually 2 to 6 minutes': 'általában 2-6 perc', Cancel: 'Mégse',
+  'Chosen for the channel language': 'A csatorna nyelvéhez igazítva', 'Auto picks the best natural voice for it.': 'Az automatikus a legjobb természetes hangot választja hozzá.',
   // Today
   'What needs you next': 'Mi vár rád legközelebb', 'New channel': 'Új csatorna', 'Setup needed': 'Beállítás szükséges', 'Open Settings': 'Beállítások megnyitása',
   'Getting started': 'Első lépések', Unfinished: 'Befejezetlen', 'Start something': 'Kezdj valamit', 'From a topic': 'Témából', 'Angle': 'Szemszög', 'Draft script': 'Script írása', 'Make video': 'Videó készítése',

@@ -22,7 +22,7 @@ function Form({ch, chans}: {ch: string; chans: ChannelRow[]}) {
   const [llm, setLlm] = useState<LlmStatus | null>(null), [model, setModel] = useState('');
   const [busy, setBusy] = useState(false), [err, setErr] = useState<string | null>(null);
   useEffect(() => { if (!chans.some(c => c.id === channel) && chans[0]) setChannel(chans[0].id); }, [chans, channel]);
-  useEffect(() => { api.voices(lang).then(x => setVoices(x.engines)).catch(() => setVoices([])); }, [lang]);
+  useEffect(() => { api.voices(lang).then(x => { setVoices(x.engines); setEngine(e => (e !== 'auto' && !x.engines.some(v => v.engine === e && v.ok) ? 'auto' : e)); }).catch(() => setVoices([])); }, [lang]); // a channel in another language never keeps a voice that cannot speak it
   useEffect(() => { api.llm().then(x => { setLlm(x); setModel(m => m || x.chosen || ''); }).catch(() => {}); api.settings().then(s => setEngine(s.engine || 'auto')).catch(() => {}); }, []);
   useEffect(() => { api.ideas(channel).then(d => setIdeas(d.ideas.filter(i => i.status === 'new').slice(0, 6))).catch(() => setIdeas([])); }, [channel]);
 
@@ -69,6 +69,7 @@ function Form({ch, chans}: {ch: string; chans: ChannelRow[]}) {
             <select value={channel} onChange={e => setChannel(e.target.value)}>{chans.map(c => <option key={c.id} value={c.id}>{c.name} ({langOf(c).toUpperCase()})</option>)}</select></label>
           <label className="field"><span>{t('Voice')}</span>
             <select value={engine} onChange={e => setEngine(e.target.value)}>{voices.length ? voices.map(v => <option key={v.engine} value={v.engine}>{v.label}{v.ok ? '' : ` (${t('not set up')})`}</option>) : <option value="auto">{t('Best available')}</option>}</select>
+            <small className="hint">{t('Chosen for the channel language')}: {lang.toUpperCase()}. {engine === 'auto' ? t('Auto picks the best natural voice for it.') : ''}</small>
             {selVoice && <small className="hint">{selVoice.ok ? selVoice.detail : `${selVoice.detail}. ${selVoice.fix ? `Run: ${selVoice.fix}` : ''}`}</small>}
             <span className="row"><button type="button" className="btn sm" disabled={pv.busy} onClick={() => { setPv({busy: true}); api.voicePreview(engine, lang).then(r => setPv({file: `${r.file}?t=${Date.now()}`})).catch(e => setPv({err: (e as Error).message})); }}><Play size={14} />{pv.busy ? t('Rendering…') : t('Hear this voice')}</button></span>
             {pv.file && <audio controls autoPlay src={pv.file} />}{pv.err && <small className="err-text" role="alert">{pv.err}</small>}</label>
@@ -114,17 +115,27 @@ function Making({id, ch, onChanged}: {id: string; ch: string; onChanged: () => v
   const stage = !d || d.state === 'running' ? 0 : !job ? 1 : job.current === 'voice' || !job.current ? 1 : job.current === 'direct' ? 2 : 3;
   const pr = d?.progress;
   const sub = (i: number) => i === 0 && d?.state === 'running' ? (pr?.total ? `${t('part')} ${Math.min(pr.done + 1, pr.total)}/${pr.total}: ${pr.label}` : pr?.label || '') : i === 3 && job?.current === 'preview' ? `${Math.round(job.progress * 100)}%` : '';
+  const [now, setNow] = useState(Date.now()), [t0] = useState(Date.now());
+  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
+  const mins = (s: number) => s < 60 ? `${Math.max(5, Math.round(s / 5) * 5)} s` : `${Math.round(s / 60)} min`;
+  const el = (now - (d?.startedAt ?? t0)) / 1000;
+  const eta = !d || d.state === 'running' ? (pr?.total && pr.done > 0 ? mins(el / pr.done * (pr.total - pr.done)) : null) : job?.current === 'preview' && job.progress > 0.05 ? mins(el / (job.progress + 0.01) * (1 - job.progress) * 0.5) : null;
+  const running = !data && !failed && !lost;
+  const cancel = async () => { try { if (d?.state === 'running') await api.draftCancel(id); else if (job) await api.cancel(job.id); toast(t('Stopped.')); } catch (e) { setErr((e as Error).message); } };
+  const retry = async () => { setBusy(true); try { if (d?.state === 'error') { const r = await api.draftRetry(id); setRoute({page: 'new', ep: r.id, ch}); } else if (job) { await api.generate(id, job.stages.filter(s => !job.done.includes(s)), 'auto'); setRoute({page: 'ep', ep: id, step: 'render', ch}); } } catch (e) { setErr((e as Error).message); } finally { setBusy(false); } };
   const finalize = async () => { setBusy(true); try { await api.generate(id, ['final'], 'auto'); toast(t('Final render started.')); setRoute({page: 'ep', ep: id, step: 'render', ch}); } catch (e) { setErr((e as Error).message); setBusy(false); } };
   return (
     <div className="page nv">
       <div className="page-head"><div><h1 className="display" tabIndex={-1}>{data ? t('Your video is ready') : t('Making your video')}</h1><p className="muted">{d?.topic ?? id}</p></div></div>
       {lost && <div className="alert" role="alert"><Alert size={18} /><span>{t('The Studio lost track of this run (it may have been restarted). Your episode may still exist in the Library.')}</span><a className="btn sm" href="#/library">{t('Open library')}</a></div>}
-      {failed && <div className="alert" role="alert"><Alert size={18} /><span className="pre"><b>{t('This did not work.')}</b> {failed}</span><a className="btn sm" href={hashFor({page: 'new', ch})}>{t('Try again')}</a></div>}
+      {failed && <div className="alert" role="alert"><Alert size={18} /><span className="pre"><b>{t('This did not work.')}</b> {failed}</span><button type="button" className="btn sm primary" onClick={() => void retry()} disabled={busy}>{t('Retry')}</button><a className="btn sm" href={hashFor({page: 'new', ch})}>{t('Start over')}</a></div>}
+      {d?.warning && running && <p className="small muted" role="note">{d.warning}</p>}
       {!data && !failed && !lost && (
         <ol className="nv-tl panel" aria-label={t('Progress')}>{STEPS.map((s, i) => (
           <li key={s} className={i < stage ? 'done' : i === stage ? 'now' : ''} aria-current={i === stage ? 'step' : undefined}>
             <span className="nv-dot">{i < stage ? <Check size={14} /> : i + 1}</span><span><b>{t(s)}</b>{sub(i) && <span className="small muted"> {sub(i)}</span>}</span></li>))}</ol>)}
-      {!data && !failed && !lost && <p className="small muted">{t('You can leave this page; the work continues. Find it under Today or Jobs.')}</p>}
+      {running && <p className="small muted" role="status">{t('Running for')} {mins(el)}{eta ? ` · ${t('about')} ${eta} ${t('left')}` : ` · ${t('usually 2 to 6 minutes')}`}. {t('You can leave this page; the work continues. Find it under Today or Jobs.')} <button type="button" className="btn sm" onClick={() => void cancel()}>{t('Cancel')}</button></p>}
+      {err && !data && <p className="err-text" role="alert">{err}</p>}
       {data && (
         <div className="nv-done">
           <video className="video nv-video" controls src={`/api/episodes/${id}/media/${id}-preview.mp4?v=${Date.now()}`} style={{maxHeight: '62vh'}} aria-label={t('Preview')} />
