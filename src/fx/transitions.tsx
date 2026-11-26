@@ -1,5 +1,6 @@
 import React from 'react';
-import {INK, W, clamp, easeInOut, easeOut} from '../theme';
+import {useVideoConfig} from 'remotion';
+import {INK, clamp, easeInOut, easeOut} from '../theme';
 
 export const TRANSITION_FRAMES = 12;
 
@@ -11,6 +12,7 @@ const Leak: React.FC<{p: number}> = ({p}) => (
 
 /** Wraps previous (frozen last frame) and current scene layers; p in [0,1]. */
 export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.ReactNode; cur: React.ReactNode; accent: string; paper: React.ReactNode}> = ({kind, p, prev: prev0, cur: cur0, accent, paper}) => {
+  const W = useVideoConfig().width; // 1920 wide, 1080 for native Shorts
   const prev = <>{paper}{prev0}</>;
   const cur = <>{paper}{cur0}</>;
   const fill: React.CSSProperties = {position: 'absolute', inset: 0};
@@ -19,6 +21,7 @@ export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.Rea
   switch (kind) {
     case 'slide':
       return <>
+        <div style={{position: 'absolute', inset: 0}}>{paper}</div>
         <div style={{...fill, transform: `translateX(${-e * W * 0.35}px) scale(${1 - e * 0.04})`, opacity: 1 - e * 0.6, filter: `blur(${mb * 10}px)`}}>{prev}</div>
         <div style={{...fill, transform: `translateX(${(1 - easeOut(p)) * W}px) skewX(${-(1 - easeOut(p)) * 6}deg)`, filter: `blur(${(1 - easeOut(p)) * 12}px)`}}>{cur}</div>
       </>;
@@ -50,6 +53,7 @@ export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.Rea
     }
     case 'whip': // fast horizontal whip pan: both scenes smear sideways
       return <>
+        <div style={{position: 'absolute', inset: 0}}>{paper}</div>
         <div style={{...fill, transform: `translateX(${-easeInOut(Math.min(1, p * 1.4)) * W * 0.9}px)`, filter: `blur(${mb * 26}px)`, opacity: 1 - clamp(p * 1.6 - 0.2)}}>{prev}</div>
         <div style={{...fill, transform: `translateX(${(1 - easeInOut(Math.max(0, p * 1.4 - 0.4))) * W * 0.9}px)`, filter: `blur(${mb * 26}px)`}}>{cur}</div>
       </>;

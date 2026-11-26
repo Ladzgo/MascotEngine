@@ -74,7 +74,7 @@ const Counter: React.FC<{s: Extract<Scene, {type: 'big_number'}>; t: number; w: 
 };
 
 const Versus: React.FC<{a: {title: string; value: string}; b: {title: string; value: string}; t: number; w: number; h: number; y: number; accent: string}> = ({a, b, t, w, h, y, accent}) => {
-  const tall = h > w, cw = tall ? w * 0.78 : w * 0.34, ch = tall ? 190 : 230;
+  const tall = h > w, cw = tall ? w * 0.78 : w * 0.34, ch = tall ? 190 : 170;
   const card = (c: {title: string; value: string}, i: number) => {
     const e = easeOut((t - 0.3 - i * 0.35) / 0.4);
     return <div key={i} style={{width: cw, height: ch, borderRadius: 30, background: i ? accent : 'rgba(255,255,255,0.96)', color: i ? '#fff' : '#16182a', boxShadow: '0 14px 36px rgba(0,0,0,0.4)', opacity: e, transform: `translate(${(1 - e) * (tall ? 0 : (i ? 80 : -80))}px, ${(1 - e) * (tall ? (i ? 60 : -60) : 0)}px)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: DISPLAY, textAlign: 'center', padding: 12}}>
@@ -110,7 +110,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
 
   const ctxText = calloutTexts(scene), hasCallouts = ctxText.length > 0;
   const overlay = scene.type === 'compare' || scene.type === 'before_after' || scene.type === 'big_number' || scene.type === 'title';
-  const heroSize = (tall ? w * 0.98 : h * 0.86) * (hasCallouts ? 0.82 : overlay ? 0.78 : 1), cx = w / 2, cy = tall ? h * (hasCallouts ? 0.31 : overlay ? 0.43 : 0.385) : h * 0.47;
+  const heroSize = (tall ? w * 0.98 : h * 0.86) * (hasCallouts ? 0.82 : scene.type === 'title' ? 0.66 : overlay ? 0.78 : 1), cx = w / 2, cy = tall ? h * (hasCallouts ? 0.31 : scene.type === 'title' ? 0.53 : overlay ? 0.43 : 0.385) : h * (scene.type === 'title' ? 0.58 : 0.47);
   const hs = hasCallouts && !tall ? h * 0.72 : heroSize;
   const hx = hasCallouts && !tall ? w * 0.68 : cx;
     return (
@@ -134,7 +134,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       </div>
       {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} />}
-      {(scene.type === 'compare' || scene.type === 'before_after') && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.12 : h * 0.62} accent={accent} />}
+      {(scene.type === 'compare' || scene.type === 'before_after') && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.12 : h * 0.5} accent={accent} />}
       {hasCallouts && ctxText.slice(0, 5).map((txt, i) => {
         const size = tall ? 54 : 40, left = i % 2 === 0, wp = Math.min(size * 0.62 * txt.length + size * 1.6, size * 14);
         const y = tall ? h * 0.47 + i * (size * 2.5) : h * 0.16 + i * (size * 2.5);
