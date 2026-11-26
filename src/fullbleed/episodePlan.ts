@@ -85,3 +85,15 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
 }
 const SUBJECT_SET = new Set(Object.keys(OBJECTS));
 void candidatesFor;
+
+/** Variety numbers of a plan: share of plain beats (one centred object on a talk beat), distinct pictures, closest repeat, stock share, layout mix. Targets: plain <= 25%, distinct >= 60%, repeat gap >= 8. */
+export function planStats(plans: ScenePlan[], scenes: {type: string; stockFile?: string; stock?: unknown}[]) {
+  const n = plans.length, first = plans.map(p => p.shots[0]?.kind), layouts: Record<string, number> = {};
+  plans.forEach(p => { layouts[p.layout] = (layouts[p.layout] ?? 0) + 1; });
+  let gap = Infinity;
+  first.forEach((k, i) => { for (let j = i - 1; j >= 0; j--) if (first[j] === k) { gap = Math.min(gap, i - j); break; } });
+  return {
+    beats: n, layouts, plainShare: n ? plans.filter((p, i) => p.layout === 'hero' && scenes[i].type === 'talk' && !scenes[i].stock).length / n : 0,
+    distinct: n ? new Set(first).size / n : 0, minRepeatGap: gap === Infinity ? null : gap, stockShare: n ? scenes.filter(s => s.stock || s.stockFile).length / n : 0,
+  };
+}

@@ -87,3 +87,10 @@ test('shot.at: the subject lands on its spoken word, later shots stay ordered', 
   assert.equal(p[0].shots[0].kind, 'heart'); assert.ok(Math.abs(p[0].shots[0].at - 1.2) < 1e-6);
   p[0].shots.forEach((s, i) => { if (i) assert.ok(s.at > p[0].shots[i - 1].at); });
 });
+
+import {planStats} from './episodePlan.js';
+test('planStats: plain share, distinct pictures and closest repeat', () => {
+  const pl = (k: string, layout = 'hero') => ({env: 'city', pal: 0, camera: 0, zoom: 'wide', layout, shots: [{kind: k, at: 0, action: 'pop_in'}]}) as any;
+  const st = planStats([pl('a'), pl('b'), pl('a', 'split'), pl('c')], [{type: 'talk'}, {type: 'talk', stock: 1}, {type: 'talk'}, {type: 'chart'}]);
+  assert.equal(st.plainShare, 0.25); assert.equal(st.distinct, 0.75); assert.equal(st.minRepeatGap, 2); assert.equal(st.stockShare, 0.25);
+});
