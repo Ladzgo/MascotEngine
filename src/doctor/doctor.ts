@@ -1,3 +1,4 @@
+import {bestNeural} from '../pipeline/neural.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -49,6 +50,8 @@ export async function checkReadiness(p: Probe = realProbe(path.resolve(new URL('
   const music = fs.existsSync(musicDir) ? fs.readdirSync(musicDir).filter(f => /\.(mp3|wav|m4a|ogg)$/i.test(f)) : [];
   const piper = (p.onPath('piper') || (!!p.env.PIPER_BIN && fs.existsSync(p.env.PIPER_BIN))) && !!p.env.PIPER_MODEL && fs.existsSync(p.env.PIPER_MODEL);
   const voice = p.platform === 'darwin' && p.onPath('say') ? 'say' : piper ? 'piper' : p.onPath('espeak-ng') ? 'espeak-ng' : '';
+  const nb = (['en', 'hu'] as const).map(l => [l, bestNeural(l)] as const).filter(([, e]) => e).map(([l, e]) => `${l}: ${e}`);
+  const neuralBest = nb.length === 2 ? nb.join(', ') : ''; // both languages need a natural voice for 'ok'
   const chromium = findChromium(p);
   const ff = p.onPath('ffmpeg') && p.onPath('ffprobe');
   const items = [
@@ -63,6 +66,7 @@ export async function checkReadiness(p: Probe = realProbe(path.resolve(new URL('
     item('ollama', 'Ollama running', false, models.length > 0, 'running', 'Install Ollama and run `ollama serve` (the Studio can also start it).'),
     item('ollama-model', 'Ollama model', false, !!picked, picked ?? '', 'Run `ollama pull qwen2.5:7b` (offline: copy ~/.ollama/models from another machine, see docs/OFFLINE.md).'),
     item('music', 'Music bed', false, music.length > 0, music.join(', '), 'Put a licensed track in assets/music/ (an ambient pad ships with the repo).'),
+    item('voice-neural', 'Natural voice (Kokoro English, Piper Hungarian)', false, !!neuralBest, neuralBest, 'Run `npm run setup:voice` (about 700 MB, free, keyless; creates .venv-tts and data/models/tts). Without it the robotic macOS `say` voice is used.'),
     item('voice', 'Voice engine', false, !!voice, voice, 'Linux: apt install espeak-ng, or set PIPER_BIN and PIPER_MODEL. macOS has say built in. (--engine silent works without.)'),
   ];
   return {ok: items.every(i => i.ok || !i.required), items};

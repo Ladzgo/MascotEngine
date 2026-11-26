@@ -19,7 +19,8 @@ import {deletePreset, listPresets, savePreset} from '../src/channel/userPresets.
 import react from '@vitejs/plugin-react';
 import {z} from 'zod';
 import {Episode} from '../src/schema.js';
-import {ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
+import {voiceEngines, previewVoice} from '../src/pipeline/voicePreview.js';
+import {VoicePreviewBody, ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
 import {ensureOllama, llmSetupState, ollamaReachable, pickModel} from '../src/llm/llm.js';
 
 const ROOT = new URL('../', import.meta.url).pathname;
@@ -844,6 +845,17 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         const was = job.status; job.status = 'cancelled'; job.current = null; if (was === 'running') job.child?.kill(); emit(job); if (was === 'queued') pump(); return json(res, 200, {ok: true});
       }
       if (!p[2] && m === 'GET') return json(res, 200, {id: job.id, episode: job.episode, status: job.status, current: job.current, done: job.done, progress: job.progress, error: job.error});
+    }
+    if (p[0] === 'voices' && m === 'GET') return json(res, 200, {lang: url.searchParams.get('lang') ?? 'en', engines: voiceEngines(url.searchParams.get('lang') ?? 'en')});
+    if (p[0] === 'voice-preview') {
+      if (m === 'POST') {
+        const b = await body(req, VoicePreviewBody);
+        if (!/^[a-z]{2}$/.test(String(b.lang ?? 'en'))) throw new HttpError(400, 'Invalid language.');
+        let f: string;
+        try { f = previewVoice(String(b.engine ?? 'auto'), String(b.lang ?? 'en'), `${ROOT}data/voice-preview`); } catch (e) { throw new HttpError(422, (e as Error).message); }
+        return json(res, 200, {file: `/api/voice-preview/${path.basename(f)}`});
+      }
+      if (m === 'GET' && p[1] && /^preview-[a-z-]+-[a-z]{2}\.mp3$/.test(p[1])) return sendFile(req, res, `${ROOT}data/voice-preview/${p[1]}`);
     }
     if (p[0] === 'jobs' && !p[1]) { const running = [...jobs.values()].find(j => j.status === 'running'); return json(res, 200, {running: running?.id ?? null}); }
     if (p[0] === 'llm' && !p[2]) {

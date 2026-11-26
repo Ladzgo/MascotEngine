@@ -20,3 +20,4 @@ out-golden-*
 data/jobs.json
 data/logs
 .venv-tts
+data/voice-preview

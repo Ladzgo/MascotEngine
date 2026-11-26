@@ -2,6 +2,7 @@ import {z} from 'zod';
 
 // Request-body schemas for the Studio API. Loose objects: unknown keys pass, wrong types are a 400.
 const str = z.string();
+export const VoicePreviewBody = z.looseObject({engine: str.optional(), lang: str.optional()});
 export const MakeBody = z.looseObject({topic: str.optional(), angle: str.optional(), channel: str.optional(), stopAtPreview: z.boolean().optional(), format: z.enum(['wide', 'short']).optional()});
 export const DraftBody = z.looseObject({topic: str.optional(), angle: str.optional(), channel: str.optional(), id: str.optional(), format: z.enum(['wide', 'short']).optional()});
 export const IdeasGenerateBody = z.looseObject({focus: str.optional(), count: z.number().int().min(1).max(20).optional()});

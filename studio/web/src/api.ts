@@ -88,6 +88,8 @@ export const api = {
   cancel: (jobId: string) => call<{ok: boolean}>(`/api/jobs/${jobId}/cancel`, {method: 'POST'}),
   running: () => call<{running: string | null}>('/api/jobs'),
   settings: () => call<Settings>('/api/settings'),
+  voices: (lang: string) => call<{lang: string; engines: {engine: string; label: string; ok: boolean; detail: string; fix: string; online: boolean}[]}>(`/api/voices?lang=${lang}`),
+  voicePreview: (engine: string, lang: string) => call<{file: string}>('/api/voice-preview', {method: 'POST', body: JSON.stringify({engine, lang})}),
   llm: () => call<LlmStatus>('/api/llm'),
   llmSetup: () => call<LlmStatus>('/api/llm/setup', {method: 'POST'}),
   saveSettings: (b: Partial<{apiKey: string; llmModel: string; voiceId: string; model: string; engine: string}>) => call<{ok: boolean}>('/api/settings', {method: 'PUT', body: JSON.stringify(b)}),

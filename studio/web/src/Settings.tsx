@@ -31,7 +31,9 @@ export function ReadinessPanel({onlyMissing = false}: {onlyMissing?: boolean}) {
 
 export function Settings({onSaved}: {onSaved: () => void}) {
   const [s, setS] = useState<S | null>(null);
-  const [apiKey, setKey] = useState(''), [voiceId, setVoice] = useState(''), [model, setModel] = useState(''), [engine, setEngine] = useState('say');
+  const [apiKey, setKey] = useState(''), [voiceId, setVoice] = useState(''), [model, setModel] = useState(''), [engine, setEngine] = useState('auto');
+  const [vlang, setVlang] = useState('en'), [voices, setVoices] = useState<Awaited<ReturnType<typeof api.voices>>['engines']>([]), [pv, setPv] = useState<{busy?: boolean; file?: string; err?: string}>({});
+  useEffect(() => { api.voices(vlang).then(x => setVoices(x.engines)).catch(() => setVoices([])); }, [vlang]);
   const [msg, setMsg] = useState<{ok: boolean; text: string} | null>(null);
   useEffect(() => { api.settings().then(x => { setS(x); setVoice(x.voiceId); setModel(x.model); setEngine(x.engine); }); }, []);
   if (!s) return <div className="settings"><h1 className="display" tabIndex={-1}>Settings</h1><Loading /></div>;
@@ -53,11 +55,19 @@ export function Settings({onSaved}: {onSaved: () => void}) {
       <AiPanel />
       <label className="field"><span>{t('Voice engine')}</span>
         <select value={engine} onChange={e => setEngine(e.target.value)}>
-          <option value="say">{t('Free voice (built into your Mac)')}</option>
+          {voices.map(v => <option key={v.engine} value={v.engine}>{v.label}{v.ok ? '' : ' (not set up)'}</option>)}
+          {!voices.length && <option value="auto">Best available</option>}
           <option value="eleven">ElevenLabs (paid, optional)</option>
           <option value="local">{t('My own recordings (local)')}</option>
           <option value="silent">{t('Silent (estimated timing, for quick previews)')}</option>
         </select>
+        {(() => { const v = voices.find(x => x.engine === engine); return v && <small className="hint">{v.ok ? v.detail : `${v.detail}.${v.fix ? ` Run: ${v.fix}` : ''}`}{v.online ? ' Online voices send the script text to Microsoft.' : ''}</small>; })()}
+        <span className="row">
+          <select aria-label="Preview language" value={vlang} onChange={e => setVlang(e.target.value)}><option value="en">English</option><option value="hu">Magyar</option></select>
+          <button type="button" className="btn sm" disabled={pv.busy} onClick={() => { setPv({busy: true}); api.voicePreview(engine, vlang).then(r => setPv({file: `${r.file}?t=${Date.now()}`})).catch(e => setPv({err: (e as Error).message})); }}>{pv.busy ? 'Rendering…' : 'Preview voice (10 s)'}</button>
+        </span>
+        {pv.file && <audio controls autoPlay src={pv.file} />}
+        {pv.err && <small className="err-text" role="alert">{pv.err}</small>}
         {engine === 'local' && <small className="hint">Needs one audio file per scene (wav, mp3 or m4a). Word timing is approximate unless whisper is installed.</small>}
       </label>
       <label className="field"><span>ElevenLabs API key (optional)</span>
