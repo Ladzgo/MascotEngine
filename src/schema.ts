@@ -20,6 +20,8 @@ const Overrides = {
   /** Backdrop art, public-dir relative; injected by render.ts when episodes/<id>/art/scene-N.png exists. */
   art: z.string().regex(/^art\/scene-\d+\.png$/).optional(),
   /** Hero illustration for the scene (src/visuals); absent = picked from the narration keywords. */
+  /** Chapter divider: a tag with this title slides in at the start of the scene (wide video); scene-local, so render chunks stay cacheable. */
+  chapter: z.string().min(1).max(40).optional(),
   visual: z.object({kind: VisualKind, label: z.string().max(40).optional()}).optional(),
 };
 

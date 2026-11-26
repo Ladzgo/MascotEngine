@@ -21,7 +21,7 @@ export function splitBeats(ep: Episode): Episode {
       const text = g.join(' ');
       const emphasis = (s.emphasis ?? []).filter(e => text.toLowerCase().includes(e.toLowerCase()));
       if (k === 0) out.push({...s, narration: text, emphasis} as Sc);
-      else { const {visual, layout, camera, transition, pose, art, ...rest} = s as Sc & Record<string, unknown>; void visual; void layout; void camera; void transition; void pose; void art; out.push({...rest, narration: text, emphasis} as Sc); }
+      else { const {visual, layout, camera, transition, pose, art, chapter, ...rest} = s as Sc & Record<string, unknown>; void chapter; void visual; void layout; void camera; void transition; void pose; void art; out.push({...rest, narration: text, emphasis} as Sc); }
     });
   });
   return {...ep, scenes: out as Episode['scenes']};

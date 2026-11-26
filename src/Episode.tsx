@@ -9,7 +9,7 @@ import {Paper} from './fx/paper';
 import {Captions, buildPhrases, captionLayout, type CaptionWord} from './fx/captions';
 import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
-import {SourceCard} from './fx/overlays';
+import {ChapterTag, SourceCard} from './fx/overlays';
 import {Camera, Living, ProgressBar, Vignette} from './fx/life';
 import {DISPLAY, INK, SANS, loadFonts, easeOut, spring, clamp} from './theme';
 
@@ -70,6 +70,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     <Living frame={frame + preroll} seed={i} accent={acc(i)} />
     <Camera frame={frame + preroll} seed={i}>
       {host0 && ['big_number', 'chart'].includes(episode.scenes[i].type) && <SourceCard host={host0} t={(frame + preroll) / fps} accent={acc(i)} />}
+      {episode.scenes[i].chapter && <ChapterTag title={episode.scenes[i].chapter!} t={(frame + preroll) / fps} accent={acc(i)} />}
       <ActingContext.Provider value={{words: sceneWordsRel[i], emphasis: episode.scenes[i].emphasis, big: episode.scenes[i].type === 'big_number', fps}}>
         <SceneView scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} preroll={preroll} fps={fps} accent={acc(i)}
           assets={assets} words={sceneWordsRel[i]} intro={decisions.intro} episodeTitle={episode.title} />

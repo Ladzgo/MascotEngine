@@ -8,12 +8,13 @@ import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
 import {sourceFlags} from './lint.js';
+import {draftByOutline} from './outline.js';
 import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
 const {values, positionals} = parseArgs({
   allowPositionals: true,
-  options: {id: {type: 'string'}, angle: {type: 'string'}, dry: {type: 'boolean'}, channel: {type: 'string'}, 'no-punchup': {type: 'boolean'}, 'no-expand': {type: 'boolean'}, 'no-edit': {type: 'boolean'}},
+  options: {id: {type: 'string'}, angle: {type: 'string'}, dry: {type: 'boolean'}, channel: {type: 'string'}, 'no-punchup': {type: 'boolean'}, 'no-expand': {type: 'boolean'}, 'no-edit': {type: 'boolean'}, legacy: {type: 'boolean'}},
 });
 const topic = positionals.join(' ').trim();
 const id = values.id;
@@ -37,7 +38,10 @@ if (fs.existsSync(path.join(dir, 'episode.json'))) die(`Episode ${id} already ex
 const client = await requireClient(die);
 if (/^hu/i.test(lang) && !/gemma3|14b|27b|32b|70b/i.test(process.env.DRAFT_MODEL ?? process.env.OLLAMA_MODEL ?? '')) console.log('DRAFT_WARN Hungarian from small local models (7B and below) is often ungrammatical. For real use set OLLAMA_MODEL to gemma3:12b or larger (ollama pull gemma3:12b), or a hosted model.');
 try {
-  const ep0 = await draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model: process.env.DRAFT_MODEL ?? MODEL});
+  const model = process.env.DRAFT_MODEL ?? MODEL, log = (m: string) => console.log(`DRAFT_NOTE ${m}`);
+  const legacy = () => draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model});
+  // outline first, then one call per section (progress lines feed the Studio); the one-shot storyboard prompt is the fallback
+  const ep0 = values.legacy ? await legacy() : await draftByOutline({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model, log, progress: (d, n, label) => console.log(`DRAFT_PROGRESS ${d}/${n} ${label}`)}).catch(e => { log(`outline draft failed (${(e as Error).message.split('\n')[0]}); using the one-shot prompt`); return legacy(); });
   const ep1 = values['no-expand'] ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const ep1b = values['no-expand'] ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const ep2 = values['no-punchup'] ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL, lang);

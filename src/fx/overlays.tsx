@@ -15,6 +15,18 @@ export const SourceCard: React.FC<{host: string; t: number; at?: number; accent:
   );
 };
 
+/** Chapter divider: tag at the top-left that slides in at the start of a section and out again after about 2.6 s. */
+export const ChapterTag: React.FC<{title: string; t: number; accent: string}> = ({title, t, accent}) => {
+  const e = easeOut((t - 0.15) / 0.4) * (1 - easeOut((t - 2.6) / 0.4));
+  if (e <= 0.01) return null;
+  return (
+    <div style={{position: 'absolute', left: 80, top: 24, ...CARD, padding: '10px 28px 10px 20px', opacity: e, transform: `translateX(${(1 - e) * -80}px) rotate(${-1.2 * e}deg)`, display: 'flex', alignItems: 'center', gap: 16, background: '#fff6d6'}}>
+      <svg width={26} height={34} viewBox="0 0 26 34" aria-hidden><path d="M2 2h22v30l-11-8-11 8z" fill={accent === INK ? '#e8c25a' : accent} stroke={INK} strokeWidth={3} strokeLinejoin="round" /></svg>
+      <div><div style={{fontFamily: SANS, fontWeight: 700, fontSize: 18, letterSpacing: 4, color: INK, opacity: 0.55}}>CHAPTER</div><div style={{fontFamily: SANS, fontWeight: 700, fontSize: 34, color: INK, lineHeight: 1.05}}>{title}</div></div>
+    </div>
+  );
+};
+
 /** Quote card: a short pulled line with an attribution; enters with the shared ease. */
 export const QuoteCard: React.FC<{text: string; by?: string; t: number; at?: number; accent: string; width?: number; x?: number; y?: number}> = ({text, by, t, at = 0, accent, width = 1100, x = (1920 - width) / 2, y = 280}) => {
   const e = easeOut((t - at) / 0.5);

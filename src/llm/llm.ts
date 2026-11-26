@@ -11,6 +11,13 @@ const ollamaHost = (env: NodeJS.ProcessEnv) => (env.OLLAMA_HOST || 'http://127.0
 /** Preferred small instruct models, best first. Already-installed ones are used before anything is downloaded. */
 const PREFERRED = ['qwen2.5:7b', 'llama3.1:8b', 'qwen3:8b', 'qwen2.5:14b', 'gemma2:9b', 'mistral', 'llama3.2', 'qwen2.5:3b', 'phi3', 'qwen2.5:1.5b'];
 export const DEFAULT_PULL = 'llama3.1:8b';
+/** Per-request limit for local models: bigger models are slower per token. LLM_TIMEOUT_MS overrides. */
+export function ollamaTimeoutMs(model: string, env: NodeJS.ProcessEnv = process.env): number {
+  const forced = Number(env.LLM_TIMEOUT_MS);
+  if (forced > 0) return forced;
+  const b = Number(/(\d+(?:\.\d+)?)b\b/i.exec(model)?.[1] ?? 8);
+  return (b <= 4 ? 120 : b <= 9 ? 240 : b <= 15 ? 480 : 900) * 1000;
+}
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export async function ollamaReachable(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
@@ -127,16 +134,19 @@ async function viaOllama(system: string, messages: ChatMsg[], json: boolean, env
   let res: Response;
   try {
     res = await fetch(`${host}/api/chat`, {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({model, stream: false, ...(json ? {format: 'json'} : {}), options: {temperature: 0.6, num_ctx: 8192}, messages: [{role: 'system', content: system}, ...messages]}),
+      method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(ollamaTimeoutMs(model, env)),
+      body: JSON.stringify({model, stream: true, ...(json ? {format: 'json'} : {}), options: {temperature: 0.6, num_ctx: 8192}, messages: [{role: 'system', content: system}, ...messages]}),
     });
-  } catch {
+  } catch (e) {
+    if ((e as Error).name === 'TimeoutError') throw new Error(`Ollama model "${model}" took longer than ${ollamaTimeoutMs(model, env) / 1000}s for one answer (set LLM_TIMEOUT_MS to allow more).`);
     throw new Error(`Ollama is not running at ${host}. ${NO_PROVIDER}`);
   }
   if (res.status === 404) throw new Error(`Ollama model "${model}" is not installed. Run: ollama pull ${model}`);
   if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data: any = await res.json();
-  const text = data.message?.content;
+  // streamed (NDJSON) so a slow big model never trips the 5 min header timeout of fetch; the body is joined here
+  let body: string;
+  try { body = await res.text(); } catch (e) { throw new Error((e as Error).name === 'TimeoutError' ? `Ollama model "${model}" took longer than ${ollamaTimeoutMs(model, env) / 1000}s for one answer (set LLM_TIMEOUT_MS to allow more).` : `Ollama connection dropped: ${(e as Error).message}`); }
+  const text = body.split('\n').filter(l => l.trim()).map(l => { try { return (JSON.parse(l) as any).message?.content ?? ''; } catch { return ''; } }).join('');
   if (typeof text !== 'string' || !text) throw new Error('Ollama returned no text.');
   return text;
 }

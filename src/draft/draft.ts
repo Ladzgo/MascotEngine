@@ -3,7 +3,7 @@ import path from 'node:path';
 import {Episode, VISUAL_KINDS} from '../schema.js';
 import {HU_SHAPE_EXAMPLE, LANG_RULES, isHu} from './lang.js';
 import {styleGaps} from './critic.js';
-import {autoFixEpisode, lintEpisode, repeatedPhrases} from './lint.js';
+import {autoFixEpisode, lintEpisode, repeatedPhrases, spokenNumbers} from './lint.js';
 import {extractJson, type Client} from '../llm/llm.js';
 
 export const MODEL = 'claude-sonnet-5-5';
@@ -28,6 +28,21 @@ const EN_SHAPE_EXAMPLE = `{"title":"Renting Is Not Throwing Money Away","scenes"
 
 export const langNote = (lang?: string) => (isHu(lang) ? ' Write the narration in natural spoken Hungarian (numbers: 1 234 567, decimal comma).' : '');
 
+export const SCENE_TYPES = `Scene types (pick what fits the content): 
+- title {narration, emotion}
+- talk {narration, emotion, emphasis?: string[]}
+- big_number {narration, emotion, value:number, prefix, suffix, label, decimals}
+- chart {narration, emotion, chart:{kind:"line"|"bar", labels:[...], values:[...] same length, yLabel}}
+- compare {narration, emotion, left:{title,value}, right:{title,value}}
+- list {narration, emotion, items: 1-6 strings}
+- timeline {narration, emotion, events:[{when:"1971", what:"short step"}...] 2-5 steps in time order; use when the script walks through dates or stages}
+- before_after {narration, emotion, before:{title,value}, after:{title,value}; use for one thing then and now}
+- table {narration, emotion, columns:[2-4 short headers], rows:[2-5 rows, one cell per column, first cell is the row label], highlight?: row index}
+- checklist {narration, emotion, steps:[2-6 short steps]}
+- stats {narration, emotion, stats:[{value:number, prefix, suffix, decimals, label}] 2-3 numbers, each said in the narration}
+Any scene may also carry "visual":{"kind": illustration kind}.
+emotion is one of: neutral, smug, worried, shocked, happy, excited, thinking, explaining, angry, sad, confused, sweating.`;
+
 export function buildSystem(voice: string, channelCtx?: string, lang?: string): string {
   const hu = isHu(lang);
   return `You write draft scripts for an explainer YouTube channel.${channelCtx ? `\n\nChannel profile:\n${channelCtx}` : ''}${hu ? `\n\n${LANG_RULES.hu}` : ''}
@@ -42,20 +57,7 @@ ${hu ? HU_SHAPE_EXAMPLE : EN_SHAPE_EXAMPLE}
 Output ONLY one JSON object (no prose, no code fences) matching this episode schema:
 {"id": string, "title": string, "series": "money-myths", "seed": 0, "disclaimer": true, "sources": [url...],
  "scenes": [scene...]}
-Scene types (pick what fits the content): 
-- title {narration, emotion}
-- talk {narration, emotion, emphasis?: string[]}
-- big_number {narration, emotion, value:number, prefix, suffix, label, decimals}
-- chart {narration, emotion, chart:{kind:"line"|"bar", labels:[...], values:[...] same length, yLabel}}
-- compare {narration, emotion, left:{title,value}, right:{title,value}}
-- list {narration, emotion, items: 1-6 strings}
-- timeline {narration, emotion, events:[{when:"1971", what:"short step"}...] 2-5 steps in time order; use when the script walks through dates or stages}
-- before_after {narration, emotion, before:{title,value}, after:{title,value}; use for one thing then and now}
-- table {narration, emotion, columns:[2-4 short headers], rows:[2-5 rows, one cell per column, first cell is the row label], highlight?: row index}
-- checklist {narration, emotion, steps:[2-6 short steps]}
-- stats {narration, emotion, stats:[{value:number, prefix, suffix, decimals, label}] 2-3 numbers, each said in the narration}
-Any scene may also carry "visual":{"kind": illustration kind}.
-emotion is one of: neutral, smug, worried, shocked, happy, excited, thinking, explaining, angry, sad, confused, sweating.
+${SCENE_TYPES}
 Rules: the FIRST scene is the hook, 15 words or fewer, with one surprising fact or claim. One clear angle. Every number shown (big_number, chart, or quoted in narration) must come from a real source whose URL is listed in "sources". Never invent URLs or data; if unsure, leave the number out. A big_number scene's "value" must be the exact number its own narration says out loud and must come from a source you list; if you do not know a real figure, write a talk scene instead (a big_number whose value the narration does not say is dropped). Never repeat a metaphor, simile, joke or phrase across scenes: each scene brings a fresh image or a plain fact. No guarantees, no advice phrasing. Narration is spoken text: spell out numbers naturally. This is a draft a human will rewrite.`;
 }
 
@@ -69,7 +71,7 @@ Every scene, including list, needs real spoken narration (never "..."); the last
 }
 
 const EMO_ALIAS: Record<string, string> = {surprised: 'shocked', anxious: 'worried', nervous: 'worried', concerned: 'worried', curious: 'thinking', serious: 'neutral', calm: 'neutral', playful: 'smug', ironic: 'smug', sarcastic: 'smug', cynical: 'smug', mad: 'angry', frustrated: 'angry', upset: 'sad', confident: 'smug', amused: 'happy', hopeful: 'happy', skeptical: 'thinking'};
-const EMOTIONS = ['neutral', 'smug', 'worried', 'shocked', 'happy', 'excited', 'thinking', 'explaining', 'angry', 'sad', 'confused', 'sweating'];
+export const EMOTIONS = ['neutral', 'smug', 'worried', 'shocked', 'happy', 'excited', 'thinking', 'explaining', 'angry', 'sad', 'confused', 'sweating'];
 const str = (v: unknown) => v === undefined || v === null ? '' : String(v);
 
 /** Small local models drift from the schema in harmless ways; fix those before validating (never invents numbers). */
@@ -118,7 +120,7 @@ export function repairDraft(raw: any): any {
 }
 
 export type DraftStats = {attempts: number; failures: string[][]; demoted: number};
-function validate(text: string, id: string, channel?: string, stats?: DraftStats): {ep?: Episode; errors: string[]} {
+export function validate(text: string, id: string, channel?: string, stats?: DraftStats): {ep?: Episode; errors: string[]} {
   let raw: any;
   try { raw = extractJson(text); } catch (e) { return {errors: [`Output is not valid JSON: ${(e as Error).message}`]}; }
   if (raw && typeof raw === 'object') { raw.id = id; if (channel) raw.channel = channel; repairDraft(raw); }
@@ -184,7 +186,8 @@ export async function punchUpHook(client: Client, ep: Episode, model?: string, l
     const text = res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
     const hook = String((extractJson(text) as {hook?: unknown}).hook ?? '').trim();
     const cand = autoFixEpisode({...ep, scenes: [{...first, narration: hook} as Episode['scenes'][number], ...ep.scenes.slice(1)]});
-    if (hook && hook.split(/\s+/).length <= 14 && cand.scenes[0].narration === hook && !lintEpisode(cand).length) return cand;
+    const heard = ep.scenes.flatMap(s => spokenNumbers(s.narration)); // a sharper hook may not invent a figure
+    if (hook && spokenNumbers(hook).every(n => heard.includes(n)) && hook.split(/\s+/).length <= 14 && cand.scenes[0].narration === hook && !lintEpisode(cand).length) return cand;
   } catch { /* keep the original hook */ }
   return ep;
 }

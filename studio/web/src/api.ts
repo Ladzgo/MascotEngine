@@ -67,6 +67,7 @@ export const api = {
   startClip: (b: {path?: string; upload?: string; min: number; max: number; count: number}) => call<{name: string}>('/api/clip', {method: 'POST', body: JSON.stringify(b)}),
   uploadClipSource: (file: File) => audioCall<{name: string}>(`/api/clips/upload?name=${encodeURIComponent(file.name.replace(/[^A-Za-z0-9._-]+/g, '_'))}`, {method: 'POST', body: file}),
   analytics: () => call<AnalyticsSummary>('/api/analytics'),
+  draftProgress: () => call<{done: number; total: number; label: string}>('/api/draft-progress'),
   readiness: () => call<Readiness>('/api/readiness'),
   makeThumb: (id: string, text?: string) => call<{ok: boolean; at: number}>(`/api/episodes/${id}/thumbnail`, {method: 'POST', body: JSON.stringify({text})}),
   draft: (topic: string, angle: string, channel: string) => call<{id: string}>('/api/draft', {method: 'POST', body: JSON.stringify({topic, angle, channel})}),

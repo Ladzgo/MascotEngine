@@ -228,18 +228,25 @@ const nextId = (topic: string) => {
   const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 4).join('-');
   return `ep${String(n).padStart(3, '0')}${slug ? '-' + slug : ''}`;
 };
-function runNpm(args: string[]) {
+function runNpm(args: string[], onLine?: (l: string) => void) {
   return new Promise<{code: number | null; out: string[]}>(ok => {
     const child = spawn('npm', ['run', ...args], {cwd: ROOT, env: process.env});
     const out: string[] = [];
-    const onData = (b: Buffer) => out.push(...b.toString().split('\n').filter(l => l.trim()));
+    const onData = (b: Buffer) => { const ls = b.toString().split('\n').filter(l => l.trim()); out.push(...ls); ls.forEach(l => onLine?.(l)); };
     child.stdout.on('data', onData); child.stderr.on('data', onData);
     child.on('error', e => ok({code: 1, out: [e.message]}));
     child.on('close', code => ok({code, out}));
   });
 }
-const runDraft = (topic: string, id: string, angle: string, channel: string) =>
-  runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : [])]);
+/** Section progress of the running draft (DRAFT_PROGRESS lines from the CLI), polled by the Studio. */
+let draftProgress: {done: number; total: number; label: string} | null = null;
+const runDraft = (topic: string, id: string, angle: string, channel: string) => {
+  draftProgress = {done: 0, total: 0, label: 'Planning the outline'};
+  return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : [])], l => {
+    const m = /^DRAFT_PROGRESS (\d+)\/(\d+) (.*)$/.exec(l);
+    if (m) draftProgress = {done: +m[1], total: +m[2], label: m[3]};
+  }).finally(() => { draftProgress = null; });
+};
 const scriptInstalled = (name: string) => !!readJson<{scripts?: Record<string, string>}>(`${ROOT}package.json`)?.scripts?.[name];
 const cliMessage = (out: string[], code: number | null) => friendlyError(out.filter(l => !l.startsWith('>') && !/^npm (warn|notice)/.test(l)).slice(-6).join('\n')) || `Command failed (exit ${code}).`;
 /** One AI command at a time (draft, ideas, publish pack). Returns a release function. */
@@ -822,6 +829,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       return void res.end(toCsv(await scheduleRows(ROOT)));
     }
     if (p[0] === 'analytics' && m === 'GET') return json(res, 200, summarize(ROOT));
+    if (p[0] === 'draft-progress' && m === 'GET') return json(res, 200, draftProgress ?? {done: 0, total: 0, label: ''});
     if (p[0] === 'readiness' && m === 'GET') return json(res, 200, await readiness());
     if (p[0] === 'overview' && m === 'GET') return json(res, 200, {channels: overview()});
     if (p[0] === 'jobs' && p[1]) {

@@ -67,8 +67,8 @@ test('repairDraft fixes small-model schema drift without inventing numbers', asy
 test('punchUpHook accepts a valid sharper hook, rejects a long one', async () => {
   const {punchUpHook} = await import('./draft.js');
   const ep: any = {...good, scenes: [{type: 'talk', emotion: 'neutral', emphasis: [], narration: 'Savings lose value.'}], disclaimer: true};
-  const ok = await punchUpHook(mk([JSON.stringify({hook: 'Your savings lose three dollars of power every hundred.'})]), ep);
-  assert.equal(ok.scenes[0].narration, 'Your savings lose three dollars of power every hundred.');
+  const ok = await punchUpHook(mk([JSON.stringify({hook: 'Your savings quietly lose their power every year.'})]), ep);
+  assert.equal(ok.scenes[0].narration, 'Your savings quietly lose their power every year.');
   const long = await punchUpHook(mk([JSON.stringify({hook: 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen'})]), ep);
   assert.equal(long.scenes[0].narration, 'Savings lose value.');
 });

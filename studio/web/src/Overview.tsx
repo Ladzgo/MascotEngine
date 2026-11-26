@@ -22,6 +22,12 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
   const warn = cfg ? readiness(cfg, cfg.engine).filter(c => !c.ok) : [];
   const target = ch === 'all' ? chans[0]?.id ?? 'default' : ch;
   const shown = (rows ?? []).filter(r => ch === 'all' || r.channel.id === ch);
+  const [prog, setProg] = useState('');
+  useEffect(() => {
+    if (!drafting) { setProg(''); return; }
+    const iv = setInterval(() => { api.draftProgress().then(p => setProg(p.label ? (p.total ? `section ${Math.min(p.done + 1, p.total)} of ${p.total}: ${p.label}` : p.label) : '')).catch(() => {}); }, 2000);
+    return () => clearInterval(iv);
+  }, [drafting]);
   const todo = eps.filter(e => (ch === 'all' || e.channel === ch) && !e.archived && !e.stages.final);
   const stale = eps.filter(e => (ch === 'all' || e.channel === ch) && (e.stale.preview || e.stale.final));
   const draftBlock = !cfg ? null : !cfg.draftInstalled ? 'Drafter not installed' : null;
@@ -75,7 +81,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
           <p className="small muted">New episodes go to {chans.find(c => c.id === target)?.name ?? target}.</p>
           <label className="field"><span>{t('From a topic')}</span><input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. why savings accounts lose to inflation" disabled={drafting} /></label>
           <label className="field"><span>{t('Angle')} <em>· optional</em></span><input value={angle} onChange={e => setAngle(e.target.value)} disabled={drafting} /></label>
-          <div className="row"><button className="btn primary" type="submit" disabled={drafting || !topic.trim() || !!draftBlock}><Play size={15} />{drafting ? 'Drafting… (about a minute)' : t('Draft script')}</button><button type="button" className="btn" onClick={() => void make()} disabled={drafting || !topic.trim() || !!draftBlock} title="Draft, voice and preview in one go (free, local)"><Play size={15} />{t('Make video')}</button>{draftBlock && <span className="small muted">{draftBlock}</span>}</div>
+          <div className="row"><button className="btn primary" type="submit" disabled={drafting || !topic.trim() || !!draftBlock}><Play size={15} />{drafting ? `Drafting… ${prog || '(a few minutes)'}` : t('Draft script')}</button><button type="button" className="btn" onClick={() => void make()} disabled={drafting || !topic.trim() || !!draftBlock} title="Draft, voice and preview in one go (free, local)"><Play size={15} />{t('Make video')}</button>{draftBlock && <span className="small muted">{draftBlock}</span>}</div>
           <label className="small" style={{display: 'flex', gap: 8, alignItems: 'center', flexDirection: 'row'}}><input style={{width: 'auto', margin: 0}} type="checkbox" checked={stop} onChange={e => setStop(e.target.checked)} />{t('Stop at preview')} <span className="muted">{stop ? '(voice, plan, preview)' : '(voice, plan, final render)'}</span></label>
           {formErr && <p className="err-text" role="alert">{formErr}</p>}
           <div className="row blank-ep"><label className="field grow"><span>{t('Or a blank episode')}</span><input value={newId} onChange={e => setNewId(e.target.value)} placeholder="ep003-topic" /></label><button type="button" className="btn" onClick={create} disabled={!newId.trim()}>{t('Create')}</button></div>
