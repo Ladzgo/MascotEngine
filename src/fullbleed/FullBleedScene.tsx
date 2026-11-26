@@ -238,7 +238,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
       {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: `scale(${Math.max(1, subZ) * (subX ? 1.15 : 1)}) translate(${subX * w * 0.5}px, ${subY * h * 0.5}px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /></div> : (
-      <div style={{position: 'absolute', inset: 0, transform: `scale(${(1.06 + 0.1 * p) * Math.max(1, subZ) * (subX ? 1.1 : 1)}) translateX(${panX * 0.5 + subX * w * 0.4}px)`, transformOrigin: '50% 60%'}}>
+      <div style={{position: 'absolute', inset: 0, transform: `scale(${(1.06 + 0.1 * p) * Math.max(1, subZ) * (subX ? 1.1 : 1)}) translateX(${panX * 0.5 + subX * w * 0.4}px)`, transformOrigin: '50% 60%', filter: `blur(${tall ? 3 : 2}px)`}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
       </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
@@ -283,6 +283,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       </div>
       {lay === 'kinetic' && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.1) / 0.3), fs = Math.min(w * 0.18, (w * 0.88) / (Math.max(...kw.split(/\s+/).map(x => x.length)) * 0.68), 220); return <div style={{position: 'absolute', left: w * 0.04, width: w * 0.92, top: tall ? h * 0.09 : h * 0.08, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{kw}</div>; })()}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
+      {/* key light from the upper left + falloff to the lower right: one consistent light source reads as a lit 3D set, not flat vectors */}
+      {!scene.stockFile && <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'soft-light', background: 'radial-gradient(ellipse 80% 60% at 22% 18%, rgba(255,244,220,0.85), rgba(255,244,220,0) 60%), linear-gradient(160deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45))'}} />}
       {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} words={words} />}
       {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
