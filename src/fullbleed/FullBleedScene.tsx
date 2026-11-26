@@ -212,7 +212,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const versus = scene.type === 'compare' || scene.type === 'before_after';
   // hero stands on the ground plane (y = 68% of a tall frame, 80% of a wide one); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.3 : h * 1.05;
-  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' ? 0.5 : lay === 'broll' ? 0.85 : 1;
+  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
   const hs = base * scale, groundY = tall ? h * 0.67 : h * 0.8, cy = groundY - 0.325 * hs;
   const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
@@ -234,7 +234,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           const feet = groundY, Cmp = plan.companion ?? s.kind;
           const slots: Slot[] = lay === 'split' && !hasCallouts && !versus ? [{x: w * 0.27, s: 0.44, feet, kind: s.kind, delay: 0, main: true}, {x: w * 0.73, s: 0.44, feet, kind: Cmp, delay: 0.25, main: false}]
             : lay === 'grid' && !hasCallouts && !versus ? Array.from({length: 6}, (_, k) => ({x: w * (0.19 + (k % 3) * 0.31), s: 0.28, feet: feet - Math.floor(k / 3) * hs * 0.3 * 0.62 - (k % 3 === 1 ? 14 : 0), kind: s.kind, delay: k * 0.12, main: k === 1}))
-            : lay === 'pip' ? [{x: w * 0.74, s: 1, feet: tall ? h * 0.58 : h * 0.74, kind: s.kind, delay: 0, main: true}]
+            : lay === 'pip' || lay === 'broll' ? [{x: w * (lay === 'pip' ? 0.74 : 0.26), s: 1, feet: tall ? h * 0.66 : h * 0.74, kind: s.kind, delay: 0, main: true}]
             : [{x: hx, s: 1, feet, kind: s.kind, delay: 0, main: true}];
           return slots.map((sl, si) => {
             const O = OBJECTS[sl.kind] ?? Obj, lt = local - sl.delay;
