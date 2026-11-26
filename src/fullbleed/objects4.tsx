@@ -21,26 +21,26 @@ export const Atm: Obj = ({t}) => {
   );
 };
 
-export const Paycheck: Obj = ({t}) => {
+export const Paycheck: Obj = ({t, value}) => {
   const s = pop(t, 0, 0.5);
   return (
     <g transform={`translate(0 ${wave(t, 3) * 3}) rotate(${-4 + (1 - s) * 18} 200 190) scale(${Math.max(0.01, s)})`} style={{transformOrigin: '200px 190px'}}>
       <Shadow rx={150} o={0.6} />
       <rect x={40} y={100} width={320} height={170} rx={12} fill="#fffdf6" /><rect x={40} y={100} width={320} height={28} rx={12} fill={url('green')} />
       <Txt x={110} y={122} size={20} fill="#fff">PAY CHECK</Txt><rect x={64} y={150} width={150} height={10} rx={5} fill="#c9ccd6" /><rect x={64} y={176} width={110} height={10} rx={5} fill="#c9ccd6" />
-      <rect x={230} y={150} width={104} height={44} rx={8} fill="#eef3ee" /><Txt x={282} y={184} size={30} fill={P('green', 2)}>{`$${money(2400 * seg(t, 0.4, 1.4))}`}</Txt>
+      <rect x={230} y={150} width={104} height={44} rx={8} fill="#eef3ee" />{value !== undefined && <Txt x={282} y={184} size={30} fill={P('green', 2)}>{`$${money(value * seg(t, 0.4, 1.4))}`}</Txt>}
       <path d="M64 236 q30 -30 50 0 t50 0" stroke="#16182a" strokeWidth={4} fill="none" />
     </g>
   );
 };
 
-export const Bills: Obj = ({t}) => (
+export const Bills: Obj = ({t, value}) => (
   <g>
     <Shadow rx={150} />
     {[0, 1, 2, 3].map(i => { const k = seg(t, i * 0.18, 0.5 + i * 0.18); return (
       <g key={i} transform={`translate(${(i % 2 ? 12 : -10)} ${-(1 - k) * 100 - i * 26}) rotate(${(i - 1.5) * 4})`} opacity={clamp(k * 3)} style={{transformOrigin: '200px 300px'}}>
         <rect x={80} y={240} width={240} height={80} rx={8} fill={['#fffdf6', '#ffe9c0', '#d9ecff', '#ffd9d2'][i]} /><rect x={96} y={256} width={90} height={9} rx={4} fill="#9aa0b3" /><rect x={96} y={276} width={60} height={9} rx={4} fill="#9aa0b3" />
-        <Txt x={270} y={292} size={26} fill={i === 3 ? P('red', 2) : '#16182a'}>{['$84', '$120', '$45', '$310'][i]}</Txt>
+        {i === 3 && value !== undefined ? <Txt x={262} y={292} size={26} fill={P('red', 2)}>{`$${value.toLocaleString('en-US')}`}</Txt> : <rect x={232} y={276} width={70} height={14} rx={6} fill="#9aa0b3" opacity={0.7} />}
       </g>); })}
     <g transform={`rotate(-14 270 200) scale(${pop(t, 1.0, 0.35)})`} style={{transformOrigin: '270px 200px'}}><rect x={210} y={170} width={120} height={50} rx={6} fill="none" stroke={P('red', 1)} strokeWidth={6} /><Txt x={270} y={208} size={34} fill={P('red', 1)}>DUE</Txt></g>
   </g>
@@ -145,7 +145,7 @@ export const Hourglass: Obj = ({t}) => {
   );
 };
 
-export const Thermometer: Obj = ({t}) => {
+export const Thermometer: Obj = ({t, value}) => {
   const k = seg(t, 0.2, 2.4), pulse = 1 + Math.sin(t * 6) * 0.03 * k;
   return (
     <g transform={`scale(${Math.max(0.01, pop(t, 0, 0.5))})`} style={{transformOrigin: '200px 330px'}}>
@@ -153,17 +153,17 @@ export const Thermometer: Obj = ({t}) => {
       <rect x={168} y={30} width={64} height={250} rx={32} fill="#eef3ff" /><circle cx={200} cy={296} r={52} fill="#eef3ff" />
       <rect x={188} y={270 - k * 200} width={24} height={k * 200 + 20} rx={12} fill={url('red')} /><circle cx={200} cy={296} r={40 * pulse} fill={url('red')} />
       {[0, 1, 2, 3, 4].map(i => <rect key={i} x={240} y={60 + i * 44} width={i % 2 ? 22 : 36} height={5} rx={2} fill="#fff" opacity={0.7} />)}
-      <Txt x={300} y={90} size={44} fill="#ff9a8a">{`${(2 + k * 7).toFixed(1)}%`}</Txt>
+      {value !== undefined && <Txt x={300} y={90} size={44} fill="#ff9a8a">{`${+(value * k).toFixed(1)}%`}</Txt>}
     </g>
   );
 };
 
-export const GasPump: Obj = ({t}) => {
-  const v = 3.1 + seg(t, 0.3, 2.6) * 2.4;
+export const GasPump: Obj = ({t, value}) => {
+  const v = (value ?? 0) * seg(t, 0.3, 2.6);
   return (
     <g transform={`scale(${Math.max(0.01, pop(t, 0, 0.5))})`} style={{transformOrigin: '200px 330px'}}>
       <Shadow rx={110} />
-      <rect x={90} y={40} width={170} height={290} rx={18} fill={url('red')} /><rect x={110} y={64} width={130} height={70} rx={8} fill="#12142a" /><Txt x={175} y={116} size={36} fill="#5be38b">{`$${v.toFixed(2)}`}</Txt>
+      <rect x={90} y={40} width={170} height={290} rx={18} fill={url('red')} /><rect x={110} y={64} width={130} height={70} rx={8} fill="#12142a" />{value !== undefined && <Txt x={175} y={116} size={36} fill="#5be38b">{`$${v.toFixed(2)}`}</Txt>}
       <rect x={110} y={160} width={130} height={14} rx={6} fill="#fff" opacity={0.3} /><rect x={90} y={316} width={170} height={20} rx={6} fill={P('red', 2)} />
       <path d="M260 120 q70 0 70 70 v90 q0 20 -20 20" fill="none" stroke="#1b1d26" strokeWidth={14} strokeLinecap="round" /><rect x={296} y={290} width={30} height={30} rx={6} fill="#1b1d26" />
     </g>
