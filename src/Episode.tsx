@@ -103,7 +103,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
       ))}
       {!fullbleed && <Vignette />}
       {!fullbleed && g < endStart && <ProgressBar index={sceneAt(L, g)} count={totalScenes} p={(g - base) / Math.max(1, L.ends[sceneAt(L, g)] - L.froms[sceneAt(L, g)])} accent={accent} />}
-      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={!['big_number', 'title', 'compare', 'before_after'].includes(episode.scenes[sceneAt(L, g)].type)} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
+      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={!['big_number', 'title', 'compare', 'before_after'].includes(episode.scenes[sceneAt(L, g)].type) && fbPlan[sceneAt(L, g)]?.layout !== 'kinetic'} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
       {episode.disclaimer && episode.format !== 'short' && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
           <EndCard episode={episode} accent={accent} />
