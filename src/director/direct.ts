@@ -12,7 +12,7 @@ const CAPTIONS = ['bar', 'pill', 'outline'] as const;
 const INTROS = ['ink_draw', 'pop', 'slide'] as const;
 const MOODS = ['calm', 'curious', 'tense', 'upbeat'] as const;
 const CAMERAS = ['static', 'slow_push', 'slow_pull', 'pan_left', 'pan_right', 'drift'];
-const TRANSITIONS = ['cut', 'slide', 'wipe_ink', 'circle_reveal', 'zoom_through', 'paper_flip'];
+const TRANSITIONS = ['cut', 'slide', 'wipe_ink', 'circle_reveal', 'zoom_through', 'paper_flip', 'whip', 'light_leak', 'tear'];
 
 const LAYOUTS: Record<string, string[]> = {
   title: ['center', 'closeup'],
@@ -130,6 +130,9 @@ function fitTransition(tr: string, s: Scene, prev?: Scene): number {
   if (tr === 'wipe_ink' && (s.type === 'chart' || s.type === 'timeline')) return 1.5;
   if (tr === 'paper_flip' && s.type === 'before_after') return 1.6;
   if (tr === 'slide' && (s.type === 'table' || s.type === 'checklist')) return 1.5;
+  if (tr === 'whip' && (s.type === 'talk' || s.type === 'checklist')) return 1.3;
+  if (tr === 'light_leak' && (s.type === 'title' || s.emotion === 'happy' || s.emotion === 'excited')) return 1.5;
+  if (tr === 'tear' && (s.emotion === 'angry' || s.emotion === 'shocked' || s.type === 'before_after')) return 1.5;
   if (tr === 'zoom_through' && s.type === 'stats') return 1.5;
   if (tr === 'circle_reveal' && s.type === 'compare') return 1.3;
   if (tr !== 'cut' && prev && prev.type === s.type && ['chart', 'list', 'table', 'checklist'].includes(s.type)) return tr === 'slide' ? 0.6 : 1; // same-type neighbours: the cut already reads as the same family

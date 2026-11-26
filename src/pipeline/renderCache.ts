@@ -67,7 +67,7 @@ export function chunkKeys(o: {ranges: Range[]; episode: any; decisions: any; tim
   };
   return o.ranges.map(r => {
     const i = r.scene === 'end' ? decisions.scenes.length : r.scene;
-    const parts = [global, L ? r.to - r.from : [r.from, r.to], r.scene === 'end' ? null : per(i), per(i - 1), per(i + 1), around(i)];
+    const parts = [global, [r.scene, decisions.scenes.length], L ? r.to - r.from : [r.from, r.to], r.scene === 'end' ? null : per(i), per(i - 1), per(i + 1), around(i)];
     if (process.env.RENDER_CACHE_DEBUG) fs.writeFileSync(`${process.env.RENDER_CACHE_DEBUG}.${r.scene}.json`, JSON.stringify(parts, null, 1));
     return sha(...parts);
   });
