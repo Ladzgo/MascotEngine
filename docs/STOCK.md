@@ -23,3 +23,14 @@ copied into every beat) dominates the search, so the photo matches the room, not
 ("living room percent", "living room gauge"): none of those pictures say "debt" or "interest".
 Suggested fix: build `stock.query` from the sentence's concrete noun + the topic keyword (e.g. "credit card bill", "interest rate"),
 never from `setting`; drop hits whose title/tags share no word with the topic; keep the procedural object when no hit overlaps.
+
+## B2 notes (ep011, 2026-11-26, Groq draft, 52.5 s)
+
+QA: 16/18 pass. Fails: visual change rate 3.8 s (cap 3 s, 14 changes) and longest scene 7.9 s. The scene length is fixed on the B2 side (de6dad5: spoken word counting, Short data scenes > 14 spoken words go back to the drafter). The change rate is planShots: most beats get one shot. Owner: A2.
+
+Visual, from a contact sheet (every 4 s):
+- Hook mug shows "$6" while the voice says $5: the label number should come from the narration.
+- Off-topic stock: a child watching TV for "the average American", empty goal posts for "habit quietly eats", a grey splash for "days".
+- The lower ~35% of the frame is a dark empty band under the captions.
+- Captions read "ONE THOUSAND EIGHT HUNDRED": the drafter writes numbers as words, so captions lose the numerals. The prompt should ask for numerals ($1,825); TTS spells them out anyway.
+- Script: $1,825 is said four times in the 12 beats. Story variety (A2: story.ts/outline).
