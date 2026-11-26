@@ -1,3 +1,4 @@
+import {SwapImage} from './SwapImage';
 import React, {useState} from 'react';
 import type {Decisions, EpisodeDoc, Scene, SceneAudio, Settings} from './api';
 import {Publish} from './Publish';
@@ -84,6 +85,7 @@ export function Inspector({cfg, hasVideo, doc, decisions, variety, audio, onAudi
               <Pick label="Emotion" value={s.emotion} options={EMOTIONS} onChange={v => set({emotion: v ?? 'neutral'})} />
               <label className="field"><span>Emphasis words</span><input value={s.emphasis.join(', ')} onChange={e => set({emphasis: csv(e.target.value)})} placeholder="goes down, 3%" /></label>
             </div>}
+            {view === 'visuals' && <SwapImage key={`${doc.id}-${sel}`} ep={doc.id} scene={sel} stock={s.stock} onPicked={st => set({stock: st})} />}
             {showV('visuals') && s.type === 'big_number' && (
               <fieldset><legend>Big number</legend>
                 <div className="two">

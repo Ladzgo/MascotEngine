@@ -189,3 +189,17 @@ test('make: Cancel stops a running draft, Retry starts it again with the same se
     assert.equal((await post('/api/drafts/nope/retry')).status, 404);
   } finally { await new Promise(r => setTimeout(r, 800)); for (const d of fs.readdirSync(`${ROOT}episodes`)) if (d.includes('zz-cancel')) fs.rmSync(`${ROOT}episodes/${d}`, {recursive: true, force: true}); }
 });
+
+test('stock swap API: lists beats, rejects unknown scene / short query / hits that were never searched', async () => {
+  const topic = `zz-stock-${process.pid}`, post = (u: string, b: object) => fetch(`${BASE}${u}`, {method: 'POST', headers: J, body: JSON.stringify(b)});
+  try {
+    const {id} = await (await post('/api/make', {topic})).json() as {id: string};
+    for (let i = 0; i < 40; i++) { if ((await fetch(`${BASE}/api/episodes/${id}/stock`)).status === 200) break; await new Promise(r => setTimeout(r, 100)); }
+    const st = await (await fetch(`${BASE}/api/episodes/${id}/stock`)).json() as {scenes: {scene: number}[]};
+    assert.equal(st.scenes.length, 1);
+    assert.equal((await post(`/api/episodes/${id}/stock/search`, {scene: 9, query: 'money'})).status, 422);
+    assert.equal((await post(`/api/episodes/${id}/stock/search`, {scene: 0, query: ' '})).status, 422);
+    assert.equal((await post(`/api/episodes/${id}/stock/swap`, {scene: 0, id: 'x', provider: 'pixabay'})).status, 409); // no SSRF: only our own search results can be downloaded
+    assert.equal((await fetch(`${BASE}/api/stock-cache/..%2Fpackage.json`)).status === 200, false);
+  } finally { await new Promise(r => setTimeout(r, 500)); for (const d of fs.readdirSync(`${ROOT}episodes`)) if (d.includes('zz-stock')) fs.rmSync(`${ROOT}episodes/${d}`, {recursive: true, force: true}); }
+});

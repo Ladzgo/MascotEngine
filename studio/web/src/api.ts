@@ -1,7 +1,7 @@
 import type React from 'react';
 export type Scene = {
   type: 'title' | 'talk' | 'big_number' | 'chart' | 'compare' | 'list' | 'timeline' | 'before_after';
-  narration: string; emotion: string; emphasis: string[];
+  narration: string; emotion: string; emphasis: string[]; stock?: {query: string; kind: 'photo' | 'video'};
   layout?: string; camera?: string; transition?: string; pose?: string;
   value?: number; prefix?: string; suffix?: string; label?: string; decimals?: number;
   chart?: {kind: 'line' | 'bar'; labels: string[]; values: number[]; yLabel: string};
@@ -31,7 +31,7 @@ export type IdeasData = {generatedAt: string; ideas: Idea[]; installed: boolean}
 export type PublishPack = {titles: string[]; description: string; tags: string[]; chapters: {startSec: number; title: string}[]; thumbnailText: string[]; source: 'ai' | 'fallback'};
 export type OverviewRow = {channel: Channel; episodes: number; rendered: number; ideasNew: number; lastRender: {id: string; at: string} | null; unfinished: {id: string; title: string} | null};
 
-async function call<T>(url: string, init?: RequestInit): Promise<T> {
+export async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {...init, headers: {'Content-Type': 'application/json'}});
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);

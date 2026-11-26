@@ -21,7 +21,9 @@ import {z} from 'zod';
 import {Episode} from '../src/schema.js';
 import {voiceEngines, previewVoice} from '../src/pipeline/voicePreview.js';
 import {VoicePreviewBody, ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, LlmProviderBody, StockKeyBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
-import {testPixabayKey} from '../src/stock/providers.js';
+import {testPixabayKey, setApiCacheDir, type StockHit} from '../src/stock/providers.js';
+import {PROVIDERS, rank, prepVideo, readStock, creditLines, CACHE_DIR, type StockRecord} from '../src/stock/index.js';
+import crypto from 'node:crypto';
 import {ensureOllama, llmSetupState, ollamaReachable, pickModel, testProvider} from '../src/llm/llm.js';
 
 const ROOT = new URL('../', import.meta.url).pathname;
@@ -278,6 +280,7 @@ const runDraft = (topic: string, id: string, angle: string, channel: string, sho
 type DraftJob = {id: string; state: 'running' | 'done' | 'error'; progress: {done: number; total: number; label: string}; error?: string; warning?: string; jobId?: string; startedAt: number; topic: string; retry?: DraftOpts};
 type DraftOpts = {device?: string; topic: string; angle: string; channel: string; short: boolean; model?: string; ideaId?: string; make?: {stages: Stage[]; engine: string}};
 const drafts = new Map<string, DraftJob>();
+const swapHits = new Map<string, StockHit[]>();
 let ideasPid = 0, ideasCancelled = false;
 const draftPid = new Map<string, number>(), draftCancelled = new Set<string>();
 const DRAFTS_FILE = process.env.STUDIO_DRAFTS_FILE ?? `${ROOT}data/drafts.json`;
@@ -772,6 +775,42 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
           return json(res, 200, {ok: true});
         }
       }
+      if (p[2] === 'stock') { // per-beat "Swap image": search licensed hits, pick one (uses the src/stock providers; only hits returned by our own search can be downloaded)
+        const epFile = `${d}episode.json`, ep0 = Episode.parse(readJson(epFile)), sceneNo = (v: unknown) => { const n = Number(v); if (!Number.isInteger(n) || n < 0 || n >= ep0.scenes.length) throw new HttpError(422, 'Unknown scene.'); return n; };
+        const env = {...process.env, ...readEnv()} as Record<string, string | undefined>;
+        if (!p[3] && m === 'GET') { const st = readStock(d); return json(res, 200, {format: ep0.format, scenes: ep0.scenes.map((sc, i) => ({scene: i, narration: sc.narration, stock: sc.stock ?? null, item: st.items.find(x => x.scene === i) ?? null})), credits: st.credits, hasKey: !!env.PIXABAY_API_KEY}); }
+        if (p[3] === 'search' && m === 'POST') {
+          const b = await body(req), n = sceneNo(b.scene), q = typeof b.query === 'string' && b.query.trim() ? b.query.trim().slice(0, 80) : ep0.scenes[n].stock?.query ?? '';
+          if (q.length < 2) throw new HttpError(422, 'Type a search word first.');
+          const kind: 'photo' | 'video' = b.kind === 'video' ? 'video' : 'photo', a = {query: q, kind, orientation: ep0.format === 'short' ? 'portrait' as const : 'landscape' as const};
+          setApiCacheDir(path.join(CACHE_DIR, 'api'));
+          const hits: StockHit[] = [], names: string[] = [];
+          for (const pr of PROVIDERS) { if (pr.needsKey && !env[pr.needsKey]) continue; try { hits.push(...rank(await pr.search(fetch, a, env), a, ep0.format).slice(0, 8)); names.push(pr.name); } catch { /* a provider being down is not an error */ } if (hits.length >= 12) break; }
+          swapHits.set(`${id}:${n}`, hits.slice(0, 16));
+          return json(res, 200, {query: q, hits: hits.slice(0, 16).map(h => ({id: h.id, provider: h.provider, kind: h.kind, thumb: h.url, title: h.title, author: h.author, license: h.license, pageUrl: h.pageUrl}))});
+        }
+        if (p[3] === 'swap' && m === 'POST') {
+          const b = await body(req), n = sceneNo(b.scene), hit = swapHits.get(`${id}:${n}`)?.find(h => h.id === b.id && h.provider === b.provider);
+          if (!hit) throw new HttpError(409, 'That result is no longer available. Search again, then pick one.');
+          const ext = (/\.(jpe?g|png|webp|mp4)(\?|$)/i.exec(hit.url)?.[1] ?? (hit.kind === 'video' ? 'mp4' : 'jpg')).toLowerCase().replace('jpeg', 'jpg');
+          const file = path.join(CACHE_DIR, `${crypto.createHash('sha1').update(hit.url).digest('hex').slice(0, 20)}.${ext}`);
+          if (!fs.existsSync(file)) {
+            const r = await fetch(hit.url, {signal: AbortSignal.timeout(60000)}).catch(() => null);
+            if (!r?.ok) throw new HttpError(502, 'Could not download that picture. Pick another one.');
+            fs.mkdirSync(CACHE_DIR, {recursive: true}); fs.writeFileSync(`${file}.part`, Buffer.from(await r.arrayBuffer())); fs.renameSync(`${file}.part`, file);
+          }
+          const used = hit.kind === 'video' ? prepVideo(file, ep0.format, CACHE_DIR) : file;
+          const q = String(b.query ?? ep0.scenes[n].stock?.query ?? '').trim().slice(0, 80) || hit.title.slice(0, 80) || 'stock';
+          const st = readStock(d), rec: StockRecord = {scene: n, query: q.length < 2 ? 'stock' : q, file: `stock-cache/${path.basename(used)}`, provider: hit.provider, pageUrl: hit.pageUrl, author: hit.author, license: hit.license, title: hit.title, kind: hit.kind};
+          const items = [...st.items.filter(x => x.scene !== n), rec].sort((x, y) => x.scene - y.scene);
+          snapshot(d, false);
+          ep0.scenes[n].stock = {query: rec.query, kind: hit.kind}; // same query + kind: `npm run stock` keeps this choice
+          fs.writeFileSync(epFile, JSON.stringify(ep0, null, 2));
+          fs.writeFileSync(`${d}stock.json`, JSON.stringify({items, credits: creditLines(items)}, null, 2));
+          return json(res, 200, {ok: true, item: rec});
+        }
+        if (p[3] === 'clear' && m === 'POST') { const n = sceneNo((await body(req)).scene), st = readStock(d), items = st.items.filter(x => x.scene !== n); fs.writeFileSync(`${d}stock.json`, JSON.stringify({items, credits: creditLines(items)}, null, 2)); return json(res, 200, {ok: true}); }
+      }
       if (p[2] === 'audio' && p[3]) {
         const n = Number(p[3]), count = sceneCount(d);
         if (!/^\d+$/.test(p[3]) || n < 1 || n > count) throw new HttpError(400, `Scene must be 1 to ${count}.`);
@@ -970,6 +1009,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (reachable) try { models = ((await (await fetch(`${process.env.OLLAMA_HOST || 'http://127.0.0.1:11434'}/api/tags`)).json()) as any).models.map((x: any) => x.name); } catch { /* ignore */ }
       return json(res, 200, {...llmSetupState(), reachable, models, chosen: pickModel(models, process.env.OLLAMA_MODEL?.trim() || undefined)});
     }
+    if (p[0] === 'stock-cache' && p[1] && m === 'GET' && /^[A-Za-z0-9._-]+$/.test(p[1])) return sendFile(req, res, `${CACHE_DIR}${p[1]}`);
     if (p[0] === 'stock') { // licensed b-roll: Pixabay key (saved to .env, never echoed back) and a test call
       const key = () => readEnv().PIXABAY_API_KEY || process.env.PIXABAY_API_KEY || '';
       if (p[1] === 'status' && m === 'GET') return json(res, 200, {pixabay: !!key(), keyless: ['openverse', 'wikimedia']});
