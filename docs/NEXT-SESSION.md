@@ -1,44 +1,58 @@
 # Új session indító prompt (másold be egy friss Claude Code session-be)
 
 ```
-Folytasd a /Users/laci/ytAutomation (MascotEngine, Remotion + helyi Studio) fejlesztését. Olvasd el először: docs/ARCHITECTURE.md, docs/REFERENCE-ANALYSIS.md, docs/DECISIONS.md vége (62+ tételek), docs/TTS.md, és ezt a fájlt (docs/NEXT-SESSION.md). Magyarul válaszolj, röviden. A CLAUDE.md szabályait tartsd be (rtk parancsok, Grep/Glob tilos). Commitolj minden lépés után (Co-Authored-By sor), pusholj; a CI (ubuntu) zöld maradjon.
+Folytasd a /Users/laci/ytAutomation (MascotEngine: Remotion + helyi Studio, http://localhost:4177) fejlesztését. A cél: profi, alig AI-nak látszó, CSAK ANGOL videók. Előbb a 9:16 Shorts, utána a 16:9 hosszú videók. Működő HU kódot ne törölj, de ne fókuszálj rá.
 
-CÉL: igazán profi, alig-AI-nak ható videók (Shorts 9:16 elsősorban, hosszú 16:9 másodsorban), ingyenes/helyi eszközökkel. Minőségi referencia: docs/REFERENCE-ANALYSIS.md (4 Shorts: teljes képernyős illusztráció, 2–3 mp-enként új kép, folyamatos kamera, 2–4 szavas feliratok, 150–170 szó/perc, -12..-15 LUFS).
+Olvasd el először: docs/ARCHITECTURE.md, docs/REFERENCE-ANALYSIS.md, docs/STOCK.md, docs/DECISIONS.md vége, és ezt a fájlt.
 
-ÁLLAPOT (2026-11-26):
-- Szkript: helyi Ollama, alapértelmezett qwen2.5:14b (gemma3:12b választható; ANTHROPIC_API_KEY a .env-ben van, LLM_PROVIDER=anthropic bekapcsolja – csak a felhasználó kérésére). Outline→szakaszonkénti draft, számellenőrzés (src/draft/outline.ts).
-- Hang: src/pipeline tts adapter: kokoro (EN, helyi), piper (HU/EN, helyi), edge (online, csak TTS_ONLINE=1), say (tartalék). Telepítés: npm run setup:voice (.venv-tts). Meghallgatás: npm run voice-test. A felhasználó szerint a hang "sokkal jobb". Ajánlás: docs/TTS.md.
-- Képek: src/fullbleed (teljes képernyős 2.5D SVG jelenetek, 31+ tárgy, akció-animációk, kamera), src/visuals, src/stock (Pixabay – PIXABAY_API_KEY a .env-ben, élőben tesztelve; tartalék: Openverse, Wikimedia), Punch feliratok.
-- Studio: npm run app → http://localhost:4177 ; "+ New video" folyamat (#/new), háttérben futó draft (GET /api/drafts/:id). Szerverkód változás után újraindítás kell.
-- Zene: 12 procedurális szint, assets/LICENSES.md.
-- QA: npm run qa (Shorts-tudatos), npm run qa:golden, npm run qa:semantic (qwen2.5vl:7b látásmodellel pontozza, hogy a kép illik-e a mondathoz).
-- Magyar csatorna: channels/hu-futas (futás témájú, teszt), channels/hu-finance. Utolsó futó generálás: ep009-hogyan-kell-helyesen-futni (HU Short, hu-futas) – nézd meg, lefutott-e, és nézd át a képkockákat + a hangot.
+Szabályok:
+- Magyarul válaszolj, röviden.
+- CLAUDE.md: rtk parancsok, Grep/Glob tilos (rtk grep / rtk find). Read csak Edit előtt, csak a szükséges sorokra. A hookot ne kerüld meg.
+- Minden lépés után commit ("Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>") és push. A CI (ubuntu) zöld maradjon.
+- Ne kérj engedélyt a projekten belüli, visszafordítható lépésekhez. Csak fizetős, külső vagy visszafordíthatatlan lépésnél kérdezz.
+- ANTHROPIC_API_KEY csak kérésre (kredit).
 
-FELHASZNÁLÓI VISSZAJELZÉSEK (ezekre kell megoldás):
-1. A videógenerálás felhasználói élménye (UX) rossz, több hiba van a Studióban, amikor videót akarunk csinálni. Az első feladat: végigcsinálni a teljes utat egy valódi böngészőben (Claude in Chrome vagy headless Chrome + screenshot) – Today → + New video → téma / Suggest ideas → formátum, csatorna, nyelv, hang → Make video → progress → player → Make final / Publish pack – és MINDEN hibát, értelmetlen címkét, zsákutcát, hiányzó visszajelzést, lassú vagy néma lépést javítani. Egy elsőre használó embernek egyértelmű legyen, mit kell csinálnia; hibák emberi nyelven; minden hosszú művelet mutasson élő előrehaladást és becsült időt; a csatorna/nyelv/hang választásnak együtt kell működnie (magyar csatorna → magyar hang automatikusan); legyen "Cancel" és "Retry"; a szerver ne álljon le, és újraindításkor a futó munkák maradjanak meg. Írj Playwright/smoke tesztet erre a teljes útra (scripts/smoke-ui.ts screenshot lépése hibás: Remotion page objektumnak nincs screenshot-ja – javítani).
-2. A videók elemei legyenek sokkal változatosabbak, és értelmük legyen az adott pillanatban (kép–mondat illeszkedés). Eszköz: npm run qa:semantic; cél a medián pontszám emelése, előtte-utána számokkal. A `shot` spec (subject, action, setting, label, mood, camera) a drafterből jöjjön, kontrollált szókészlettel (src/visuals/kinds.ts + src/fullbleed katalógus).
-3. A szkriptek legyenek sokkal érdekesebbek: váltakozó történetmesélő eszközök (névvel ellátott szereplő, mítosz-vs-valóság, "mi lenne ha 10 évig", hibafeltárás, visszaszámlálás), 5 hook-jelölt + LLM-bíráló, szkriptpontszám 0–100 küszöbbel, hook-ra visszautaló zárás. Magyar nyelvű minőség külön ellenőrzendő (nyelvtan, természetes hangzás).
-3b. STOCK BEKÖTÉSE A FOLYAMATBA (jelenleg NINCS bekötve): a Pixabay-kód kész (src/stock, PIXABAY_API_KEY a .env-ben), de a "Make video" nem használja. Kell: (a) a drafter/storyboard minden beathez `stock: {query, kind: photo|video}` mezőt írjon (angol keresőszó a `shot.subject`-ből, még magyar videónál is; Pixabay `lang=hu` is lehet), a beatek ~40–50%-a stock, a többi procedurális; (b) a letöltés (npm run stock) legyen a Make video lépése a voice és a preview között, élő előrehaladással, cache-elve, és ha nincs kulcs/találat, csendben procedurális tartalék; (c) videóklip trim/loop a beat hosszára, Ken Burns a fotóra, színezés a palettához; (d) forráskredit a publish csomagba; (e) Studio: beatenként "Swap image" találati rács; (f) mérd a semantic QA-val, hogy a stock-képek illenek-e a mondathoz (márkás/témán kívüli találatok kiszűrése, pl. logók, szöveges képek, arcok).
-4. Ne indíts egyszerre sok ügynököt: a felhasználó szerint "túl sok" – legfeljebb két ügynök, szigorúan külön fájlterülettel, és ne küldj újabb munkát, amíg a futók nem végeztek.
+Ügynökök:
+- Max 2, Opus 5.5, szigorúan diszjunkt fájl-sávokkal.
+  - A (vizuál): src/fullbleed, src/fx, src/visuals, src/stock, src/draft/outline.ts, src/draft/storyboard.ts, scripts/qa, docs/STOCK.md.
+  - B (szkript/hang/infra): src/director, src/pipeline, src/draft/{draft,lint,story,beats,speech,cli}.ts, src/llm, studio/, scripts/smoke-ui.ts.
+- Folyamatosan dolgozzanak, a main mindig adjon nekik következő feladatot (cron-kör ~17 percenként).
+- Ha elfogy a roadmap, a main találja ki a következő legjobb feladatot: friss EN Short render, contact sheet (scripts/qa/stills.ts), QA-számok és a referencia-rés alapján.
+- Hosszú parancsokat előtérben futtassanak, ne háttérben.
 
-ep009 (HU futás Short) ÉRTÉKELÉS, a felhasználótól: "nem rossz, de nem oda illő elemek vannak, eléggé monoton, gyakran ismétlődnek az elemek, és messze nincs a referenciák (docs/REFERENCE-ANALYSIS.md, scratchpad refs sheet1-4.png: 3D, teljes képernyős, mozgó kamera) szintjén." Mért okok: a tárgykönyvtár csak PÉNZÜGYI (érme, bankjegy, csekk, széf, trófea, %) – futás témánál értelmetlen; kulcsszavas választás; 10/14 jelenet "talk"; szkriptpontszám 56/100; 57 s.
+Állapot (2026-11-27, HEAD 7f6cf96, CI zöld):
+- LLM: Groq működik (GROQ_API_KEY a .env-ben). A modellt a /models listából rangsorolja, 429-nél a következő modellre lép. Cerebras/OpenRouter is van. A Gemini AQ. kulcs használhatatlan (401).
+- Stock: Pixabay (PIXABAY_API_KEY a .env-ben). Topic gate, ötlet-beatek a koncepcióból, minden második stock beat videóklip, fotó fallbackkel.
+- Kész:
+  - sub-shotok 2–3 mp-enként;
+  - fényes padló a sötét sáv helyett;
+  - átmenetek csak kameramozgások (whip/tilt/push) vagy vágás;
+  - DOF blur és key light;
+  - szám-tagmondatok lassabban;
+  - captionön nincs TAKEAWAY;
+  - a zárómondat visszautal a hookra;
+  - legfeljebb 2 rewrite kör 75 pont alatt;
+  - Shorts hossz a kimondott szavakból.
+- Mérések:
+  - ep011: stock 6/6 on-topic, semantic medián 6 (cél 7), képváltás átlag 1.97 mp;
+  - ep012: 15/18 QA PASS;
+  - hang -14.5 LUFS, TP -1.7.
+- Nem commitolt: src/fullbleed/objects4.tsx (egy A-ügynök félbehagyott munkája). Nézd meg a diffet, és döntsd el, hogy befejezed vagy elveted.
 
-PRIORITÁSI ROADMAP A PROFI SZINTHEZ (ebben a sorrendben):
-A. TÉMAFÜGGETLEN VIZUÁLIS RENDSZER (legfontosabb). A jelenet NE fix tárgykatalógusból válasszon, hanem a mondat jelentéséből: (1) minden beathez LLM-es `shot` + `stock` spec (lásd 3 és 3b); (2) elsődleges forrás a Pixabay valódi fotó/videó (kereshető bármilyen témára: futás, főzés, utazás...), a procedurális tárgy csak kiegészítő réteg (számláló, címke, nyíl, infografika); (3) téma-csomagok a procedurális tárgyakhoz (sport, egészség, utazás, tech, étel, tudomány, pénz) – de csak ha a stock nem ad jó találatot; (4) a választás indoklása naplózva (npm run … plan), és a semantic QA (qwen2.5vl) küszöb alatt automatikusan újraválaszt (másik query/tárgy). Mérőszám: semantic médián >= 7/10 minden témán, egy videóban egy kép/tárgy se ismétlődjön 8 beaten belül, legalább 60% különböző kép.
-B. VÁLTOZATOSSÁG: beatenként váltakozó elrendezés (teljes fotó + Ken Burns, osztott képernyő, infografika-animáció, óriás szöveg, kép-a-képben, adat-vizualizáció), váltakozó kameramozgás, környezet, színpaletta; a "talk" arány <= 25%.
-C. REFERENCIA-SZINT (3D érzet): textúrázott/megvilágított tárgyak, mélységélesség (blur előtér), árnyék, részecskék, folyamatos kamerapálya jelenet-határokon átívelően (match-cut/átúszás), nem keresztkeverés; a feliratok vékonyabbak/kisebbek, mint most (referenciákban kicsi, vastag körvonalas, 2–4 szó); alsó üres sáv megszüntetése; opcionálisan @remotion/three procedurális 3D (kocka/gömb/henger primitívekből), ha fut headless.
-D. SZKRIPT: történetmesélő eszközök, 5 hook-jelölt + bíráló, szkriptpontszám küszöb (>=75) automatikus újraírással; magyar nyelvi minőség ellenőrzése külön lépésben; konkrét számok/nevek minden 2. beatben; mondathossz-változatosság; jelenettípus-változatosság (kevesebb sima talk). Hosszak: Short 35–55 s; Long 3–5 perc.
-E. LLM-SZOLGÁLTATÓ: helyi qwen2.5:14b lassú és sok RAM-ot (10 GB) eszik (16 GB-os Mac; a böngészős generálás is ezért állt meg). A GEMINI_API_KEY az .env-ben `AQ.` formátumú → 401 ACCESS_TOKEN_TYPE_UNSUPPORTED a generativelanguage API-n (ismert Google-hiba, lásd discuss.ai.google.dev AQ. szálak); a src/llm/llm.ts gemini ága `gemini-2.0-flash` modellt használ, ami új felhasználóknak 403/404 (a listában gemini-3.x modellek vannak). Feladat: (a) a gemini modell legyen konfigurálható/automatikusan választott a /models listából, (b) próbálj Vertex express és egyéb auth módot csak ha dokumentált, (c) adj hozzá Groq (gsk_ kulcs, OpenAI-kompatibilis, ingyenes) és OpenRouter szolgáltatót, (d) az ANTHROPIC_API_KEY megvan, de kredit kell (a felhasználó nem töltött fel) – csak kérésre. Minden szolgáltatónál: egy "Test provider" gomb a Settingsben.
-F. MEGBÍZHATÓSÁG: ep009 előtt két draft-folyamat futott párhuzamosan, `EEXIST ... episode.json` (src/draft/draft.ts:175 flag 'wx') hibával elbukott a Studio-s generálás, miközben a szkript elkészült; a Studio-szerver újraindítása nem öli meg a gyerek `draft/cli` folyamatokat (árva folyamatok maradnak, pkill-lel kellett leállítani; valami újra elindított egy draft/cli-t a háttérben – nyomozd ki, mi). Teendő: draft folyamat PID-követés + leállítás szerver-leálláskor, idempotens újraindítás, ne dobja el az elkészült szkriptet EEXIST miatt, memória-védelem (RAM-nyomás esetén figyelmeztetés/kisebb modell).
-G. UX (lásd 1.): teljes út végigjárása böngészőben, hibák javítása.
+Nyitott feladatok:
+A (vizuál):
+1. Friss EN Short (ep011 + egy tech téma) render. Contact sheet előtte/utána, és vizsgáld meg:
+   - nincs-e levágott objektum (malacpersely);
+   - nem ütközik-e a caption a charttal;
+   - az "if you invested" beat illik-e a tartalomhoz.
+2. Semantic medián >= 7, 3 futás átlaga (npm run qa:semantic, qwen2.5vl:7b). Elsőként az absztrakt mondatok vizuálját javítsd (en-sleep: 5).
+3. qa:golden referenciák frissítése az új kinézetre.
+4. 16:9 hosszú videó kinézetének felhozása a Shorts szintjére.
+B (szkript/hang/infra):
+1. Shorts 35–55 mp, 150–170 wpm. Mérd 3 Groq drafton.
+2. Hook: 5 jelölt, bíró, >= 75 pont. Story device-ok, szám vagy név minden 2. beatben. Ellenőrizd 3 drafton.
+3. Derítsd ki, mi írta felül az ep011-v2 episode.json-t.
+4. Showcase EN Short a Studióból Groq-kal a végső renderig: npm run qa zöld, és add meg a contact sheet útvonalát.
 
-NYITOTT ISMERT HIBÁK/GYENGESÉGEK:
-- Fullbleed: alsó ~20% üres padló; sík vektor-tárgyak (nem 3D) – a referenciákhoz képest még látszik a különbség; feliratok nehezebbek, mint a referenciákban; timeline/checklist címkék kicsik.
-- Stock: a kulcs nélküli (Openverse/Wikimedia) találatok gyakran témán kívüliek; "Swap image" rács a Studióban még nincs; a drafter még nem ír `stock` mezőt; videóklip trim/loop a beat hosszára hiányos.
-- Ideas oldalon még két elsődleges gomb van egy ötletnél; nem minden oldalon van egy fő gomb.
-- Hosszú (3–5 perces) szkriptek: a 7B kevés; a 14B-vel még nem mértük.
-- A Chrome-bővítmény kapcsolata megszakadt a session közben (ide: ECONNREFUSED) – ha kell, a felhasználóval újrakapcsoltatni.
-- Pixabay-kulcs a beszélgetésben látszott: a felhasználónak érdemes a Rotate gombbal újat generálni, és a Studio Settingsben megadni.
-
-ELSŐ LÉPÉSEK: (1) git log + gh run list (CI zöld?), npm run typecheck && npm test; (2) a Studio újraindítása, ep009 ellenőrzése; (3) a teljes UX-út végigjárása és hibalista, (4) javítás kisebb, commitolt lépésekben; (5) a felhasználótól egy rövid visszajelzés kérése a végén.
+Hasznos: npm run qa (18 Shorts check), qa:semantic, qa:golden, qa:restoryboard, scripts/qa/stills.ts <id>. A Studio szerverkód változása után a Studiót újra kell indítani.
 ```
