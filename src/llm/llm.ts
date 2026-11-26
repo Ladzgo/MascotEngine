@@ -2,7 +2,8 @@ import {spawn} from 'node:child_process';
 import {extractJson} from './json.js';
 export {extractJson};
 
-export type Provider = 'anthropic' | 'gemini' | 'ollama';
+export type Provider = 'anthropic' | 'gemini' | 'ollama' | 'groq' | 'openrouter';
+export const PROVIDERS: Provider[] = ['ollama', 'gemini', 'groq', 'openrouter', 'anthropic'];
 export type ChatMsg = {role: 'user' | 'assistant'; content: string};
 export const NO_PROVIDER = 'The free local AI (Ollama) is not available. Install it from ollama.com; the Studio starts it and downloads a model for you.';
 export const ANTHROPIC_MODEL = 'claude-sonnet-5-5';
@@ -101,14 +102,37 @@ export function ensureOllama(env: NodeJS.ProcessEnv = process.env, log: (m: stri
 export async function resolveProvider(env: NodeJS.ProcessEnv = process.env): Promise<Provider> {
   const p = env.LLM_PROVIDER?.trim().toLowerCase();
   if (!p || p === 'ollama') return 'ollama';
-  if (p === 'anthropic' || p === 'gemini') return p;
-  throw new Error(`Unknown LLM_PROVIDER "${p}" (use ollama, anthropic or gemini).`);
+  if ((PROVIDERS as string[]).includes(p)) return p as Provider;
+  throw new Error(`Unknown LLM_PROVIDER "${p}" (use ${PROVIDERS.join(', ')}).`);
+}
+
+/** Ranks Gemini model names for a script drafter: stable flash first, then pro, never lite/preview-only/embedding/image. */
+export function pickGemini(names: string[]): string | null {
+  const ok = names.map(n => n.replace(/^models\//, '')).filter(n => /^gemini-/.test(n) && !/(lite|embed|image|tts|live|audio|vision|thinking|exp|preview)/.test(n));
+  const ver = (n: string) => Number(/gemini-(\d+(?:\.\d+)?)/.exec(n)?.[1] ?? 0);
+  const rank = (n: string) => ver(n) * 10 + (/flash/.test(n) ? 2 : /pro/.test(n) ? 1 : 0);
+  return ok.sort((a, b) => rank(b) - rank(a))[0] ?? null;
+}
+const geminiCache = new Map<string, string>();
+/** The key's own /models list decides: gemini-2.0-flash is not offered to new accounts. */
+async function geminiModel(key: string): Promise<string> {
+  const hit = geminiCache.get(key); if (hit) return hit;
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {headers: {'x-goog-api-key': key}, signal: AbortSignal.timeout(15000)});
+  if (!r.ok) throw new Error(geminiAuthMessage(r.status, await r.text()));
+  const d: any = await r.json();
+  const m = pickGemini((d.models ?? []).filter((x: any) => (x.supportedGenerationMethods ?? []).includes('generateContent')).map((x: any) => String(x.name)));
+  if (!m) throw new Error('This Gemini key lists no usable chat model. Set GEMINI_MODEL.');
+  geminiCache.set(key, m); return m;
+}
+function geminiAuthMessage(status: number, text: string): string {
+  if (/ACCESS_TOKEN_TYPE_UNSUPPORTED/.test(text)) return 'Gemini rejected this key type (keys starting with "AQ." are not accepted by the Gemini API). Create a normal key (starts with "AIza") at aistudio.google.com/apikey, or use Groq or OpenRouter instead.';
+  return `Gemini HTTP ${status}: ${text.slice(0, 200)}`;
 }
 
 async function viaGemini(system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
   const key = env.GEMINI_API_KEY;
   if (!key) throw new Error('GEMINI_API_KEY is missing (only needed when LLM_PROVIDER=gemini).');
-  const model = env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = env.GEMINI_MODEL?.trim() || await geminiModel(key);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const body = JSON.stringify({
     systemInstruction: {parts: [{text: system}]},
@@ -122,10 +146,33 @@ async function viaGemini(system: string, messages: ChatMsg[], json: boolean, env
     if (attempt === 0) await new Promise(r => setTimeout(r, Number(env.LLM_RETRY_MS ?? 5000)));
   }
   if (res!.status === 429) throw new Error('Gemini free quota reached, try later');
-  if (!res!.ok) throw new Error(`Gemini HTTP ${res!.status}: ${(await res!.text()).slice(0, 200)}`);
+  if (!res!.ok) throw new Error(geminiAuthMessage(res!.status, await res!.text()));
   const data: any = await res!.json();
   const text = (data.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('');
   if (!text) throw new Error(`Gemini returned no text (${data.candidates?.[0]?.finishReason ?? data.promptFeedback?.blockReason ?? 'unknown reason'}).`);
+  return text;
+}
+
+const OPENAI_COMPAT = {
+  groq: {url: 'https://api.groq.com/openai/v1/chat/completions', key: 'GROQ_API_KEY', model: 'GROQ_MODEL', def: 'llama-3.3-70b-versatile', name: 'Groq'},
+  openrouter: {url: 'https://openrouter.ai/api/v1/chat/completions', key: 'OPENROUTER_API_KEY', model: 'OPENROUTER_MODEL', def: 'meta-llama/llama-3.3-70b-instruct:free', name: 'OpenRouter'},
+} as const;
+/** Groq (gsk_ keys, free tier) and OpenRouter speak the OpenAI chat format. */
+async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
+  const c = OPENAI_COMPAT[p], key = env[c.key]?.trim();
+  if (!key) throw new Error(`${c.key} is missing (only needed when LLM_PROVIDER=${p}).`);
+  const body = JSON.stringify({model: env[c.model]?.trim() || c.def, temperature: 0.6, max_tokens: 4096, ...(json ? {response_format: {type: 'json_object'}} : {}), messages: [{role: 'system', content: system}, ...messages]});
+  let res: Response | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    res = await fetch(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`}, body, signal: AbortSignal.timeout(120000)});
+    if (res.status !== 429) break;
+    if (attempt === 0) await sleep(Number(env.LLM_RETRY_MS ?? 5000));
+  }
+  if (res!.status === 429) throw new Error(`${c.name} free quota reached, try later`);
+  if (res!.status === 401 || res!.status === 403) throw new Error(`${c.name} rejected the key (HTTP ${res!.status}). Check it is copied completely.`);
+  if (!res!.ok) throw new Error(`${c.name} HTTP ${res!.status}: ${(await res!.text()).slice(0, 200)}`);
+  const text = ((await res!.json()) as any).choices?.[0]?.message?.content;
+  if (typeof text !== 'string' || !text) throw new Error(`${c.name} returned no text.`);
   return text;
 }
 
@@ -159,11 +206,22 @@ async function viaAnthropic(system: string, messages: ChatMsg[], env: NodeJS.Pro
   return res.content.filter((c: any) => c.type === 'text').map((c: any) => c.text ?? '').join('');
 }
 
+/** Settings "Test provider" button: one tiny real request against the named provider, never throws. */
+export async function testProvider(p: string, env: NodeJS.ProcessEnv = process.env): Promise<{ok: boolean; message: string; ms?: number}> {
+  if (!(PROVIDERS as string[]).includes(p)) return {ok: false, message: `Unknown provider "${p}".`};
+  const t0 = Date.now();
+  try {
+    const text = await chat({system: 'Reply with the single word OK.', messages: [{role: 'user', content: 'ping'}], env: {...env, LLM_PROVIDER: p, LLM_TIMEOUT_MS: '60000'}});
+    return {ok: true, ms: Date.now() - t0, message: `Works (${((Date.now() - t0) / 1000).toFixed(1)} s): "${text.trim().slice(0, 40)}"`};
+  } catch (e) { return {ok: false, ms: Date.now() - t0, message: (e as Error).message}; }
+}
+
 /** Multi-turn variant used by retry-with-errors loops. */
 export async function chat(o: {system: string; messages: ChatMsg[]; json?: boolean; env?: NodeJS.ProcessEnv}): Promise<string> {
   const env = o.env ?? process.env;
   const p = await resolveProvider(env);
   if (p === 'gemini') return viaGemini(o.system, o.messages, !!o.json, env);
+  if (p === 'groq' || p === 'openrouter') return viaOpenAi(p, o.system, o.messages, !!o.json, env);
   if (p === 'ollama') return viaOllama(o.system, o.messages, !!o.json, env);
   return viaAnthropic(o.system, o.messages, env);
 }

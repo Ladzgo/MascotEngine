@@ -54,6 +54,7 @@ export function Settings({onSaved}: {onSaved: () => void}) {
       <ReadinessPanel />
       <p className="small"><button type="button" className="btn sm" onClick={() => { resetOnboarding(); location.hash = '#/today'; location.reload(); }}>Run first-run setup again</button> <span className="muted">(only shows while there are no episodes)</span></p>
       <AiPanel />
+      <CloudAiPanel />
       <StockPanel />
       <label className="field"><span>{t('Voice engine')}</span>
         <select value={engine} onChange={e => setEngine(e.target.value)}>
@@ -111,6 +112,42 @@ export function AiPanel() {
       </label>
       {st.phase === 'pulling' && <progress max={100} value={st.pct ?? 0} aria-label="Model download" />}
       {!ready && !busy && <button type="button" className="btn" onClick={() => void api.llmSetup().then(setSt)}>Start local AI</button>}
+    </div>
+  );
+}
+
+const CLOUD: {id: string; name: string; hint: string; placeholder: string}[] = [
+  {id: 'groq', name: 'Groq (free tier, fast)', hint: 'Key from console.groq.com/keys (starts with gsk_).', placeholder: 'gsk_…'},
+  {id: 'openrouter', name: 'OpenRouter (free models available)', hint: 'Key from openrouter.ai/keys.', placeholder: 'sk-or-…'},
+  {id: 'gemini', name: 'Google Gemini', hint: 'Key from aistudio.google.com/apikey (starts with AIza). Keys starting with AQ. do not work. The model is chosen automatically.', placeholder: 'AIza…'},
+  {id: 'anthropic', name: 'Claude (paid, needs credit)', hint: 'Only if you want it: needs an Anthropic API key with credit.', placeholder: 'sk-ant-…'},
+];
+/** Optional cloud script AI: save a key, press Test, pick which one writes scripts. Local Ollama stays the default. */
+export function CloudAiPanel() {
+  const [st, setSt] = useState<Awaited<ReturnType<typeof api.llmProviders>> | null>(null);
+  const [keys, setKeys] = useState<Record<string, string>>({}), [res, setRes] = useState<Record<string, {ok: boolean; text: string} | 'busy'>>({});
+  const load = () => api.llmProviders().then(setSt).catch(() => setSt(null));
+  useEffect(() => { void load(); }, []);
+  if (!st) return null;
+  const run = async (id: string) => {
+    setRes(r => ({...r, [id]: 'busy'}));
+    try { if (keys[id]?.trim()) { await api.llmProviderSave({provider: id, key: keys[id]}); setKeys(k => ({...k, [id]: ''})); await load(); } const t = await api.llmTest(id); setRes(r => ({...r, [id]: {ok: t.ok, text: t.message}})); }
+    catch (e) { setRes(r => ({...r, [id]: {ok: false, text: (e as Error).message}})); }
+  };
+  return (
+    <div className="ready" aria-label="Cloud AI">
+      <h2 className="label">Cloud script AI (optional)</h2>
+      <p className="muted">Faster than the local model and no memory use. Local AI stays the default until you press "Use for scripts".</p>
+      {CLOUD.map(c => { const p = st.providers.find(x => x.id === c.id), r = res[c.id], on = st.active === c.id; return (
+        <div key={c.id} className="field">
+          <span>{c.name}{on ? ' (in use)' : ''}</span>
+          <input type="password" autoComplete="off" placeholder={p?.keySet ? 'Key saved. Paste a new one to replace' : c.placeholder} value={keys[c.id] ?? ''} onChange={e => setKeys(k => ({...k, [c.id]: e.target.value}))} />
+          <small className="hint">{c.hint}</small>
+          <button type="button" className="btn sm" disabled={r === 'busy' || (!p?.keySet && !keys[c.id]?.trim())} onClick={() => void run(c.id)}>{r === 'busy' ? 'Testing…' : 'Save and test provider'}</button>{' '}
+          <button type="button" className="btn sm" disabled={!p?.keySet && !keys[c.id]?.trim()} onClick={() => void api.llmProviderSave({provider: c.id, key: keys[c.id], active: !on}).then(() => { setKeys(k => ({...k, [c.id]: ''})); return load(); }).catch(e => setRes(x => ({...x, [c.id]: {ok: false, text: (e as Error).message}})))}>{on ? 'Back to local AI' : 'Use for scripts'}</button>
+          {r && r !== 'busy' && <p className={r.ok ? 'ok-text' : 'err-text'} role="status">{r.text}</p>}
+        </div>
+      ); })}
     </div>
   );
 }

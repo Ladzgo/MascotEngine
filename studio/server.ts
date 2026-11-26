@@ -20,9 +20,9 @@ import react from '@vitejs/plugin-react';
 import {z} from 'zod';
 import {Episode} from '../src/schema.js';
 import {voiceEngines, previewVoice} from '../src/pipeline/voicePreview.js';
-import {VoicePreviewBody, ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, StockKeyBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
+import {VoicePreviewBody, ArchiveBody, ClipStartBody, DuplicateBody, IdeaStatusBody, NewEpisodeBody, NotesBody, QueueBody, RegenerateBody, SettingsBody, LlmProviderBody, StockKeyBody, ThumbBody, ChannelBody, DraftBody, GenerateBody, IdeasGenerateBody, MakeBody, parseBody, PresetBody, StatusBody} from './schemas.js';
 import {testPixabayKey} from '../src/stock/providers.js';
-import {ensureOllama, llmSetupState, ollamaReachable, pickModel} from '../src/llm/llm.js';
+import {ensureOllama, llmSetupState, ollamaReachable, pickModel, testProvider} from '../src/llm/llm.js';
 
 const ROOT = new URL('../', import.meta.url).pathname;
 const EPISODES = `${ROOT}episodes/`;
@@ -893,6 +893,25 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (m === 'GET' && p[1] && /^preview-[a-z-]+-[a-z]{2}\.mp3$/.test(p[1])) return sendFile(req, res, `${ROOT}data/voice-preview/${p[1]}`);
     }
     if (p[0] === 'jobs' && !p[1]) { const running = [...jobs.values()].find(j => j.status === 'running'); return json(res, 200, {running: running?.id ?? null}); }
+    if (p[0] === 'llm' && (p[1] === 'providers' || p[1] === 'test') && !p[2]) { // optional cloud AI: keys go to .env and are never echoed back
+      const KEY: Record<string, [string, string]> = {gemini: ['GEMINI_API_KEY', 'GEMINI_MODEL'], groq: ['GROQ_API_KEY', 'GROQ_MODEL'], openrouter: ['OPENROUTER_API_KEY', 'OPENROUTER_MODEL'], anthropic: ['ANTHROPIC_API_KEY', 'DRAFT_MODEL']};
+      const cur = () => ({...process.env, ...readEnv()});
+      if (p[1] === 'providers' && m === 'GET') { const e = cur(); return json(res, 200, {active: (e.LLM_PROVIDER || 'ollama').toLowerCase(), providers: Object.entries(KEY).map(([id, [k, mk]]) => ({id, keySet: !!e[k], model: e[mk] ?? ''}))}); }
+      const b = await body(req, LlmProviderBody), id = b.provider;
+      if (p[1] === 'test' && m === 'POST') return json(res, 200, await testProvider(id, cur() as NodeJS.ProcessEnv));
+      if (p[1] === 'providers' && m === 'PUT') {
+        const upd: Record<string, string> = {};
+        if (id !== 'ollama') {
+          const [k, mk] = KEY[id] ?? [];
+          if (!k) throw new HttpError(422, 'Unknown provider.');
+          if (b.key?.trim()) upd[k] = b.key.trim();
+          if (typeof b.model === 'string') upd[mk] = b.model.trim();
+        }
+        if (b.active === true) { if (id !== 'ollama' && !(upd[KEY[id][0]] || cur()[KEY[id][0]])) throw new HttpError(422, 'Save a key first.'); upd.LLM_PROVIDER = id; }
+        else if (b.active === false && (cur().LLM_PROVIDER || 'ollama') === id) upd.LLM_PROVIDER = 'ollama';
+        writeEnv(upd); return json(res, 200, {ok: true});
+      }
+    }
     if (p[0] === 'llm' && !p[2]) {
       if (p[1] === 'setup' && m === 'POST') { void ensureOllama().catch(() => {}); await new Promise(r => setTimeout(r, 50)); }
       else if (p[1] || m !== 'GET') throw new HttpError(404, 'Not found.');

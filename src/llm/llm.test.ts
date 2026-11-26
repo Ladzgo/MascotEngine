@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {chat, resolveProvider, extractJson, pickModel} from './llm.js';
+import {chat, resolveProvider, extractJson, pickModel, pickGemini, testProvider} from './llm.js';
 
 const realFetch = globalThis.fetch;
 const mockFetch = (fn: (url: string, init?: any) => Response | Promise<Response>) => { globalThis.fetch = ((u: any, i: any) => Promise.resolve(fn(String(u), i))) as any; };
@@ -34,11 +34,11 @@ test('gemini: json mode, 429 retry then clear error', async () => {
   let n = 0, body: any;
   mockFetch((_u, init) => { n++; body = JSON.parse(init.body); return j({}, 429); });
   try {
-    await assert.rejects(chat({system: 's', json: true, messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', LLM_RETRY_MS: '1'}}), /Gemini free quota reached, try later/);
+    await assert.rejects(chat({system: 's', json: true, messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'm', LLM_RETRY_MS: '1'}}), /Gemini free quota reached, try later/);
     assert.equal(n, 2);
     assert.equal(body.generationConfig.responseMimeType, 'application/json');
     mockFetch(() => j({candidates: [{content: {parts: [{text: '{"ok":1}'}]}}]}));
-    assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k'}}), '{"ok":1}');
+    assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k', GEMINI_MODEL: 'm'}}), '{"ok":1}');
   } finally { restore(); }
 });
 
@@ -50,5 +50,40 @@ test('ollama: not running, model listing and chat', async () => {
     await assert.rejects(chat({system: 's', messages: msgs, env}), /not running/);
     mockFetch(u => u.endsWith('/api/tags') ? j({models: [{name: 'llama3.2:latest'}]}) : j({message: {content: 'hi'}}));
     assert.equal(await chat({system: 's', messages: msgs, env}), 'hi');
+  } finally { restore(); }
+});
+
+test('gemini model comes from the key\'s /models list; AQ. keys get a plain message', () => {
+  assert.equal(pickGemini(['models/gemini-2.5-flash-lite', 'models/gemini-3.0-flash', 'models/gemini-2.5-pro', 'models/gemini-3.0-flash-preview', 'models/embedding-001']), 'gemini-3.0-flash');
+  assert.equal(pickGemini(['models/text-bison']), null);
+});
+
+test('gemini auto model: lists models once, then generates; AQ. 401 is explained', async () => {
+  const urls: string[] = [];
+  mockFetch(u => { urls.push(u); return u.includes('generateContent') ? j({candidates: [{content: {parts: [{text: 'yo'}]}}]}) : j({models: [{name: 'models/gemini-3.0-flash', supportedGenerationMethods: ['generateContent']}]}); });
+  try {
+    const env = {LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'k-auto'};
+    assert.equal(await chat({system: 's', messages: [{role: 'user', content: 'u'}], env}), 'yo');
+    assert.ok(urls.some(u => u.includes('models/gemini-3.0-flash:generateContent')));
+    mockFetch(() => j({error: {status: 'ACCESS_TOKEN_TYPE_UNSUPPORTED'}}, 401));
+    await assert.rejects(chat({system: 's', messages: [{role: 'user', content: 'u'}], env: {...env, GEMINI_API_KEY: 'AQ.x'}}), /AIza/);
+  } finally { restore(); }
+});
+
+test('groq and openrouter: OpenAI format, bearer key, json mode, testProvider never throws', async () => {
+  let seen: any;
+  mockFetch((u, init) => { seen = {u, auth: init.headers.Authorization, body: JSON.parse(init.body)}; return j({choices: [{message: {content: 'OK'}}]}); });
+  try {
+    const m = [{role: 'user' as const, content: 'u'}];
+    assert.equal(await chat({system: 's', messages: m, json: true, env: {LLM_PROVIDER: 'groq', GROQ_API_KEY: 'gsk_1'}}), 'OK');
+    assert.match(seen.u, /api\.groq\.com/); assert.equal(seen.auth, 'Bearer gsk_1'); assert.equal(seen.body.response_format.type, 'json_object');
+    await chat({system: 's', messages: m, env: {LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'or', OPENROUTER_MODEL: 'x/y'}});
+    assert.match(seen.u, /openrouter\.ai/); assert.equal(seen.body.model, 'x/y');
+    assert.equal((await testProvider('groq', {GROQ_API_KEY: 'gsk_1'})).ok, true);
+    const bad = await testProvider('groq', {});
+    assert.equal(bad.ok, false); assert.match(bad.message, /GROQ_API_KEY is missing/);
+    mockFetch(() => j({}, 401));
+    assert.match((await testProvider('openrouter', {OPENROUTER_API_KEY: 'k'})).message, /rejected the key/);
+    assert.equal((await testProvider('bogus')).ok, false);
   } finally { restore(); }
 });

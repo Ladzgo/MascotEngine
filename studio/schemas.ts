@@ -29,3 +29,5 @@ export const parseBody = <S extends z.ZodType>(v: unknown, schema: S): z.infer<S
 };
 
 export const StockKeyBody = z.looseObject({key: str});
+
+export const LlmProviderBody = z.looseObject({provider: str, key: str.optional(), model: str.optional(), active: z.boolean().optional()});

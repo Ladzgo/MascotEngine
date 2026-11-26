@@ -97,6 +97,9 @@ export const api = {
   voices: (lang: string) => call<{lang: string; engines: {engine: string; label: string; ok: boolean; detail: string; fix: string; online: boolean}[]}>(`/api/voices?lang=${lang}`),
   voicePreview: (engine: string, lang: string) => call<{file: string}>('/api/voice-preview', {method: 'POST', body: JSON.stringify({engine, lang})}),
   llm: () => call<LlmStatus>('/api/llm'),
+  llmProviders: () => call<{active: string; providers: {id: string; keySet: boolean; model: string}[]}>('/api/llm/providers'),
+  llmProviderSave: (b: {provider: string; key?: string; model?: string; active?: boolean}) => call<{ok: boolean}>('/api/llm/providers', {method: 'PUT', body: JSON.stringify(b)}),
+  llmTest: (provider: string) => call<{ok: boolean; message: string}>('/api/llm/test', {method: 'POST', body: JSON.stringify({provider})}),
   llmSetup: () => call<LlmStatus>('/api/llm/setup', {method: 'POST'}),
   saveSettings: (b: Partial<{apiKey: string; llmModel: string; voiceId: string; model: string; engine: string}>) => call<{ok: boolean}>('/api/settings', {method: 'PUT', body: JSON.stringify(b)}),
 };

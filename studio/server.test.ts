@@ -167,3 +167,13 @@ test('make: returns at once, draft progress is polled, success enqueues the rend
     assert.equal((await fetch(`${BASE}/api/drafts/nope`)).status, 404);
   } finally { for (const d of fs.readdirSync(`${ROOT}episodes`)) if (d.includes(slug) || d.includes('will-fail')) fs.rmSync(`${ROOT}episodes/${d}`, {recursive: true, force: true}); }
 });
+
+test('llm providers: status never echoes keys, bad provider and missing key are plain errors, test never throws', async () => {
+  const st = await (await fetch(`${BASE}/api/llm/providers`)).json() as {active: string; providers: {id: string; keySet: boolean}[]};
+  assert.deepEqual(st.providers.map(p => p.id).sort(), ['anthropic', 'gemini', 'groq', 'openrouter']);
+  assert.ok(!JSON.stringify(st).includes('gsk_'));
+  const put = (b: object) => fetch(`${BASE}/api/llm/providers`, {method: 'PUT', headers: J, body: JSON.stringify(b)});
+  assert.equal((await put({provider: 'nope', key: 'x'})).status, 422);
+  const t = await (await fetch(`${BASE}/api/llm/test`, {method: 'POST', headers: J, body: JSON.stringify({provider: 'bogus'})})).json() as {ok: boolean; message: string};
+  assert.equal(t.ok, false); assert.match(t.message, /Unknown provider/);
+});
