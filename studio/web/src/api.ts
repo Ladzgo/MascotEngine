@@ -62,7 +62,7 @@ export const api = {
   create: (id: string, channel: string) => call<Summary>('/api/episodes', {method: 'POST', body: JSON.stringify({id, channel})}),
   save: (ep: EpisodeDoc) => call<{ok: boolean}>(`/api/episodes/${ep.id}`, {method: 'PUT', body: JSON.stringify(ep)}),
   generate: (id: string, stages: Stage[], engine: string) => call<{jobId: string}>(`/api/episodes/${id}/generate`, {method: 'POST', body: JSON.stringify({stages, engine})}),
-  makeVideo: (topic: string, angle: string, channel: string, stopAtPreview = true) => call<{id: string; jobId: string}>('/api/make', {method: 'POST', body: JSON.stringify({topic, angle, channel, stopAtPreview})}),
+  makeVideo: (topic: string, angle: string, channel: string, stopAtPreview = true, format: 'wide' | 'short' = 'wide') => call<{id: string; jobId: string}>('/api/make', {method: 'POST', body: JSON.stringify({topic, angle, channel, stopAtPreview, format})}),
   clips: () => call<ClipsData>('/api/clips'),
   startClip: (b: {path?: string; upload?: string; min: number; max: number; count: number}) => call<{name: string}>('/api/clip', {method: 'POST', body: JSON.stringify(b)}),
   uploadClipSource: (file: File) => audioCall<{name: string}>(`/api/clips/upload?name=${encodeURIComponent(file.name.replace(/[^A-Za-z0-9._-]+/g, '_'))}`, {method: 'POST', body: file}),

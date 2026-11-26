@@ -12,6 +12,8 @@ const CAPTIONS = ['bar', 'pill', 'outline'] as const;
 const INTROS = ['ink_draw', 'pop', 'slide'] as const;
 const MOODS = ['calm', 'curious', 'tense', 'upbeat'] as const;
 const CAMERAS = ['static', 'slow_push', 'slow_pull', 'pan_left', 'pan_right', 'drift'];
+/** shorts-pro profile (docs/REFERENCE-ANALYSIS.md): full-bleed look or native Shorts get camera-move transitions, minimal tails (no pause above ~0.4 s) and a hook inside 1.5 s. */
+const PRO_TRANSITIONS = ['slide', 'zoom_through', 'whip', 'circle_reveal'];
 const TRANSITIONS = ['cut', 'slide', 'wipe_ink', 'circle_reveal', 'zoom_through', 'paper_flip', 'whip', 'light_leak', 'tear'];
 
 const LAYOUTS: Record<string, string[]> = {
@@ -185,6 +187,7 @@ function findWord(text: string, words: {w: string; start: number}[]): number | n
 
 export async function direct(idArg: string, opts: {final: boolean; weights?: Record<string, number>}) {
   const ep = loadEpisode(idArg);
+  const pro = ep.look === "fullbleed" || ep.format === "short";
   const weights = opts.weights ?? retentionWeights();
   const dir = episodeDir(ep.id);
   const timings: Timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
@@ -252,6 +255,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
 
     const transition = i === 0 ? 'cut' : pick(TRANSITIONS, t => {
       if (s.transition && t !== s.transition) return 0;
+      if (pro && !PRO_TRANSITIONS.includes(t)) return 0; // shorts-pro: camera-move transitions only, no hard cuts, no paper/ink effects
       let sc = fitTransition(t, s, prevScene) * noise(rand) * sceneFreqPenalty(t, 'transition', recent);
       if (prev && prev.transition === t) sc *= s.transition ? 0.1 : 0; // never the same transition twice in a row unless the author pinned it
       return sc;
@@ -265,7 +269,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
 
     // timing (relative to scene start)
     const speechDur = tm.end - tm.start;
-    const lead = i === 0 ? 0.3 : 0.1 - JCUT; // J-cut: narration starts JCUT s before the picture cut (the transition midpoint); the tail below pays it back
+    const lead = i === 0 ? (pro ? 0.15 : 0.3) : 0.1 - JCUT; // J-cut: narration starts JCUT s before the picture cut (the transition midpoint); the tail below pays it back
     const words = tm.words.map(w => ({w: w.w, start: w.start - tm.start + lead, end: w.end - tm.start + lead}));
     const speechEnd = lead + speechDur;
     let elements: number[] = [];
@@ -318,6 +322,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     else if (s.type === 'chart' || s.type === 'table') tail += 0.2;
     if (i === nScenes - 2 && nScenes > 6) tail += 0.2;
     tail = Math.max(tail, MIN_TAIL);
+    if (pro) tail = MIN_TAIL;
     if (i === ep.scenes.length - 1) tail = Math.max(tail, OUTRO_TAIL); // quiet outro: the video never ends on the last syllable
     if (i < ep.scenes.length - 1) tail += JCUT; // next scene's voice starts early, so this scene's picture holds on (L-cut feel)
     // whole frames: every scene starts on a frame, so a chunk's frame layout never depends on rounding of earlier scenes (render cache)
@@ -339,7 +344,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     }
     let hook: SceneDecision['hook'];
     if (isHook) {
-      const atSec = round(Math.min(1.8, hookSignal ? lead + 0.2 : lead));
+      const atSec = round(Math.min(pro ? 1.2 : 1.8, hookSignal ? lead + 0.2 : lead));
       if (hookSignal && !punchIns.some(p => p.t <= 2)) punchIns.push({t: atSec, scale: 1.14, dur: 0.9});
       hook = {kind: hookSignal ? 'punch_in' : 'slow_open', atSec};
     }

@@ -17,7 +17,7 @@ const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-
 export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: ChannelRow[]; eps: Summary[]; cfg: Settings | null; onChanged: () => void}) {
   const [rows, setRows] = useState<OverviewRow[] | null>(null), [err, setErr] = useState<string | null>(null);
   const [topic, setTopic] = useState(''), [angle, setAngle] = useState(''), [newId, setNewId] = useState('');
-  const [drafting, setDrafting] = useState(false), [stop, setStop] = useState(true), [formErr, setFormErr] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false), [stop, setStop] = useState(true), [fmt, setFmt] = useState<'wide' | 'short'>('wide'), [formErr, setFormErr] = useState<string | null>(null);
   useEffect(() => { api.overview().then(x => setRows(x.channels)).catch(e => setErr(e.message)); }, [eps.length]);
   const warn = cfg ? readiness(cfg, cfg.engine).filter(c => !c.ok) : [];
   const target = ch === 'all' ? chans[0]?.id ?? 'default' : ch;
@@ -41,7 +41,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
   const make = async () => {
     if (!topic.trim() || drafting) return;
     setDrafting(true); setFormErr(null);
-    try { const {id} = await api.makeVideo(topic, angle, target, stop); onChanged(); setRoute({page: 'ep', ep: id, ch: target, step: 'render'}); }
+    try { const {id} = await api.makeVideo(topic, angle, target, stop, fmt); onChanged(); setRoute({page: 'ep', ep: id, ch: target, step: 'render'}); }
     catch (x) { setFormErr((x as Error).message); } finally { setDrafting(false); }
   };
   const create = async (e: React.FormEvent) => {
@@ -81,6 +81,7 @@ export function Overview({ch, chans, eps, cfg, onChanged}: {ch: string; chans: C
           <p className="small muted">New episodes go to {chans.find(c => c.id === target)?.name ?? target}.</p>
           <label className="field"><span>{t('From a topic')}</span><input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. why savings accounts lose to inflation" disabled={drafting} /></label>
           <label className="field"><span>{t('Angle')} <em>· optional</em></span><input value={angle} onChange={e => setAngle(e.target.value)} disabled={drafting} /></label>
+          <label className="field"><span>Format</span><select value={fmt} onChange={e => setFmt(e.target.value as 'wide' | 'short')} disabled={drafting}><option value="wide">Video (landscape, 3-5 min)</option><option value="short">Short (vertical, 25-60 s; Make video only)</option></select></label>
           <div className="row"><button className="btn primary" type="submit" disabled={drafting || !topic.trim() || !!draftBlock}><Play size={15} />{drafting ? `Drafting… ${prog || '(a few minutes)'}` : t('Draft script')}</button><button type="button" className="btn" onClick={() => void make()} disabled={drafting || !topic.trim() || !!draftBlock} title="Draft, voice and preview in one go (free, local)"><Play size={15} />{t('Make video')}</button>{draftBlock && <span className="small muted">{draftBlock}</span>}</div>
           <label className="small" style={{display: 'flex', gap: 8, alignItems: 'center', flexDirection: 'row'}}><input style={{width: 'auto', margin: 0}} type="checkbox" checked={stop} onChange={e => setStop(e.target.checked)} />{t('Stop at preview')} <span className="muted">{stop ? '(voice, plan, preview)' : '(voice, plan, final render)'}</span></label>
           {formErr && <p className="err-text" role="alert">{formErr}</p>}

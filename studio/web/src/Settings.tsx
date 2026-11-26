@@ -83,6 +83,7 @@ export function AiPanel() {
     tick(); return () => { live = false; clearTimeout(t); };
   }, []);
   if (!st) return null;
+  const GEMMA = 'gemma3:12b', options = st.models.includes(GEMMA) ? st.models : [...st.models, GEMMA];
   const busy = st.phase === 'starting' || st.phase === 'pulling', ready = st.reachable && !!st.chosen && !busy;
   return (
     <div className="ready" aria-label="Local AI">
@@ -90,6 +91,12 @@ export function AiPanel() {
       <p className={ready ? 'ok-text' : st.phase === 'error' ? 'err-text' : 'muted'} role="status">
         {ready ? `Ready: ${st.chosen}. No key needed.` : busy ? (st.message ?? 'Working…') : st.phase === 'error' ? st.message : 'Not started yet. It starts by itself when you draft, or press the button.'}
       </p>
+      <label className="field"><span>Script model</span>
+        <select value={st.chosen ?? ''} onChange={e => void api.saveSettings({llmModel: e.target.value}).then(() => api.llm().then(setSt))}>
+          {options.map(m => <option key={m} value={m}>{m}{st.models.includes(m) ? '' : ' (not installed)'}</option>)}
+        </select>
+        <small className="hint">gemma3:12b writes noticeably better scripts than the 7B models but is slow: expect 3 to 6 minutes per draft (Shorts less) and about 9 GB of memory. Install once with `ollama pull gemma3:12b`.</small>
+      </label>
       {st.phase === 'pulling' && <progress max={100} value={st.pct ?? 0} aria-label="Model download" />}
       {!ready && !busy && <button type="button" className="btn" onClick={() => void api.llmSetup().then(setSt)}>Start local AI</button>}
     </div>

@@ -240,9 +240,9 @@ function runNpm(args: string[], onLine?: (l: string) => void) {
 }
 /** Section progress of the running draft (DRAFT_PROGRESS lines from the CLI), polled by the Studio. */
 let draftProgress: {done: number; total: number; label: string} | null = null;
-const runDraft = (topic: string, id: string, angle: string, channel: string) => {
+const runDraft = (topic: string, id: string, angle: string, channel: string, short = false) => {
   draftProgress = {done: 0, total: 0, label: 'Planning the outline'};
-  return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : [])], l => {
+  return runNpm(['draft', '--', topic, '--id', id, '--channel', channel, ...(angle ? ['--angle', angle] : []), ...(short ? ['--short'] : [])], l => {
     const m = /^DRAFT_PROGRESS (\d+)\/(\d+) (.*)$/.exec(l);
     if (m) draftProgress = {done: +m[1], total: +m[2], label: m[3]};
   }).finally(() => { draftProgress = null; });
@@ -356,14 +356,14 @@ function readPack(d: string) {
   const chapters = (Array.isArray(f.chapters) ? f.chapters : []).filter((c): c is {startSec: number; title: string} => !!c && typeof (c as {startSec?: unknown}).startSec === 'number' && typeof (c as {title?: unknown}).title === 'string');
   return {titles: strList(f.titles), description: typeof f.description === 'string' ? f.description : '', tags: strList(f.tags), chapters, thumbnailText: strList(f.thumbnailText), source: f.source === 'ai' ? 'ai' : 'fallback'};
 }
-async function draftEpisode(topic: string, angle: string, channel: string, wantId?: string) {
+async function draftEpisode(topic: string, angle: string, channel: string, wantId?: string, short = false) {
   needAi('draft');
   const id = wantId ?? nextId(topic);
   if (!ID_RE.test(id)) throw new HttpError(400, 'Invalid episode id.');
   if (fs.existsSync(epDir(id))) throw new HttpError(409, `Episode ${id} already exists.`);
   const release = lockAi();
   try {
-    const {code, out} = await runDraft(topic, id, angle, channel);
+    const {code, out} = await runDraft(topic, id, angle, channel, short);
     const ok = out.filter(l => l.startsWith('DRAFT_OK')).pop();
     if (code === 0 && ok && fs.existsSync(`${EPISODES}${id}/episode.json`)) return {id, path: ok.slice(8).trim(), log: out.slice(-40)};
     throw new HttpError(422, cliMessage(out, code));
@@ -762,7 +762,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
       const channel = typeof b.channel === 'string' && b.channel ? b.channel : 'default';
       needChannel(channel);
-      const {id} = await draftEpisode(topic, angle, channel, undefined);
+      const {id} = await draftEpisode(topic, angle, channel, undefined, b.format === 'short');
       const engine = String(readEnv().STUDIO_ENGINE ?? process.env.STUDIO_ENGINE ?? 'auto');
       return json(res, 202, {id, jobId: enqueue(id, {stages: b.stopAtPreview === false ? ['voice', 'direct', 'final'] : ['voice', 'direct', 'preview'], engine}).jobId});
     }
@@ -773,7 +773,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
       if (!topic) return json(res, 400, {error: 'Enter a topic first.'});
       const channel = typeof b.channel === 'string' && b.channel ? b.channel : 'default';
       needChannel(channel);
-      return json(res, 200, await draftEpisode(topic, angle, channel, typeof b.id === 'string' && b.id ? b.id : undefined));
+      return json(res, 200, await draftEpisode(topic, angle, channel, typeof b.id === 'string' && b.id ? b.id : undefined, b.format === 'short'));
     }
     if (await globalDataApi(req, res, url, p, m)) return;
     if (p[0] === 'presets') {
