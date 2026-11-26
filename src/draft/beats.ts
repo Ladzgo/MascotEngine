@@ -1,7 +1,8 @@
 import type {Episode} from '../schema.js';
+import {spoken} from '../pipeline/speech.js';
 
 type Sc = Episode['scenes'][number];
-const wc = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
+const wc = (t: string) => spoken(t).split(/\s+/).filter(Boolean).length; // spoken length: numerals are read out, so "$1,825" counts as six words
 const MAX_BEAT = 22; // words (about 8 s spoken): longer talk scenes become several beats
 
 /**

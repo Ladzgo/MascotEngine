@@ -1,3 +1,4 @@
+import {spoken} from '../pipeline/speech.js';
 import type {Episode} from '../schema.js';
 import {scrubSlop} from './critic.js';
 import {HU_BANNED, huWordValue} from './lang.js';
@@ -9,14 +10,19 @@ const BANNED = [
 ];
 // Allow "get rich quick" only when mocked in a title scene is not worth the nuance: keep it strict.
 
+/** Words as the voice says them: "$1,825" is six words, not one. */
+export const spokenWords = (t: string) => spoken(t).split(/\s+/).filter(Boolean).length;
+
 export function lintEpisode(ep: Episode): string[] {
   const errs: string[] = [];
   const hook = ep.scenes[0]?.narration ?? '';
   const words = hook.trim().split(/\s+/).length;
   if (words > 15) errs.push(`Hook (scene 1 narration) has ${words} words; must be 15 or fewer.`);
   // numerals are spoken out ("$10k" = ten thousand dollars): a hook that takes over ~4.3 s to say makes the first beat the longest one
-  const spoken = hook.trim().split(/\s+/).reduce((n, w) => n + 1 + (/\d/.test(w) ? 1 + (/[$%]|\d[km]\b/i.test(w) ? 1 : 0) : 0), 0);
-  if (spoken > 13) errs.push(`Hook takes about ${(spoken * 60 / 165).toFixed(1)} s to say once numbers are spelled out; keep it under 4.3 s (about 12 spoken words).`);
+  const spokenN = spokenWords(hook);
+  if (spokenN > 13) errs.push(`Hook takes about ${(spokenN * 60 / 165).toFixed(1)} s to say once numbers are spelled out; keep it under 4.3 s (about 12 spoken words).`);
+  // Shorts: every beat stays under ~5 s on screen; data scenes are never split later, so their narration must already be short
+  if (ep.format === 'short') ep.scenes.forEach((s, i) => { const n = spokenWords(s.narration); if (i > 0 && s.type !== 'talk' && n > 14) errs.push(`Scene ${i + 1} (${s.type}) takes about ${(n * 60 / 165).toFixed(1)} s to say once numbers are spelled out; Short beats must stay under 5 s (14 spoken words): shorten it.`); });
   const hasNumbers = ep.scenes.some(s => s.type === 'big_number' || s.type === 'chart');
   if (hasNumbers && ep.sources.length === 0) errs.push('big_number/chart scenes need at least one URL in "sources".');
   ep.scenes.forEach((s, i) => {
