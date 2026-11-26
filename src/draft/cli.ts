@@ -57,7 +57,7 @@ try {
     const r = await editPass(client, ep3, {model: process.env.DRAFT_MODEL ?? MODEL, lang, log: m => console.log(`DRAFT_NOTE ${m}`)});
     ep4 = r.ep; console.log(`DRAFT_NOTE editor pass: ${r.changed}/${r.tried} scenes rewritten`);
   }
-  const split = splitBeats(ensurePayoff(fixEpisode(ep4, lang), lang), values.short ? {max: 12, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a new visual idea under ~5 s
+  const split = splitBeats(ensurePayoff(fixEpisode(ep4, lang), lang), values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
   const spread = values.short ? spreadVisuals(split) : {ep: split, fixed: 0};
   const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
   let ep = fit.ep;
