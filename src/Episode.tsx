@@ -44,6 +44,8 @@ export function chunkBase(L: {froms: number[]; ends: number[]}, g: number): numb
 }
 
 /** Index of the scene whose chunk frame g belongs to. */
+// full-bleed scenes only use camera moves at a boundary (whip, tilt, push-through) or a hard cut; paper effects (tear, ink, flip) belong to the paper look
+const FB_TRANSITION: Record<string, string> = {cut: 'cut', whip: 'cam_pan', slide: 'cam_pan', wipe_ink: 'cam_pan', zoom_through: 'cam_push', circle_reveal: 'cam_push', paper_flip: 'cam_push', light_leak: 'cam_tilt', tear: 'cam_tilt'};
 const sceneAt = (L: {froms: number[]}, g: number) => { let k = 0; L.froms.forEach((f, i) => { if (f <= g) k = i; }); return k; };
 
 export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decisions, assets}) => {
@@ -98,7 +100,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
       {decisions.scenes.map((d, i) => (
         <Sequence key={i} from={L.froms[i]} durationInFrames={Math.max(1, L.ends[i] - L.froms[i])} layout="none">
           <SceneSeq paper={fullbleed ? <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, #1d2b5e, #6a4c93 60%, #241a3d)'}} /> : <Paper variant={decisions.background} />} i={i} T={L.ts[i]} start={L.starts[i]} prevLast={i > 0 ? L.froms[i] - L.starts[i - 1] - 1 : 0}
-            kind={fullbleed ? ({whip: 'cam_pan', slide: 'cam_pan', zoom_through: 'cam_push', circle_reveal: 'cam_push'} as Record<string, string>)[d.transition] ?? d.transition : d.transition} accent={accent} view={view} />
+            kind={fullbleed ? FB_TRANSITION[d.transition] ?? 'cam_push' : d.transition} accent={accent} view={view} />
         </Sequence>
       ))}
       {!fullbleed && <Vignette />}

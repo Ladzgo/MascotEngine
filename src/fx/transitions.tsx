@@ -12,7 +12,7 @@ const Leak: React.FC<{p: number}> = ({p}) => (
 
 /** Wraps previous (frozen last frame) and current scene layers; p in [0,1]. */
 export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.ReactNode; cur: React.ReactNode; accent: string; paper: React.ReactNode}> = ({kind, p, prev: prev0, cur: cur0, accent, paper}) => {
-  const W = useVideoConfig().width; // 1920 wide, 1080 for native Shorts
+  const {width: W, height: H} = useVideoConfig(); // 1920 wide, 1080 for native Shorts
   const prev = <>{paper}{prev0}</>;
   const cur = <>{paper}{cur0}</>;
   const fill: React.CSSProperties = {position: 'absolute', inset: 0};
@@ -25,12 +25,19 @@ export const TransitionLayer: React.FC<{kind: string; p: number; prev: React.Rea
         <div style={{...fill, transform: `translateX(${-e * W * 0.35}px) scale(${1 - e * 0.04})`, opacity: 1 - e * 0.6, filter: `blur(${mb * 10}px)`}}>{prev}</div>
         <div style={{...fill, transform: `translateX(${(1 - easeOut(p)) * W}px) skewX(${-(1 - easeOut(p)) * 6}deg)`, filter: `blur(${(1 - easeOut(p)) * 12}px)`}}>{cur}</div>
       </>;
-    case 'cam_pan': // clean camera whip: both scenes slide on one axis with light motion blur, backdrop underneath, no dimming
+    case 'cam_pan': // camera whip: both scenes travel on one axis (always right-to-left, so the camera keeps one direction) with a motion-blur smear
       return <>
         <div style={{position: 'absolute', inset: 0}}>{paper}</div>
-        <div style={{...fill, transform: `translateX(${-e * W}px)`, filter: `blur(${mb * 5}px)`}}>{prev}</div>
-        <div style={{...fill, transform: `translateX(${(1 - e) * W}px)`, filter: `blur(${mb * 5}px)`}}>{cur}</div>
+        <div style={{...fill, transform: `translateX(${-e * W}px)`, filter: `blur(${mb * 14}px)`}}>{prev}</div>
+        <div style={{...fill, transform: `translateX(${(1 - e) * W}px)`, filter: `blur(${mb * 14}px)`}}>{cur}</div>
       </>;
+    case 'cam_tilt': { // vertical whip: the camera tilts up into the next scene
+      return <>
+        <div style={{position: 'absolute', inset: 0}}>{paper}</div>
+        <div style={{...fill, transform: `translateY(${e * H}px)`, filter: `blur(${mb * 14}px)`}}>{prev}</div>
+        <div style={{...fill, transform: `translateY(${-(1 - e) * H}px)`, filter: `blur(${mb * 14}px)`}}>{cur}</div>
+      </>;
+    }
     case 'cam_push': // clean push-through: the old scene zooms past the lens while the new one settles in
       return <>
         <div style={{position: 'absolute', inset: 0}}>{paper}</div>
