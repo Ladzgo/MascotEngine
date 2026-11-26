@@ -48,8 +48,8 @@ export function Ideas({channel, cfg, chans, f}: {channel: Channel | null; cfg: S
         <label className="field grow"><span>Focus <em>· optional</em></span><input value={focus} onChange={e => setFocus(e.target.value)} placeholder="e.g. mortgage myths, or what happened this month" disabled={gen} maxLength={300} /></label>
         <label className="field cnt"><span>How many</span><input type="number" min={1} max={20} value={count} onChange={e => setCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))} className="num" disabled={gen} /></label>
         <label className="field cnt"><span>{t('Format')}</span><select value={fmt} onChange={e => setFmt(e.target.value as 'short' | 'wide')}><option value="short">{t('Short')} 9:16</option><option value="wide">{t('Long')} 16:9</option></select></label>
-        <button className={`btn ${shown.length ? '' : 'primary'}`} type="submit" disabled={gen || !!block}><Wand size={16} />{gen ? 'Thinking…' : 'Generate ideas'}</button>
-        {gen && <span className="small muted" role="status" data-t={tick}>{Math.round((Date.now() - genT0) / 1000)} s · usually 1 to 2 minutes <button type="button" className="btn sm" onClick={() => void api.ideasCancel()}>{t('Cancel')}</button></span>}
+        <button className={`btn ${shown.length ? '' : 'primary'}`} type="submit" disabled={gen || !!block}><Wand size={16} />{gen ? t('Thinking…') : t('Generate ideas')}</button>
+        {gen && <span className="small muted" role="status" data-t={tick}>{Math.round((Date.now() - genT0) / 1000)} s · {t('usually 1 to 2 minutes')} <button type="button" className="btn sm" onClick={() => void api.ideasCancel()}>{t('Cancel')}</button></span>}
         {block && <p className="hint idea-block"><Alert size={13} />{block}</p>}
       </form>
       {err && <div className="alert" role="alert"><Alert size={18} /><span className="pre">{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}

@@ -9,6 +9,9 @@ export const HU: Record<string, string> = {
   'Skip to content': 'Ugrás a tartalomra', 'Loading…': 'Betöltés…', Language: 'Nyelv', 'UI language': 'Felület nyelve',
   'Stopped.': 'Leállítva.', 'Start over': 'Újrakezdés', 'Running for': 'Fut már', about: 'körülbelül', left: 'van hátra', 'usually 2 to 6 minutes': 'általában 2-6 perc', Cancel: 'Mégse',
   'Chosen for the channel language': 'A csatorna nyelvéhez igazítva', 'Auto picks the best natural voice for it.': 'Az automatikus a legjobb természetes hangot választja hozzá.',
+  'Background picture': 'Háttérkép', Now: 'Most', 'This beat uses the drawn visuals.': 'Ez a jelenet a rajzolt grafikát használja.', 'Swapped. Re-render the preview to see it.': 'Kicserélve. Az előnézet újrarenderelése után látszik.', 'Swap image': 'Kép cseréje',
+  'Search stock': 'Keresés a képtárban', 'English search word, e.g. credit card': 'Angol keresőszó, pl. credit card', Photo: 'Fotó', Video: 'Videó', 'Searching…': 'Keresés…', Search: 'Keresés', Close: 'Bezár', 'No licensed pictures found. Try a simpler English word.': 'Nincs találat. Próbálj egyszerűbb angol szót.', 'Downloading…': 'Letöltés…',
+  'Working on': 'Folyamatban', 'so far': 'eddig', 'Finished. Everything is up to date.': 'Kész. Minden naprakész.', 'Cancelled.': 'Megszakítva.', 'Idle.': 'Nincs futó munka.', Stop: 'Leállít', 'Hide log': 'Napló elrejtése', 'Thinking…': 'Gondolkodik…', 'Generate ideas': 'Ötletek generálása', 'usually 1 to 2 minutes': 'általában 1-2 perc',
   // Today
   'What needs you next': 'Mi vár rád legközelebb', 'New channel': 'Új csatorna', 'Setup needed': 'Beállítás szükséges', 'Open Settings': 'Beállítások megnyitása',
   'Getting started': 'Első lépések', Unfinished: 'Befejezetlen', 'Start something': 'Kezdj valamit', 'From a topic': 'Témából', 'Angle': 'Szemszög', 'Draft script': 'Script írása', 'Make video': 'Videó készítése',

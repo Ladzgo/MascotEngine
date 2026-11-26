@@ -1,3 +1,4 @@
+import {t} from './i18n';
 import React, {useState} from 'react';
 import {call} from './api';
 
@@ -16,23 +17,23 @@ export function SwapImage({ep, scene, stock, onPicked}: {ep: string; scene: numb
     catch (e) { setErr((e as Error).message); } finally { setBusy(null); }
   };
   return (
-    <fieldset className="swap"><legend>Background picture</legend>
-      <p className="small muted">{stock ? `Now: "${stock.query}" (${stock.kind}).` : 'This beat uses the drawn visuals.'} {done && <b className="ok-text">Swapped. Re-render the preview to see it.</b>}</p>
-      {!open ? <button type="button" className="btn sm" onClick={() => { setOpen(true); if (!hits && q.length > 1) void search(); }}>Swap image</button> : (
+    <fieldset className="swap"><legend>{t('Background picture')}</legend>
+      <p className="small muted">{stock ? `${t('Now')}: "${stock.query}" (${stock.kind}).` : t('This beat uses the drawn visuals.')} {done && <b className="ok-text">{t('Swapped. Re-render the preview to see it.')}</b>}</p>
+      {!open ? <button type="button" className="btn sm" onClick={() => { setOpen(true); if (!hits && q.length > 1) void search(); }}>{t('Swap image')}</button> : (
         <>
           <div className="row">
-            <input aria-label="Search stock" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void search(); } }} placeholder="English search word, e.g. credit card" maxLength={80} />
-            <select aria-label="Photo or video" value={kind} onChange={e => setKind(e.target.value as 'photo' | 'video')}><option value="photo">Photo</option><option value="video">Video</option></select>
-            <button type="button" className="btn sm primary" disabled={busy === 'search' || q.trim().length < 2} onClick={() => void search()}>{busy === 'search' ? 'Searching…' : 'Search'}</button>
-            <button type="button" className="btn sm ghost" onClick={() => setOpen(false)}>Close</button>
+            <input aria-label={t('Search stock')} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void search(); } }} placeholder={t('English search word, e.g. credit card')} maxLength={80} />
+            <select aria-label="Photo or video" value={kind} onChange={e => setKind(e.target.value as 'photo' | 'video')}><option value="photo">{t('Photo')}</option><option value="video">{t('Video')}</option></select>
+            <button type="button" className="btn sm primary" disabled={busy === 'search' || q.trim().length < 2} onClick={() => void search()}>{busy === 'search' ? t('Searching…') : t('Search')}</button>
+            <button type="button" className="btn sm ghost" onClick={() => setOpen(false)}>{t('Close')}</button>
           </div>
-          {err && <p className="err-text" role="alert">{err} <button type="button" className="btn sm" onClick={() => void search()}>Try again</button></p>}
-          {hits && !hits.length && <p className="small muted">No licensed pictures found. Try a simpler English word.</p>}
+          {err && <p className="err-text" role="alert">{err} <button type="button" className="btn sm" onClick={() => void search()}>{t('Try again')}</button></p>}
+          {hits && !hits.length && <p className="small muted">{t('No licensed pictures found. Try a simpler English word.')}</p>}
           {hits && hits.length > 0 && <ul className="swap-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, listStyle: 'none', padding: 0}}>
             {hits.map(h => <li key={`${h.provider}${h.id}`}>
               <button type="button" className="btn ghost" style={{padding: 0, width: '100%'}} disabled={busy !== null} title={`${h.title} · ${h.author} · ${h.license}`} onClick={() => void pick(h)} aria-label={`Use: ${h.title || h.provider}`}>
                 {h.kind === 'video' ? <video src={h.thumb} muted preload="metadata" style={{width: '100%', aspectRatio: '9/14', objectFit: 'cover'}} /> : <img src={h.thumb} alt="" loading="lazy" style={{width: '100%', aspectRatio: '9/14', objectFit: 'cover'}} />}
-                <span className="small muted" style={{display: 'block'}}>{busy === h.id ? 'Downloading…' : h.provider}</span>
+                <span className="small muted" style={{display: 'block'}}>{busy === h.id ? t('Downloading…') : h.provider}</span>
               </button></li>)}
           </ul>}
         </>

@@ -1,3 +1,4 @@
+import {t} from './i18n';
 import React, {useEffect, useRef, useState} from 'react';
 import type {JobState, Stage, Summary} from './api';
 import {Alert, Check, Film, Mic, Phone, Reel, Wand, X} from './icons';
@@ -17,7 +18,7 @@ export function StageTrack({summary, job, onCancel, onRetry}: {summary: Summary;
   useEffect(() => { if (job?.status !== 'running') return; const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, [job?.status]);
   const el = (now - t0.current.at) / 1000, p0 = job?.progress ?? 0;
   const fmt = (x: number) => x < 90 ? `${Math.max(5, Math.round(x / 5) * 5)} s` : `${Math.round(x / 60)} min`;
-  const eta = p0 > 0.05 && p0 < 1 ? ` · about ${fmt(el * (1 - p0) / p0)} left` : '';
+  const eta = p0 > 0.05 && p0 < 1 ? ` · ${t('about')} ${fmt(el * (1 - p0) / p0)} ${t('left')}` : '';
   const running = job?.status === 'running';
   const failed = job?.status === 'error';
   const doneNow = (s: Stage) => (job && job.episode === summary.id && job.done.includes(s)) || (!running && !!summary.stages[s]);
@@ -41,12 +42,12 @@ export function StageTrack({summary, job, onCancel, onRetry}: {summary: Summary;
         })}
       </ol>
       <div className="msg" role="status" aria-live="polite">
-        {failed ? <span className="err-text">{job?.error}</span> : running ? <span>Working on {job?.current}… {fmt(el)} so far{eta}. {job?.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? ''}</span> : job?.status === 'done' ? <span>Finished. Everything is up to date.</span> : job?.status === 'cancelled' ? <span>Cancelled.</span> : <span className="muted">Idle.</span>}
+        {failed ? <span className="err-text">{job?.error}</span> : running ? <span>{t('Working on')} {job?.current}… {fmt(el)} {t('so far')}{eta}. {job?.log.filter(l => !l.startsWith('render ')).slice(-1)[0] ?? ''}</span> : job?.status === 'done' ? <span>{t('Finished. Everything is up to date.')}</span> : job?.status === 'cancelled' ? <span>{t('Cancelled.')}</span> : <span className="muted">{t('Idle.')}</span>}
       </div>
       <div className="track-actions">
-        {failed && job?.current && <button className="btn sm" onClick={() => onRetry(job.current!)}>Try again: {job.current}</button>}
-        {running && <button className="btn ghost sm" onClick={onCancel}><X size={15} />Stop</button>}
-        {job && <button className="btn ghost sm" onClick={() => setOpen(o => !o)} aria-expanded={open}>{open ? 'Hide log' : 'Log'}</button>}
+        {failed && job?.current && <button className="btn sm" onClick={() => onRetry(job.current!)}>{t('Try again')}: {job.current}</button>}
+        {running && <button className="btn ghost sm" onClick={onCancel}><X size={15} />{t('Stop')}</button>}
+        {job && <button className="btn ghost sm" onClick={() => setOpen(o => !o)} aria-expanded={open}>{open ? t('Hide log') : t('Log')}</button>}
       </div>
       {open && job && <pre className="log" tabIndex={0}>{job.log.join('\n') || 'No output yet.'}</pre>}
     </footer>
