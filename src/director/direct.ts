@@ -308,6 +308,12 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     if (s.type !== 'big_number' && s.type !== 'list' && s.type !== 'talk') {
       tail *= pace === 'punchy' ? 0.8 : pace === 'explain' ? 1.2 : 1;
     }
+    // pacing curve: fast open (tight tails in the first four beats), breathing room after key numbers, a held beat before the recap/outro
+    const nScenes = ep.scenes.length;
+    if (i > 0 && i < 4) tail *= 0.6;
+    if (s.type === 'big_number' || s.type === 'stats') tail += 0.45;
+    else if (s.type === 'chart' || s.type === 'table') tail += 0.2;
+    if (i === nScenes - 2 && nScenes > 6) tail += 0.2;
     tail = Math.max(tail, MIN_TAIL);
     if (i === ep.scenes.length - 1) tail = Math.max(tail, OUTRO_TAIL); // quiet outro: the video never ends on the last syllable
     if (i < ep.scenes.length - 1) tail += JCUT; // next scene's voice starts early, so this scene's picture holds on (L-cut feel)
@@ -360,6 +366,7 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     if (s.type === 'list') elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (['compare', 'before_after', 'timeline', 'table', 'checklist'].includes(s.type)) elements.forEach(t => sfx.push({t, kind: 'pop', variant: variant('pop')}));
     if (s.type === 'title') sfx.push({t: 0.15, kind: 'pop', variant: variant('pop')});
+    if ((s.type === 'big_number' || s.type === 'stats') && elements[0] > 0.5) sfx.push({t: round(Math.max(0, elements[0] - 0.45)), kind: 'whoosh', variant: variant('whoosh')}); // riser into the number
     if (s.type === 'big_number') {
       for (let t = elements[0]; t < elements[1]; t += 0.11) sfx.push({t: round(t), kind: 'tick', variant: 0});
       sfx.push({t: elements[1], kind: 'ding', variant: variant('ding')});

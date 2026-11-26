@@ -174,6 +174,20 @@ export class LocalRecordingTTS implements TTSAdapter {
   }
 }
 
+/**
+ * Prosody for macOS `say` via embedded commands: a short silence after each sentence end (longer after ? and ...), a beat at dashes,
+ * a light stress on the scene's emphasis words and a slight slow-down on numbers, so the read has phrasing instead of one flat stream.
+ * The text the viewer sees (and the aligner maps against) is unchanged; only what is spoken gets the tags.
+ */
+export function prosody(text: string, emphasis: string[] = []): string {
+  let t = text.replace(/\s+/g, ' ').trim();
+  t = t.replace(/\s*(?:—|–| - )\s*/g, ' [[slnc 260]] ').replace(/\.{3}|…/g, '... [[slnc 380]]');
+  t = t.replace(/([.!?])(["')]*)\s+(?=\S)/g, (_, p, q) => `${p}${q} [[slnc ${p === '?' ? 300 : p === '!' ? 240 : 200}]] `);
+  t = t.replace(/,\s+(?=\S)/g, ', [[slnc 90]] ');
+  for (const e of emphasis) { const w = e.trim().split(/\s+/)[0]; if (w.length > 2) t = t.replace(new RegExp(`(^|\\s)(${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?=[\\s.,!?]|$)`, 'i'), '$1[[emph +]] $2'); }
+  return t;
+}
+
 /** Free macOS voice: `say` -> aiff -> mp3 (ffmpeg), proportional word timing. */
 export class SayTTS implements TTSAdapter {
   name = 'say';
@@ -190,10 +204,10 @@ export class SayTTS implements TTSAdapter {
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`;
       const aiff = `${outDir}audio/scene-${index + 1}.aiff`;
-      const rate = sayRate(ep), key = audioKey('say', `${voice}@${rate ?? ''}`, lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
+      const rate = sayRate(ep), key = audioKey('say', `${voice}@${rate ?? ''}`, 'prosody2', lang ?? '', aligner ?? '', TRIM_AF, s.narration), cached = cacheGet(file, key);
       let dur: number, rel: RelWord[];
       if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
-        const r = spawnSync('say', ['-v', voice, ...(rate ? ['-r', String(rate)] : []), '-o', aiff, '--', s.narration], {encoding: 'utf8'});
+        const r = spawnSync('say', ['-v', voice, ...(rate ? ['-r', String(rate)] : []), '-o', aiff, '--', prosody(s.narration, 'emphasis' in s ? s.emphasis : [])], {encoding: 'utf8'});
         if (r.error || r.status !== 0) throw new Error(`say failed on scene ${index + 1} (voice "${voice}"): ${(r.stderr || r.error?.message || '').slice(0, 200)}. List voices with: say -v '?'`);
         const c = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', aiff, '-af', TRIM_AF, '-ar', '44100', '-codec:a', 'libmp3lame', '-q:a', '4', file], {encoding: 'utf8'});
         fs.rmSync(aiff, {force: true});

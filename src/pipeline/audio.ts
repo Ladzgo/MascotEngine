@@ -89,8 +89,17 @@ export function sceneGains(scenes: Float32Array[]): number[] {
   });
 }
 
-/** Narration clean-up: rumble cut + gentle compression so quiet words stay audible under music. */
-const VOICE_FX = 'highpass=f=80,acompressor=threshold=0.125:ratio=3:attack=5:release=120:makeup=2,';
+/** Narration clean-up: rumble cut, a little warmth and presence, de-ess (synthetic sibilants are harsh), gentle compression so quiet words stay audible under music. */
+const VOICE_FX = 'highpass=f=85,equalizer=f=170:t=q:w=1:g=1.5,equalizer=f=3200:t=q:w=1.2:g=1.8,deesser=i=0.35:m=0.5:f=0.5,lowpass=f=12000,acompressor=threshold=0.125:ratio=3:attack=5:release=120:makeup=2,';
+
+/** Music gain curve: +4 dB lift (1.6x) with 0.6 s ramps over the cold open, every big_number/stats beat and the outro, 1.0 elsewhere. */
+export function swellExpr(dec: EpisodeDecisions, total: number): string {
+  const win: [number, number][] = [[0, 3.5]];
+  for (const d of dec.scenes) if (d.type === 'big_number' || d.type === 'stats') win.push([d.startSec + Math.max(0, (d.elements?.[0] ?? 0) - 0.4), d.startSec + d.durSec]);
+  win.push([Math.max(0, total - 5), total]);
+  const R = 0.6;
+  return '1+' + win.slice(0, 40).map(([a, b]) => `0.6*clip(min((t-${a.toFixed(2)})/${R},(${b.toFixed(2)}-t)/${R}),0,1)`).join('+');
+}
 
 /**
  * Builds the final audio: narration (if audio/scene-N.wav exists) + SFX + music bed (if assets/music has a track,
@@ -122,18 +131,20 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   const musicDir = process.env.YT_MUSIC_DIR ? process.env.YT_MUSIC_DIR.replace(/\/?$/, '/') : new URL('../../assets/music/', import.meta.url).pathname;
   const beds = fs.existsSync(musicDir) ? fs.readdirSync(musicDir).filter(f => /\.(mp3|wav|m4a|ogg)$/i.test(f)) : [];
   const track = dec.music?.track && beds.includes(dec.music.track) ? dec.music.track : beds[0]; // director's mood bed, else any bed
-  const args = ['-y', '-loglevel', 'error', '-i', voiceWav, '-i', sfxWav];
+  // room tone: a very quiet brown-noise floor so pauses are not digital silence (about -52 dBFS)
+  const args = ['-y', '-loglevel', 'error', '-i', voiceWav, '-i', sfxWav, '-f', 'lavfi', '-i', `anoisesrc=color=brown:amplitude=0.004:sample_rate=${SR}:duration=${totalSec.toFixed(3)}`];
   // voice is the sidechain key for both the SFX duck and the (optional) music duck
   const sfxDuck = 'sidechaincompress=threshold=0.03:ratio=4:attack=5:release=200';
   let filter: string;
   if (track) {
     args.push('-stream_loop', '-1', '-i', `${musicDir}${track}`);
+    const swell = swellExpr(dec, totalSec);
     // music at -22 dB, sidechain-ducked by the voice, then summed with voice + ducked sfx
     filter = '[0:a]' + VOICE_FX + 'asplit=3[v][k1][k2];[1:a][k1]' + sfxDuck + '[sfxd];' +
-      '[2:a]volume=0.12,atrim=0:' + totalSec.toFixed(3) + '[m];[m][k2]sidechaincompress=threshold=0.02:ratio=2.6:attack=20:release=400:makeup=1[duck];' +
-      '[v][sfxd][duck]amix=inputs=3:normalize=0[o]';
+      '[3:a]volume=0.12,volume=\'' + swell + '\':eval=frame,atrim=0:' + totalSec.toFixed(3) + '[m];[m][k2]sidechaincompress=threshold=0.02:ratio=2.6:attack=20:release=400:makeup=1[duck];' +
+      '[v][sfxd][duck][2:a]amix=inputs=4:normalize=0[o]';
   } else {
-    filter = '[0:a]' + VOICE_FX + 'asplit=2[v][k1];[1:a][k1]' + sfxDuck + '[sfxd];[v][sfxd]amix=inputs=2:normalize=0[o]';
+    filter = '[0:a]' + VOICE_FX + 'asplit=2[v][k1];[1:a][k1]' + sfxDuck + '[sfxd];[v][sfxd][2:a]amix=inputs=3:normalize=0[o]';
   }
   execFileSync('ffmpeg', [...args, '-filter_complex', filter, '-map', '[o]', '-t', totalSec.toFixed(3), mixed]);
 
