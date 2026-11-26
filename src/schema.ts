@@ -23,6 +23,10 @@ const Overrides = {
   /** Chapter divider: a tag with this title slides in at the start of the scene (wide video); scene-local, so render chunks stay cacheable. */
   chapter: z.string().min(1).max(40).optional(),
   /** Full-bleed look: 2-4 visuals inside one scene, each switching in when its keyword is spoken (src/fullbleed). Absent = one hero picked from the narration. */
+  /** Licensed b-roll for this beat (src/stock): fetched by `npm run stock`, shown full-frame under the procedural object. */
+  stock: z.object({query: z.string().min(2).max(80), kind: z.enum(['photo', 'video']).default('photo')}).optional(),
+  /** Injected by render.ts from stock.json (public-dir relative). Never written by hand. */
+  stockFile: z.string().regex(/^stock-cache\/[A-Za-z0-9._-]+$/).optional(),
   visuals: z.array(z.object({kind: z.string().min(1).max(24), at: z.string().max(40).optional()})).max(4).optional(),
   visual: z.object({kind: VisualKind, label: z.string().max(40).optional()}).optional(),
 };

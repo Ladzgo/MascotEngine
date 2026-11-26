@@ -21,3 +21,4 @@ data/jobs.json
 data/logs
 .venv-tts
 data/voice-preview
+assets/stock-cache/

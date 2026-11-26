@@ -262,13 +262,13 @@ export async function aiMeta(client: Client, ep: Episode, model = MODEL, channel
 }
 
 export async function buildPack(o: {
-  ep: Episode; timings: SceneTiming[]; totalSec: number; client?: Client; model?: string; warn?: (m: string) => void; channel?: Channel;
+  ep: Episode; timings: SceneTiming[]; totalSec: number; client?: Client; model?: string; warn?: (m: string) => void; channel?: Channel; credits?: string[];
 }): Promise<Pack> {
   const kind = kindOf(o.channel?.niche), lang = langCode(o.channel?.language);
   const warn = o.warn ?? console.error;
   const chapters = buildChapters(o.ep.scenes, o.timings, o.totalSec, o.ep.title, lang);
   if (!chapters.length) warn('Warning: video too short for YouTube chapters (need 3 chapters of 10s+); chapters omitted.');
-  const description = buildDescription(o.ep, chapters, lang);
+  const description = buildDescription(o.ep, chapters, lang) + (o.credits?.length ? `\n\nImages and footage:\n${o.credits.map(c => `- ${c}`).join('\n')}` : ''); // licence credit lines from stock.json
   let meta: Pick<Pack, 'titles' | 'tags' | 'thumbnailText'> = fallbackMeta(o.ep, o.totalSec, kind, lang);
   let source: Pack['source'] = 'fallback';
   if (o.client) {

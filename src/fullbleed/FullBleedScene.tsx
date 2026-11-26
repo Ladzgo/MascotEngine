@@ -1,4 +1,5 @@
 import React from 'react';
+import {Img, OffthreadVideo, staticFile} from 'remotion';
 import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
@@ -63,6 +64,19 @@ const Backdrop: React.FC<{w: number; h: number; env: Env; pal: [string, string, 
       <svg width={w} height={h} style={{position: 'absolute', inset: 0, filter: `blur(${tall ? 14 : 10}px)`, opacity: 0.5, pointerEvents: 'none'}}>
         {Array.from({length: 4}, (_, i) => <ellipse key={i} cx={((rnd(i + 200) * w * 1.3 - cx * 1.6 - t * 14) % (w * 1.3) + w * 1.3) % (w * 1.3) - w * 0.15} cy={h * (0.08 + rnd(i + 210) * 0.8)} rx={w * (0.05 + rnd(i + 220) * 0.07)} ry={w * (0.04 + rnd(i + 230) * 0.06)} fill={i % 2 ? pal[3] : '#fff'} opacity={0.35} />)}
       </svg>
+    </div>
+  );
+};
+
+/** Licensed b-roll fills the frame: photo gets a Ken Burns move, video plays muted; both are graded toward the scene palette with a vignette and a darker floor so captions stay readable. */
+const StockLayer: React.FC<{file: string; p: number; mv: number; w: number; h: number; pal: [string, string, string, string]}> = ({file, p, mv, w, h, pal}) => {
+  const video = /\.mp4$/i.test(file), sc = 1.08 + 0.17 * p, tx = (mv % 2 ? -1 : 1) * (p - 0.5) * w * 0.08;
+  const style: React.CSSProperties = {position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', transform: `translateX(${tx}px) scale(${sc})`, filter: 'saturate(1.15) contrast(1.05)'};
+  return (
+    <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: pal[2]}}>
+      {video ? <OffthreadVideo src={staticFile(file)} muted style={style} /> : <Img src={staticFile(file)} style={style} />}
+      <div style={{position: 'absolute', inset: 0, background: `linear-gradient(180deg, ${pal[0]}66, ${pal[1]}44 55%, ${pal[2]}cc)`, mixBlendMode: 'multiply'}} />
+      <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6))'}} />
     </div>
   );
 };
@@ -188,9 +202,10 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
+      {scene.stockFile ? <StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} /> : (
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.06 + 0.1 * p}) translateX(${panX * 0.5}px)`, transformOrigin: '50% 60%'}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
-      </div>
+      </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
         {shots.map((s, i) => {
           const Obj = OBJECTS[s.kind], local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);

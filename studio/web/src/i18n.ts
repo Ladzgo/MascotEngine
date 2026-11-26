@@ -63,7 +63,7 @@ export const HU: Record<string, string> = {
   'e.g. why paying the minimum on a credit card costs thousands': 'pl. miért kerül ezreket a hitelkártya minimum fizetése', 'Suggest ideas': 'Ötletek kérése', 'Thinking of ideas… about a minute': 'Ötleteken gondolkodik… kb. egy perc',
   'or pick one below': 'vagy válassz lent egyet', 'How should it look and sound?': 'Hogyan nézzen ki és hogyan szóljon?', Format: 'Formátum', Short: 'Short', Long: 'Hosszú',
   'Vertical, 30 to 55 seconds, full-screen pictures': 'Álló, 30–55 másodperc, teljes képernyős képek', 'Landscape, 3 to 5 minutes, mascot and paper look': 'Fekvő, 3–5 perc, kabala és papír megjelenés',
-  'Channel and language': 'Csatorna és nyelv', 'not set up': 'nincs beállítva', 'Best available': 'Legjobb elérhető', 'Hear this voice': 'Hang meghallgatása', 'Rendering…': 'Készül…',
+  'Channel and language': 'Csatorna és nyelv', 'not set up': 'nincs beállítva', 'Best available': 'Legjobb elérhető', 'Hear this voice': 'Hang meghallgatása',
   Automatic: 'Automatikus', 'Bigger models write better scripts but take longer (a few minutes).': 'A nagyobb modellek jobb scriptet írnak, de tovább tartanak (pár perc).',
   'Make it': 'Készítsd el', 'The Studio writes the script, records the voice and renders a preview. You can watch the progress.': 'A Studio megírja a scriptet, felveszi a hangot és renderel egy előnézetet. Követheted a haladást.',
   'Starting…': 'Indítás…', 'Enter a topic or pick an idea first.': 'Előbb írj be egy témát vagy válassz ötletet.', 'Started. Your video is being made.': 'Elindult. A videód készül.',

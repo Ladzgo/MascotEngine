@@ -23,6 +23,7 @@
     "art": "tsx src/art/cli.ts",
     "clip": "tsx src/clipper/cli.ts",
     "qa": "tsx scripts/qa/qa.ts",
+    "stock": "tsx src/stock/cli.ts",
     "schedule-export": "tsx src/publish/schedule-cli.ts",
     "qa:golden": "tsx scripts/qa/golden.ts",
     "batch": "tsx src/batch/cli.ts",

@@ -13,6 +13,7 @@ import {mixAudio} from './audio.js';
 import {chromiumTuning} from './renderOpts.js';
 import {chunkKeys, chunkRanges, codeHash} from './renderCache.js';
 import {frameLayout, ENDCARD_FRAMES} from '../Episode.js';
+import {readStock} from '../stock/index.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 
@@ -31,6 +32,12 @@ export function loadCharacterAssets(): CharacterAssets {
     out[pose] = {file: `character/${manifest[pose]?.file ?? f}`, talk: fs.existsSync(dir + talk) ? `character/${manifest[pose]?.talk ?? talk}` : undefined};
   }
   return out;
+}
+
+/** Licensed b-roll fetched by `npm run stock`: scene.stockFile = cache file listed in episodes/<id>/stock.json (and present in assets/stock-cache). */
+export function withStock(ep: Episode, dir: string): Episode {
+  const items = readStock(dir).items.filter(i => /^stock-cache\/[A-Za-z0-9._-]+$/.test(i.file) && fs.existsSync(`${ROOT}assets/${i.file}`));
+  return items.length ? {...ep, scenes: ep.scenes.map((s, i) => { const it = items.find(x => x.scene === i); return it ? {...s, stockFile: it.file} : s; }) as Episode['scenes']} : ep;
 }
 
 /**
@@ -57,7 +64,7 @@ export function withArt(ep: Episode, dir: string): {episode: Episode; publicDir:
 export async function render(idArg: string, mode: 'preview' | 'final') {
   const ep0 = loadEpisode(idArg);
   const dir = episodeDir(ep0.id);
-  const {episode: ep, publicDir, cleanup} = withArt(ep0, dir);
+  const {episode: ep, publicDir, cleanup} = withArt(withStock(ep0, dir), dir);
   const timings: Timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
   const decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8')) as EpisodeDecisions;
   const assets = loadCharacterAssets();

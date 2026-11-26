@@ -1,0 +1,82 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import {openverse, pexels, pixabay, wikimedia, type Fetcher, type Query, type StockHit} from './providers.js';
+
+const ROOT = new URL('../../', import.meta.url).pathname;
+export const CACHE_DIR = `${ROOT}assets/stock-cache/`;
+type Env = Record<string, string | undefined>;
+export type Format = 'short' | 'wide';
+
+// finance b-roll should not show faces, logos, brands or text: such hits rank last (never silently dropped, a result beats none)
+const AVOID = /\b(person|people|man|woman|men|women|girl|boy|child|portrait|face|selfie|logo|brand|sign|text|poster|banner|screenshot|advert\w*)\b/i;
+
+/** Rank hits: right orientation, enough pixels, no faces/logos/text, then bigger. Hits below the minimum size are dropped. */
+export function rank(hits: StockHit[], a: Query, format: Format): StockHit[] {
+  const minW = format === 'short' ? 720 : 1280, minH = format === 'short' ? 1280 : 720;
+  return hits
+    .filter(h => h.url && (!h.width || !h.height || (h.width >= minW * 0.9 && h.height >= minH * 0.9)))
+    .map(h => ({h, s: ((h.height >= h.width) === (a.orientation === 'portrait') ? 2 : 0) + (AVOID.test(`${h.title} ${h.tags ?? ''}`) ? -3 : 1) + Math.min(1, (h.width * h.height) / (minW * minH * 2))}))
+    .sort((x, y) => y.s - x.s).map(x => x.h);
+}
+
+/** Provider registry, in order of preference. Adding a source = one file exporting `(fetcher, query, env) => StockHit[]` plus one line here.
+ *  Keyless defaults (Openverse, Wikimedia Commons) work with no setup; Pixabay (PIXABAY_API_KEY) is the better optional source; Pexels only when a key already exists. */
+export const PROVIDERS: {name: string; needsKey?: string; search: (f: Fetcher, a: Query, env: Env) => Promise<StockHit[]>}[] = [
+  {name: 'pixabay', needsKey: 'PIXABAY_API_KEY', search: pixabay},
+  {name: 'openverse', search: (f, a) => openverse(f, a)},
+  {name: 'wikimedia', search: (f, a) => wikimedia(f, a)},
+  {name: 'pexels', needsKey: 'PEXELS_API_KEY', search: pexels},
+];
+
+export type Fetched = {file: string; hit: StockHit};
+/** Best licensed match for one query. Provider order: Pexels, Pixabay (when keyed), then Openverse, Wikimedia Commons. Downloads once into assets/stock-cache/<sha1>.<ext>. */
+export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string}): Promise<Fetched | null> {
+  const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR;
+  const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
+  for (const kinds of o.kind === 'video' ? [a, {...a, kind: 'photo' as const}] : [a]) { // a video query falls back to a photo when no keyed provider has one
+    for (const p of PROVIDERS) {
+      if (p.needsKey && !env[p.needsKey]) continue;
+      const t = () => p.search(f, kinds, env);
+      let hits: StockHit[] = [];
+      try { hits = await t(); } catch { continue; } // a provider being down is never an error
+      for (const hit of rank(hits, kinds, o.format).slice(0, 3)) {
+        const ext = (/\.(jpe?g|png|webp|mp4)(\?|$)/i.exec(hit.url)?.[1] ?? (hit.kind === 'video' ? 'mp4' : 'jpg')).toLowerCase().replace('jpeg', 'jpg');
+        const file = path.join(dir, `${crypto.createHash('sha1').update(hit.url).digest('hex').slice(0, 20)}.${ext}`);
+        if (!fs.existsSync(file)) {
+          try {
+            const r = await f(hit.url, {signal: AbortSignal.timeout(60000)});
+            if (!r.ok) continue;
+            fs.mkdirSync(dir, {recursive: true});
+            fs.writeFileSync(`${file}.part`, Buffer.from(await r.arrayBuffer()));
+            fs.renameSync(`${file}.part`, file);
+          } catch { continue; }
+        }
+        return {file, hit};
+      }
+    }
+  }
+  return null;
+}
+
+export type StockRecord = {scene: number; query: string; file: string; provider: string; pageUrl: string; author: string; license: string; title: string; kind: string};
+/** Credit lines for the video description: one per distinct source that needs or deserves attribution. */
+export function creditLines(items: StockRecord[]): string[] {
+  const seen = new Set<string>();
+  return items.flatMap(i => { const l = `${i.title ? `"${i.title.slice(0, 60)}" ` : ''}by ${i.author} (${i.license}) ${i.pageUrl}`; return seen.has(l) ? [] : (seen.add(l), [l]); });
+}
+
+/** Fetch stock for every scene with `stock`, write episodes/<id>/stock.json and return the records. */
+export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void} = {}): Promise<StockRecord[]> {
+  const items: StockRecord[] = [];
+  for (const [i, s] of scenes.entries()) {
+    if (!s.stock) continue;
+    const got = await fetchStock({query: s.stock.query, kind: s.stock.kind, format, ...o});
+    if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
+    items.push({scene: i, query: s.stock.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind});
+  }
+  fs.writeFileSync(path.join(epDir, 'stock.json'), JSON.stringify({items, credits: creditLines(items)}, null, 2));
+  return items;
+}
+
+export const readStock = (epDir: string): {items: StockRecord[]; credits: string[]} => { try { return JSON.parse(fs.readFileSync(path.join(epDir, 'stock.json'), 'utf8')); } catch { return {items: [], credits: []}; } };
