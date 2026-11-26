@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {episodeDir, loadEpisode} from '../../src/schema.js';
+import {checkShots} from '../../src/draft/storyboard.js';
+import {SCORE_FAIL_BELOW, scoreScript} from '../../src/draft/score.js';
 import {planShots} from '../../src/fullbleed/shots.js';
 import {buildPhrases} from '../../src/fx/captions.js';
 import {activeRmsDb} from '../../src/pipeline/audio.js';
@@ -172,8 +174,11 @@ export function qa(id: string, fileArg?: string) {
   });
   add('frames @10/30/50/70/90%', !bad.length, bad.length ? bad.join('; ') : short ? 'not blank, captions visible (Shorts lower third)' : 'not blank, margins clear, captions visible', `size ${probe.join('x')}`);
 
+  const script = scoreScript(ep);
+  add('script score', script.total >= SCORE_FAIL_BELOW, `${script.total}/100 (${script.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`, `>= ${SCORE_FAIL_BELOW}`);
+  if (ep.scenes.some(s => s.shot)) { const se = checkShots(ep); add('storyboard', !se.length, se.length ? se.slice(0, 3).join('; ') : 'subjects vary, actions vary, numbers from the script'); }
   const ok = checks.every(c => c.ok);
-  const report = {id: ep.id, file, at: new Date().toISOString(), ok, checks, loudness: L, pauses: P};
+  const report = {id: ep.id, file, at: new Date().toISOString(), ok, checks, loudness: L, pauses: P, script};
   fs.writeFileSync(`${b}qa.json`, JSON.stringify(report, null, 2));
   return report;
 }

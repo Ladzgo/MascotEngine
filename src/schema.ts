@@ -28,6 +28,8 @@ const Overrides = {
   /** Injected by render.ts from stock.json (public-dir relative). Never written by hand. */
   stockFile: z.string().regex(/^stock-cache\/[A-Za-z0-9._-]+$/).optional(),
   visuals: z.array(z.object({kind: z.string().min(1).max(24), at: z.string().max(40).optional()})).max(4).optional(),
+  /** Storyboard spec written by src/draft/storyboard.ts: what the picture for this beat shows. subject is a fullbleed object kind; the renderer may use any field, none is required. */
+  shot: z.object({subject: z.string().min(1).max(24), action: z.string().min(1).max(16), setting: z.string().max(40).optional(), label: z.string().max(40).optional(), number: z.union([z.number(), z.string().max(24)]).optional(), mood: z.string().max(12).optional(), camera: z.string().max(16).optional()}).optional(),
   visual: z.object({kind: VisualKind, label: z.string().max(40).optional()}).optional(),
 };
 
@@ -90,6 +92,8 @@ export const Episode = z.object({
   format: z.enum(['wide', 'short']).default('wide'),
   /** paper = hand-drawn paper + mascot; fullbleed = layered full-frame scenes with continuous camera, no mascot. */
   look: z.enum(['paper', 'fullbleed']).default('paper'),
+  /** Narrative device the script was written with (src/draft/story.ts); used to avoid repeating it in the next episodes. */
+  device: z.string().max(24).optional(),
 });
 export type Episode = z.infer<typeof Episode>;
 

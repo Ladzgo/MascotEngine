@@ -22,6 +22,12 @@ export const HU_SLOP: [RegExp, string][] = [
   [/(?<![\p{L}])végszóként\s*,?\s*/giu, ''],
   [/(?<![\p{L}])kapaszkodj meg\s*,?\s*/giu, ''],
   [/(?<![\p{L}])játékot? megváltoztató(?![\p{L}])/giu, 'nagy fordulat'],
+  [/(?<![\p{L}])(?:íme|lássuk csak)\s*,?\s*/giu, ''],
+  [/(?<![\p{L}])fontos (?:megjegyezni|tudni),? hogy\s*/giu, ''],
+  [/(?<![\p{L}])mint (?:tudjuk|köztudott)\s*,?\s*/giu, ''],
+  [/(?<![\p{L}])(?:képzeld el|képzeljük el),? hogy\s*/giu, ''],
+  [/(?<![\p{L}])a (?:lényeg|helyzet) az(?:,)? hogy\s*/giu, ''],
+  [/(?<![\p{L}])egyszóval\s*,?\s*/giu, ''],
   [/(?<![\p{L}])nincs több (?:teketória|vesztegetni való idő)\s*,?\s*/giu, ''],
 ];
 /** Hungarian advice/guarantee wording, blocked like the English list. */

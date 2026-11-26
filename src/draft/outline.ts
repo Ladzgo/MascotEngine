@@ -5,6 +5,7 @@ import {FB_FOR, FB_KINDS} from '../fullbleed/objects.js';
 import {HU_SHAPE_EXAMPLE, LANG_RULES, isHu} from './lang.js';
 import {spokenNumbers} from './lint.js';
 import {styleGaps} from './critic.js';
+import {deviceById, extraNumbers, pickDevice, pickHook, recentDevices, type Device} from './story.js';
 
 type Sc = Episode['scenes'][number];
 const wc = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
@@ -16,6 +17,8 @@ export type Outline = {
   twist: string; recap: string; cta: string;
   /** results of calc expressions that did not check out; numbers equal to these are never allowed in narration */
   badResults: number[];
+  /** story engine: device id and its device-specific facts (character, myth/truth, simulation start, ...) */
+  device?: string; extras?: unknown;
 };
 
 /** Evaluate +-*x/() arithmetic only; anything else is rejected (no eval of model text). */
@@ -45,7 +48,7 @@ export function parseOutline(raw: any, lenient = false, minSections = 4): {outli
     }
     return {heading: s(x?.heading), point: s(x?.point), fact: s(x?.fact), numbers: nums, ...(calc ? {calc} : {})};
   }).filter((x: {heading: string; fact: string}) => x.heading && x.fact);
-  const o = {title: s(raw.title), sources, hook: s(raw.hook), stakes: s(raw.stakes), sections, twist: s(raw.twist), recap: s(raw.recap), cta: s(raw.cta), badResults};
+  const o = {title: s(raw.title), sources, hook: s(raw.hook), stakes: s(raw.stakes), sections, twist: s(raw.twist), recap: s(raw.recap), cta: s(raw.cta), badResults, ...(raw.extras && typeof raw.extras === 'object' ? {extras: raw.extras} : {})};
   if (!o.title || !o.hook || !o.twist || !o.recap || !o.cta || !o.stakes) errors.push('title, hook, stakes, twist, recap and cta are all required, non-empty strings.');
   if (wc(o.hook) > 15) errors.push(`hook has ${wc(o.hook)} words; 15 or fewer.`);
   if (sections.length < minSections) errors.push(`Only ${sections.length} usable sections (each needs heading and fact); write ${minSections} to 6.`);
@@ -58,6 +61,7 @@ export function allowedNumbers(o: Outline): number[] {
   const bad = o.badResults;
   const addText = (t: string) => spokenNumbers(t).filter(n => !bad.some(b => near(n, b, 0.001))).forEach(n => base.add(n));
   [o.title, o.hook, o.stakes, o.twist, o.recap, o.cta].forEach(addText);
+  extraNumbers(o.extras).filter(n => !bad.some(b => near(n, b, 0.001))).forEach(n => base.add(n));
   for (const x of o.sections) { addText(`${x.heading} ${x.point} ${x.fact}`); x.numbers.forEach(n => base.add(n)); if (x.calc) base.add(x.calc.result); }
   const b = [...base].filter(n => n > 0 && n < 1e13).slice(0, 40), all = new Set(b);
   for (const x of b) for (const y of b) { all.add(x + y); all.add(Math.abs(x - y)); all.add(x * y); all.add(x * y / 100); all.add(x / 100); if (y) all.add(x / y); if (x) all.add(y / x); all.add(x * 12); all.add(x / 12); }
@@ -78,8 +82,8 @@ const OUTLINE_SHAPE = `{"title": string, "sources": [real URLs of official stati
  "sections": [{"heading": "3-6 words", "point": "the one idea of this section", "fact": "ONE concrete number or worked example with named amounts, e.g. a 20,000 dollar loan at 6 percent over 60 months", "numbers": [every number used in fact, as plain numbers], "calc": {"expr": "plain arithmetic using those numbers, e.g. 20000*0.06", "result": the number it gives}}  (4 to 6 sections; calc only when the fact derives a number)],
  "twist": "the catch or myth-bust", "recap": "one line", "cta": "one line, follow the channel"}`;
 
-export async function draftOutline(o: {short?: boolean; client: Client; topic: string; angle?: string; voice: string; channelContext?: string; lang?: string; model?: string; log?: (m: string) => void}): Promise<Outline> {
-  const system = `You plan explainer YouTube videos.${o.channelContext ? `\n\nChannel profile:\n${o.channelContext}` : ''}${isHu(o.lang) ? `\n\n${LANG_RULES.hu}` : ''}\n\nVoice guide:\n${o.voice}\n\nOutput ONLY one JSON object (no prose, no code fences): ${OUTLINE_SHAPE}\nRules: use only facts you are sure about; never invent URLs or statistics; do the arithmetic carefully, every derived number needs a calc. No guarantees, no advice.`;
+export async function draftOutline(o: {device?: Device; short?: boolean; client: Client; topic: string; angle?: string; voice: string; channelContext?: string; lang?: string; model?: string; log?: (m: string) => void}): Promise<Outline> {
+  const system = `You plan explainer YouTube videos.${o.channelContext ? `\n\nChannel profile:\n${o.channelContext}` : ''}${isHu(o.lang) ? `\n\n${LANG_RULES.hu}` : ''}\n\nVoice guide:\n${o.voice}\n\nOutput ONLY one JSON object (no prose, no code fences): ${OUTLINE_SHAPE}${o.device ? `\nAlso add the key "extras": ${o.device.extras}.\n\nNARRATIVE DEVICE (${o.device.name}): ${o.device.plan}` : ''}\nRules: use only facts you are sure about; never invent URLs or statistics; do the arithmetic carefully, every derived number needs a calc. No guarantees, no advice.`;
   const messages: {role: 'user' | 'assistant'; content: string}[] = [{role: 'user', content: `Topic: ${o.topic}${o.angle ? `\nAngle: ${o.angle}` : ''}\n${o.short ? 'Plan a 40 second vertical Short: hook, stakes, exactly 3 sections (each with one concrete number or worked example), a twist, a recap, a call to action. Keep every field short.' : 'Plan a 4 minute video: hook, stakes, 4 to 6 sections (each with one concrete number or worked example), a twist, a recap, a call to action.'}`}];
   let errors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -95,14 +99,15 @@ export async function draftOutline(o: {short?: boolean; client: Client; topic: s
   throw new Error(`Outline failed after 3 tries:\n- ${errors.join('\n- ')}`);
 }
 
-export type Part = {key: string; label: string; brief: string; min: number; max: number; facts: string; minWords?: number; maxBeat?: number; feature?: string; /** number a big_number can land on (calc result or the section's last number) */ focus?: number; unit?: string};
+export type Part = {key: string; label: string; brief: string; min: number; max: number; facts: string; minWords?: number; maxBeat?: number; /** hook text the closing must echo */ callback?: string; feature?: string; /** number a big_number can land on (calc result or the section's last number) */ focus?: number; unit?: string};
 /** Split the outline into the parts that are expanded one LLM call each. Feature scene types rotate so the whole video has variety. */
-export function planParts(o: Outline, short = false): Part[] {
+export function planParts(o: Outline, short = false, device?: Device): Part[] {
   const FEATURES = ['big_number', 'compare', 'list', 'timeline', 'before_after', 'checklist', 'stats'];
   const parts: Part[] = [{key: 'opening', label: 'Hook and stakes', min: 3, max: 4, feature: 'big_number', facts: `Hook (first beat, a title scene, 15 words max): ${o.hook}\nStakes: ${o.stakes}`, brief: 'beat 1 is the hook (type title). Then 2 or 3 beats on the stakes.'}];
-  o.sections.forEach((x, i) => parts.push({key: `s${i + 1}`, label: x.heading, min: 3, max: 5, feature: FEATURES[(i + 1) % FEATURES.length], focus: x.calc?.result ?? x.numbers.at(-1), facts: `Section "${x.heading}"\nIdea: ${x.point}\nFact: ${x.fact}${x.calc ? `\nArithmetic: ${x.calc.expr} = ${x.calc.result}` : ''}`, brief: 'explain the idea, then land the fact with the exact numbers, then say what it means for the viewer.'}));
+  o.sections.forEach((x, i) => parts.push({key: `s${i + 1}`, label: x.heading, min: 3, max: 5, feature: FEATURES[(i + 1) % FEATURES.length], focus: x.calc?.result ?? x.numbers.at(-1), facts: `Section "${x.heading}"\nIdea: ${x.point}\nFact: ${x.fact}${x.calc ? `\nArithmetic: ${x.calc.expr} = ${x.calc.result}` : ''}`, brief: device ? `${device.roles[i % device.roles.length]}. Land the fact with its exact numbers.` : 'explain the idea, then land the fact with the exact numbers, then say what it means for the viewer.'}));
   parts.push({key: 'twist', label: 'The catch', min: 2, max: 4, feature: 'compare', facts: `Twist: ${o.twist}`, brief: 'start with a short turn ("but" is fine here), then explain the catch concretely.'});
-  parts.push({key: 'closing', label: 'Recap and call to action', min: 2, max: 3, facts: `Recap: ${o.recap}\nCall to action: ${o.cta}`, brief: 'a one-line recap (a checklist scene is good), then the call to action as the very last beat.'});
+  if (device && parts[0]) { parts[0].brief = `${device.opening} ${parts[0].brief}`; if (o.extras) parts[0].facts += `\nStory facts (use these exact names and numbers): ${JSON.stringify(o.extras)}`; }
+  parts.push({key: 'closing', label: 'Recap and call to action', min: 2, max: 3, facts: `Recap: ${o.recap}\nCall to action: ${o.cta}`, brief: `a one-line recap (a checklist scene is good), then the call to action as the very last beat.${device ? ` The last beat must call back to the opening line ("${o.hook}") by reusing one of its key words, so the loop closes.` : ''}`, callback: o.hook});
   if (short) return parts.filter(p => p.key !== 'twist' || o.twist).map(p => ({...p, min: 2, max: p.key === 'opening' ? 3 : 2, minWords: p.key === 'closing' ? 12 : 16, maxBeat: 14, feature: p.key === 'opening' || p.key === 'closing' ? undefined : p.feature, brief: `${p.brief} Shorts pacing: every beat is ONE short sentence of 6 to 14 words (about 3 seconds spoken).`}));
   return parts;
 }
@@ -118,6 +123,9 @@ emotion is one of: ${EMOTIONS.join(', ')}.
 Visual kinds (optional "visual":{"kind":K} on talk, list and checklist beats): ${VISUAL_KINDS.join(', ')}.
 Output ONLY one JSON object, every beat WITH its "type" field, e.g. {"beats":[{"type":"talk","emotion":"explaining","narration":"...","emphasis":["key word"],"visual":{"kind":"coins"}},{"type":"compare","emotion":"thinking","narration":"...","left":{"title":"A","value":"x"},"right":{"title":"B","value":"y"}}]}. Each beat is ONE visual moment: 1 or 2 short spoken sentences, 12 to 28 words, a fresh image or a plain fact, vary sentence length. Narration is spoken text: spell numbers out naturally. Use ONLY the numbers given in the facts (or plain arithmetic on them); never invent a number, name or statistic. Never repeat a phrase or metaphor from the lines already used. No filler openers ("so", "well", "basically"), no guarantees, no advice.${short ? ` SHORTS MODE: the video is a vertical Short of 30 to 55 seconds with full-screen pictures and no host. Every beat is ONE sentence of 6 to 14 words and MUST carry \"visuals\":[{\"kind\":K,\"at\":\"a word from the beat\"}] with 1 or 2 entries: K is the object that appears on screen, one of ${FB_KINDS.join(', ')}; at = the spoken word that brings that object in (omit at for the first entry). Neighbouring beats use different objects.` : ''}`;
 
+const STOP = new Set(['that', 'this', 'with', 'your', 'from', 'they', 'have', 'what', 'when', 'will', 'about', 'than', 'then', 'into', 'were', 'been', 'does', 'more', 'most', 'every']);
+export const keyWords = (t: string) => [...new Set(t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 4 && !STOP.has(w) && !/^\d/.test(w)))];
+
 /** Section-level check: what the model must fix before the beats are accepted. */
 export function checkPart(beats: Sc[], p: Part, allowed: number[]): string[] {
   const errs: string[] = [];
@@ -131,6 +139,7 @@ export function checkPart(beats: Sc[], p: Part, allowed: number[]): string[] {
   const total = beats.reduce((a, b) => a + wc(b.narration), 0);
   const need = p.minWords ?? p.min * 14;
   if (total < need) errs.push(`only ${total} words in total; this part needs at least ${need}, so write fuller beats.`);
+  if (p.callback && beats.length) { const kw = keyWords(p.callback), last = beats.slice(-2).map(b => b.narration.toLowerCase()).join(' '); if (kw.length && !kw.some(w => last.includes(w))) errs.push(`the closing must call back to the opening line ("${p.callback}"): reuse one of ${kw.slice(0, 4).join(', ')} in the last two beats.`); }
   if (p.key === 'opening' && beats[0] && wc(beats[0].narration) > 15) errs.push('beat 1 (the hook) must be 15 words or fewer.');
   return errs;
 }
@@ -206,10 +215,17 @@ export async function expandPart(o: {client: Client; part: Part; system: string;
 /** Outline first, then one call per part; assembled, validated with the usual guards. Returns the episode (and the outline for tests/logs). */
 export async function draftByOutline(o: {
   client: Client; topic: string; id: string; angle?: string; voice: string; model?: string; channel?: string; channelContext?: string; lang?: string; stats?: DraftStats;
-  short?: boolean; log?: (m: string) => void; progress?: (done: number, total: number, label: string) => void;
+  short?: boolean; device?: string; epsRoot?: string; log?: (m: string) => void; progress?: (done: number, total: number, label: string) => void;
 }): Promise<Episode> {
-  const outline = await draftOutline({short: o.short, client: o.client, topic: o.topic, angle: o.angle, voice: o.voice, channelContext: o.channelContext, lang: o.lang, model: o.model, log: o.log});
-  const parts = planParts(outline, o.short), allowed = allowedNumbers(outline), system = beatSystem(o.voice, o.channelContext, o.lang, o.short) + langNote(o.lang);
+  const device = o.device === 'none' ? undefined : pickDevice(o.topic, o.epsRoot ? recentDevices(o.epsRoot) : [], o.device);
+  if (device) o.log?.(`story device: ${device.name}`);
+  const outline = await draftOutline({device, short: o.short, client: o.client, topic: o.topic, angle: o.angle, voice: o.voice, channelContext: o.channelContext, lang: o.lang, model: o.model, log: o.log});
+  if (device) {
+    outline.device = device.id;
+    const okH = (h: string) => unsupportedNumbers(h, allowedNumbers(outline)).length === 0;
+    outline.hook = await pickHook({client: o.client, topic: o.topic, outlineHook: outline.hook, stakes: outline.stakes, device, lang: o.lang, model: o.model, allowedOk: okH, log: o.log});
+  }
+  const parts = planParts(outline, o.short, device), allowed = allowedNumbers(outline), system = beatSystem(o.voice, o.channelContext, o.lang, o.short) + langNote(o.lang);
   const scenes: Sc[] = [];
   o.progress?.(0, parts.length, 'Outline ready');
   for (const [i, part] of parts.entries()) {
@@ -221,7 +237,7 @@ export async function draftByOutline(o: {
     o.progress?.(i + 1, parts.length, part.label);
   }
   scenes[0] = {type: 'title', emotion: scenes[0].emotion, narration: scenes[0].narration} as Sc;
-  const raw = {...(o.short ? {format: 'short', look: 'fullbleed'} : {}), id: o.id, title: outline.title, series: 'money-myths', seed: 0, disclaimer: true, sources: outline.sources, scenes};
+  const raw = {...(o.short ? {format: 'short', look: 'fullbleed'} : {}), ...(device ? {device: device.id} : {}), id: o.id, title: outline.title, series: 'money-myths', seed: 0, disclaimer: true, sources: outline.sources, scenes};
   const {ep, errors} = validate(JSON.stringify(raw), o.id, o.channel, o.stats);
   if (!ep) throw new Error(`Outline draft failed validation:\n- ${errors.join('\n- ')}`);
   const gaps = styleGaps(ep);

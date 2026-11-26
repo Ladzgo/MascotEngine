@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Episode} from '../schema.js';
+import {checkShots, repairShots} from './storyboard.js';
+import {scoreScript} from './score.js';
+import {DEVICES, extraNumbers, hookHeuristic, pickDevice} from './story.js';
+
+const sc = (narration: string, extra: object = {}) => ({type: 'talk', emotion: 'explaining', narration, emphasis: [], ...extra});
+const mk = (n: string[]) => Episode.parse({id: 't', title: 't', series: 's', seed: 0, format: 'short', look: 'fullbleed', scenes: n.map(x => sc(x))});
+
+test('pickDevice avoids recent devices and is deterministic per topic', () => {
+  const recent = DEVICES.slice(0, 3).map(d => d.id);
+  const d = pickDevice('credit cards', recent);
+  assert.ok(!recent.includes(d.id)); assert.equal(pickDevice('credit cards', recent).id, d.id);
+  assert.equal(pickDevice('x', [], 'simulation').id, 'simulation');
+  assert.equal(new Set(DEVICES.map(x => x.id)).size, DEVICES.length);
+});
+test('extraNumbers reads numbers from fields and text', () => {
+  assert.deepEqual(extraNumbers({name: 'Anna', age: 28, numbers: [4200], situation: 'owes $1,500 on a card'}).sort((a, b) => a - b), [28, 1500, 4200]);
+});
+test('hook heuristic likes short, numeric, concrete lines', () => {
+  assert.ok(hookHeuristic('Anna, 28, owes $4,200 on one card.') > hookHeuristic('Did you know that finance is really very important to everyone today?'));
+});
+test('storyboard repair: subjects not repeated within 5 beats, 4+ actions, invented numbers dropped', () => {
+  const ep = mk(['You owe a loan on your car.', 'The loan costs twelve thousand dollars.', 'Your car loses value fast.', 'A loan again, and the car keeps costing you.', 'Interest is the loan on top of the loan.', 'Your car payment is five hundred dollars.', 'The car is worth less each year.', 'Check the loan before you sign.']);
+  const out = repairShots(ep, {1: {subject: 'debt_counter', action: 'counts', number: 12000}, 2: {subject: 'car', action: 'counts', number: 999}});
+  assert.deepEqual(checkShots(out), []);
+  assert.equal(out.scenes[2].shot!.number, undefined);
+});
+test('script score: stock phrases and flat lines score lower than a concrete conversational script', () => {
+  const good = ['Anna, 28, owes $4,200 on one card.', "She's paying $85 a month and it barely moves.", "Here's why: 22 percent interest eats $77 of it.", 'Twelve months later she owes $4,100.', "You'd think that's progress. It isn't.", "So you're stuck unless you pay more.", 'Check your own card, because Anna did.'];
+  const bad = ["In today's fast-paced world, money matters.", 'It is important to note that interest exists.', 'Let us delve into the topic of finance.', 'Basically the economy is complex and varied.', 'Well, banks do things with money.', 'In conclusion, finance is a game-changer.'];
+  assert.ok(scoreScript(mk(good)).total > scoreScript(mk(bad)).total + 20);
+});
