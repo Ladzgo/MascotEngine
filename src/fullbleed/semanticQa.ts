@@ -46,11 +46,11 @@ const model = arg('model') ?? process.env.VLM_MODEL ?? 'qwen2.5vl:7b', host = (p
 async function waitForFreeOllama(maxMs = 600000): Promise<boolean> {
   for (const t0 = Date.now(); Date.now() - t0 < maxMs; await new Promise(r => setTimeout(r, 10000))) {
     try { const ps = await (await fetch(`${host}/api/ps`, {signal: AbortSignal.timeout(5000)})).json() as {models?: {name: string}[]}; if (!(ps.models ?? []).some(m => m.name !== model)) return true; } catch { return true; } // no /api/ps: just try
-    console.error('ollama busy with another model, waiting...');
   }
   return false;
 }
-if (!(await waitForFreeOllama())) { console.error(`semantic QA ${ep.id}: busy (another model stayed loaded for 10 min), no result written`); process.exit(3); }
+// every call also takes the shared data/ollama.lock, so calls never overlap; this short wait only lets another job's model unload first (keep_alive 30s)
+if (!(await waitForFreeOllama(90000))) console.error('another model still loaded after 90 s; continuing under the shared Ollama lock');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semqa-'));
 
 export type Item = {scene: number; sentence: string; score: number; shown: string; reason: string};
