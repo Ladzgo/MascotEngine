@@ -16,6 +16,6 @@ if (fs.existsSync(`${episodeDir(from)}audio`)) fs.cpSync(`${episodeDir(from)}aud
 const client = await requireClient(m => { console.error(m); process.exit(2); });
 const bare = Episode.parse({...src, id: to, scenes: src.scenes.map(({shot, stock, stockFile, visuals, visual, ...s}: any) => s)});
 const out = await storyboard(client, bare, {model: process.env.DRAFT_MODEL, log: m => console.log(m)});
-fs.writeFileSync(`${dst}episode.json`, JSON.stringify(out, null, 2));
+fs.writeFileSync(`${dst}episode.json`, JSON.stringify(out, null, 2), {flag: 'wx'}); // wx: never clobber a concurrent writer
 const n = out.scenes.length, st = out.scenes.filter(s => s.stock).length;
 console.log(`${to}: ${n} beats, ${st} with stock (${Math.round(100 * st / n)}%), ${new Set(out.scenes.map(s => s.shot?.subject)).size} distinct subjects`);
