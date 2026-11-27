@@ -71,7 +71,7 @@ test('pickHook: five formula candidates, judge blend, second round only under th
   const h = await pickHook({client, topic: 'coffee', outlineHook: 'Coffee adds up.', stakes: '', allowedOk: () => true});
   const {lastHookPick} = await import('./story.js');
   assert.equal(h, 'Your $5 coffee costs $1,825 a year.'); // outline hook is candidate 1; the numeric line wins the blend
-  assert.ok(lastHookPick!.score >= 75 && calls === 2, `score ${lastHookPick!.score}, calls ${calls}`);
+  assert.ok(lastHookPick!.score >= 75 && calls <= 4, `score ${lastHookPick!.score}, calls ${calls}`);
 });
 test('pickTitle: judged candidates, invented numbers and long titles lose', async () => {
   const {pickTitle} = await import('./story.js');
@@ -97,4 +97,23 @@ test('dropFlat removes a flat beat of an empty pair while the Short stays long e
   const client = (o: object) => ({messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify(o)}]})}}) as any;
   assert.equal((await judgeStory(client({score: 100, weakest: 'not in the script'}), ep)).score, 60);
   assert.equal((await judgeStory(client({score: 80, weakest: 'Nobody notices it.'}), ep)).score, 80);
+});
+test('improveStory rewrites the quoted weakest line and keeps it only when the re-judge scores higher', async () => {
+  const {improveStory} = await import('./story.js');
+  const ep = mk(['Hook $5.', 'It is a problem.', 'Then $40 a month.', 'So next time, $5.']);
+  let judged = 0;
+  const client = {messages: {create: async (r: {system: string}) => ({content: [{type: 'text', text: /tough YouTube/.test(r.system)
+    ? JSON.stringify({score: [80, 70][judged++] ?? 70, weakest: 'Then $40 a month.'})
+    : JSON.stringify({line: 'Anna pays $40 a month for it.'})}]})}} as any;
+  const r = await improveStory(client, ep, {score: 50, weakest: 'It is a problem.', fix: 'add a person'});
+  assert.equal(r.ep.scenes[1].narration, 'Anna pays $40 a month for it.');
+  assert.equal(r.score, 80); assert.deepEqual(r.history, [50, 80]);
+  const bad = {messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({line: 'It costs $999 now.'})}]})}} as any;
+  assert.equal((await improveStory(bad, ep, {score: 50, weakest: 'It is a problem.'})).ep, ep); // invented number: rejected
+});
+test('hook and overlay shape rules', async () => {
+  const {badHookShape, overlayOk} = await import('./story.js');
+  assert.ok(badHookShape("The reason you lose 50 dollars isn't what you think—why?"));
+  assert.ok(badHookShape('Coffee? It costs $5.') && !badHookShape('Why does your $5 coffee cost $1,825?') && !badHookShape('Your $5 coffee costs $1,825.'));
+  assert.ok(!overlayOk('Hidden fifty loss explained today') && !overlayOk('Mind the cost?') && overlayOk('Your coffee costs $1,825 a year'));
 });

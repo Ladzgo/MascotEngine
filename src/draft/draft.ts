@@ -273,3 +273,17 @@ export async function tightenLong(client: Client, ep: Episode, o: {model?: strin
     return {...ep, scenes: scenes as Episode['scenes']};
   } catch (e) { o.log?.(`tighten skipped (${(e as Error).message.slice(0, 60)})`); return ep; }
 }
+
+const FINANCE = /money|financ|budget|debt|loan|credit|invest|saving|price|cost|tax|bank|interest|bill|income|pay|salary|mortgage|inflation|grocer|spend|cash|fee|rent|retire|stock|fund/i;
+/** Does the topic belong to the channel? Shared content words with its niche/description, or money words on a finance channel. */
+export function topicFitsChannel(topic: string, ch: {niche?: string; description?: string}): boolean {
+  const words = (t: string) => new Set(t.toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 4));
+  const tw = words(topic), cw = words(`${ch.niche ?? ''} ${ch.description ?? ''}`);
+  return [...tw].some(w => cw.has(w)) || (/financ|money/i.test(ch.niche ?? '') && FINANCE.test(topic));
+}
+/** "Follow Money Myths" on a battery video: a CTA naming the channel is kept only when the topic fits it, else it becomes topic-neutral. */
+export function fixCta(ep: Episode, channelName: string, fits: boolean): Episode {
+  if (fits || !channelName) return ep;
+  const name = new RegExp(channelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  return {...ep, scenes: ep.scenes.map(s => name.test(s.narration) ? {...s, narration: /follow|subscribe/i.test(s.narration) ? 'Follow for more plain answers like this.' : s.narration.replace(name, 'this channel')} : s) as Episode['scenes']};
+}

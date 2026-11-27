@@ -119,3 +119,12 @@ test('tightenLong joins two rewrite entries with the same index', async () => {
   const ep = {id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'short', scenes: [mk('Hook.'), mk('A quick nap could help you find it faster provided you stop grogginess.'), mk('End.')]} as any;
   assert.equal((await tightenLong(client, ep, {est: s => s.narration.split(' ').length / 2})).scenes[1].narration, 'A quick nap helps. You find it faster.');
 });
+test('CTA: the channel name stays only when the topic fits the channel', async () => {
+  const {fixCta, topicFitsChannel} = await import('./draft.js');
+  const ch = {niche: 'personal finance', description: 'Short explainers that debunk personal finance myths'};
+  assert.ok(topicFitsChannel('why your grocery bill keeps going up', ch) && !topicFitsChannel('why phone batteries die in the cold', ch));
+  const mk = (n: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration: n});
+  const ep = {scenes: [mk('Hook.'), mk('Follow Money Myths for more myths busted.'), mk('So keep it warm.')]} as any;
+  assert.equal(fixCta(ep, 'Money Myths', false).scenes[1].narration, 'Follow for more plain answers like this.');
+  assert.equal(fixCta(ep, 'Money Myths', true), ep);
+});

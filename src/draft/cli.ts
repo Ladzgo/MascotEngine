@@ -4,7 +4,7 @@ import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
 import {splitBeats} from './beats.js';
-import {closeLoop, concreteGaps, dropFlat, fillConcrete, judgeStory, lastHookPick, pickTitle} from './story.js';
+import {closeLoop, concreteGaps, dropFlat, fillConcrete, improveStory, judgeStory, lastHookPick, pickTitle} from './story.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
@@ -13,7 +13,7 @@ import {draftByOutline} from './outline.js';
 import {rewriteWeak, scoreScript, SCORE_REWRITE_BELOW} from './score.js';
 import {storyboard} from './storyboard.js';
 import {estSec, fitDuration, SCENE_PAD, spreadVisuals} from '../director/shortsPro.js';
-import {addScenes, tightenLong, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
+import {addScenes, fixCta, topicFitsChannel, tightenLong, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
 const {values, positionals} = parseArgs({
@@ -29,8 +29,8 @@ if (!topic || !id) die('Usage: npm run draft -- "<topic>" --id <episode-id> [--c
 if (!/^[a-z0-9-]+$/.test(id)) die('Episode id must match [a-z0-9-]+');
 
 const channelId = values.channel ?? DEFAULT_CHANNEL_ID;
-let ctx: string, lang = 'en';
-try { const chan = loadChannel(channelId); ctx = channelContext(chan); lang = chan.language; } catch (e) { die((e as Error).message); }
+let ctx: string, lang = 'en', chanName = '', fits = true;
+try { const chan = loadChannel(channelId); ctx = channelContext(chan); lang = chan.language; chanName = chan.name; fits = topicFitsChannel(topic, chan); } catch (e) { die((e as Error).message); }
 const voice = loadVoice(path.join(root, 'docs/VOICE.md'));
 if (values.dry) {
   console.log(buildSystem(voice, ctx, lang) + '\n\n---\n' + buildUser(topic, id, values.angle));
@@ -82,9 +82,14 @@ try {
   if (storyOn && !values['no-rewrite'] && concreteGaps(ep.scenes.map(s => s.narration)).length) ep = await fillConcrete(client, ep, {model, log, maxWords: values.short ? 12 : 20});
   if (values.short && concreteGaps(ep.scenes.map(s => s.narration)).length) { const d = dropFlat(ep, estSec); if (d.dropped) { log(`concrete: ${d.dropped} flat beats dropped`); ep = d.ep; } }
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  ep = fixCta(ep, chanName, fits); // never "Follow Money Myths" on a battery video
   const titled = storyOn ? await pickTitle(client, ep, {model, log}) : {title: ep.title, score: 0};
   ep = {...ep, title: titled.title};
-  const story = storyOn ? await judgeStory(client, ep, model) : {score: 0};
+  const story0 = storyOn ? await judgeStory(client, ep, model) : {score: 0};
+  // the judge quotes its weakest line: rewrite that line by its note, re-judge, keep only a gain (2 rounds)
+  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28}) : {ep, score: story0.score, history: [story0.score]};
+  ep = improved.ep;
+  const story = {...story0, score: improved.score, history: improved.history};
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
   const sc = scoreScript(ep);
   console.log(`DRAFT_NOTE script score ${sc.total}/100 (${sc.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`);

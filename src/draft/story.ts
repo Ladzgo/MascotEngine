@@ -142,7 +142,7 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
       cands = (Array.isArray(j.hooks) ? j.hooks : []).map(x => typeof x === 'string' ? {h: x} : {h: String((x as {line?: unknown}).line ?? ''), formula: String((x as {formula?: unknown}).formula ?? '') || undefined, overlay: String((x as {overlay?: unknown}).overlay ?? '') || undefined}).map(c => ({...c, h: c.h.trim()})).filter(c => c.h);
     } catch (e) { o.log?.(`hook candidates failed (${(e as Error).message.slice(0, 60)})`); }
     if (round === 0) cands.unshift({h: o.outlineHook});
-    cands = cands.filter((c, i, a) => wcount(c.h) <= 14 && !/[=+→<>|]/.test(c.h) && o.allowedOk(c.h) && !fullName(c.h) && !pool.some(p => p.h === c.h) && a.findIndex(x => x.h === c.h) === i);
+    cands = cands.filter((c, i, a) => wcount(c.h) <= 14 && !/[=+→<>|]/.test(c.h) && !badHookShape(c.h) && o.allowedOk(c.h) && !fullName(c.h) && !pool.some(p => p.h === c.h) && a.findIndex(x => x.h === c.h) === i);
     tried += cands.length;
     if (cands.length) { const s = await judgeHooks(o.client, cands.map(c => c.h), o.model); pool.push(...cands.map((c, i) => ({...c, s: s[i]}))); }
     pool.sort((a, b) => b.s - a.s);
@@ -150,11 +150,34 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
     if (pool[0]) bar = `\nThe best line so far scored ${pool[0].s}/100: "${pool[0].h}". Write 5 sharper lines that beat it: more specific, shorter, a clearer open question.`;
   }
   const best = pool[0] ?? {h: o.outlineHook, s: 0};
-  // the overlay must stand alone for muted viewers: 4-7 words, no question-only fragments like "Mind the cost?"
-  const overlay = best.overlay && wcount(best.overlay) >= 4 && wcount(best.overlay) <= 7 ? best.overlay : undefined;
+  const overlay = await makeOverlay(o.client, best.h, best.overlay, o.model);
   lastHookPick = {hook: best.h, score: best.s, formula: best.formula, overlay, tried};
   o.log?.(`hook chosen from ${tried} (${best.formula ?? 'outline'}, ${best.s}/100${best.s < HOOK_TARGET ? `, under ${HOOK_TARGET}` : ''}): "${best.h}"`);
   return best.h;
+}
+
+/** "...isn't what you think—why?", "Coffee? Costs?": a dangling question tacked on, or a question mark mid-line. */
+export const badHookShape = (h: string) => /[—–-]\s*\w{1,8}\?\s*$/.test(h) || /\?\s*\S/.test(h.trim()) || /\?\s*\?/.test(h);
+/** Overlay rules: 4-7 words, no filler tags ("explained", "today", "revealed"), no bare number word glued to a noun ("fifty loss"), no trailing question fragment. */
+export const overlayOk = (t: string) => {
+  const w = wcount(t);
+  return w >= 4 && w <= 7 && !/\b(explained|today|revealed|here'?s why|must see|shocking)\b/i.test(t) && !/\b(one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|hundred|thousand)\s+(loss|gain|cost|fee|drop|rise)\b/i.test(t) && !badHookShape(t) && !/\?$/.test(t);
+};
+/** 5-7 word on-screen line for muted viewers: the hook candidate's own overlay plus 3 fresh ones, rule-checked, then judged for grammar and sense (>= 7/10). */
+export async function makeOverlay(client: Client, hook: string, own: string | undefined, model?: string): Promise<string | undefined> {
+  let cands = own ? [own] : [];
+  try {
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'You write the on-screen text for the first second of a vertical Short. Each is a complete, grammatical phrase of 4 to 7 words that says the same promise as the spoken line in different words, e.g. "Your coffee costs $1,825 a year". No filler like "explained" or "today", no question marks. Output ONLY JSON: {"overlays": [3 strings]}', messages: [{role: 'user', content: `Spoken line: ${hook}`}]}))) as {overlays?: unknown};
+    cands.push(...(Array.isArray(j.overlays) ? j.overlays.map(x => String(x).trim()) : []));
+  } catch { /* own only */ }
+  cands = [...new Set(cands.map(c => c.replace(/[.!]+$/, '')))].filter(overlayOk);
+  if (!cands.length) return undefined;
+  try {
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 200, system: 'Score each on-screen phrase 0-10: grammatical English a native speaker would write (5), and it makes sense on its own without the audio (5). Output ONLY JSON: {"scores": [numbers, same order]}', messages: [{role: 'user', content: cands.map((c, i) => `${i + 1}. ${c}`).join('\n')}]}))) as {scores?: unknown};
+    const sc = Array.isArray(j.scores) && j.scores.length === cands.length ? j.scores.map(Number) : cands.map(() => 7);
+    const best = cands.map((c, i) => ({c, s: sc[i] || 0})).sort((a, b) => b.s - a.s)[0];
+    return best.s >= 7 ? best.c : undefined;
+  } catch { return cands[0]; }
 }
 
 // first names the concreteness check accepts at a sentence start (elsewhere any capitalised word counts as a name)
@@ -262,4 +285,28 @@ export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, m
     scenes = scenes.filter((_, k) => k !== cand); dropped++;
   }
   return {ep: {...ep, scenes: scenes as Episode['scenes']}, dropped};
+}
+
+/** Rewrites the beat the story judge quoted as weakest, following its fix; kept only when a re-judge scores higher. Numbers must already be in the script. */
+export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
+  let cur = ep, j = first;
+  const history = [first.score];
+  for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75) && j.weakest; r++) {
+    const narr = cur.scenes.map(s => s.narration), key = j.weakest.replace(/^"|"$/g, '').slice(0, 25);
+    const idx = narr.findIndex((l, i) => i > 0 && l.includes(key));
+    if (idx < 0) break;
+    const heard = narr.flatMap(spokenNumbers), max = o.maxWords ?? 14;
+    try {
+      const res = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 400, system: `You fix one line of a spoken vertical Short so the story gets better. Follow the editor's note. One or two short spoken sentences, ${max} words or fewer, plain words, it must fit between the line before and the line after. Use only numbers already in the script (${[...new Set(heard)].join(', ') || 'none'}); no new figures, no real person's full name. Output ONLY JSON: {"line": string}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? 'make this line concrete and surprising'}\nBefore: ${narr[idx - 1] ?? ''}\nLINE TO REWRITE: ${narr[idx]}\nAfter: ${narr[idx + 1] ?? ''}`}]}))) as {line?: unknown};
+      const line = String(res.line ?? '').trim();
+      if (!line || wcount(line) > max || !spokenNumbers(line).every(n => heard.includes(n)) || slopHits(line).length || fullName(line)) { o.log?.(`story: rewrite of beat ${idx + 1} rejected: ${line}`); break; }
+      const next = {...cur, scenes: cur.scenes.map((s, i) => i === idx ? {...s, narration: line} : s) as Episode['scenes']};
+      const nj = await judgeStory(client, next, o.model);
+      history.push(nj.score);
+      o.log?.(`story: beat ${idx + 1} "${narr[idx]}" -> "${line}" (${j.score} -> ${nj.score})`);
+      if (nj.score <= j.score) break;
+      cur = next; j = nj;
+    } catch (e) { o.log?.(`story rewrite skipped (${(e as Error).message.slice(0, 60)})`); break; }
+  }
+  return {ep: cur, score: j.score, history};
 }
