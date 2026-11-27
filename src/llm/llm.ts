@@ -183,10 +183,14 @@ async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages
   let res: Response | undefined;
   for (const model of models) {
     const body = JSON.stringify({model, temperature: 0.6, max_tokens: 4096, ...(json ? {response_format: {type: 'json_object'}} : {}), messages: [{role: 'system', content: system}, ...messages]});
-    for (let attempt = 0; attempt < 2; attempt++) {
+    // Groq's free tier allows ~8k tokens per MINUTE per model: most 429s clear in seconds (retry-after), only a "per day" one means the quota is spent
+    for (let attempt = 0; attempt < 4; attempt++) {
       res = await fetch(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`}, body, signal: AbortSignal.timeout(120000)});
-      if (res.status !== 429) break;
-      if (attempt === 0) await sleep(Number(env.LLM_RETRY_MS ?? 5000));
+      if (res.status !== 429 || attempt === 3) break;
+      const daily = /per day|\b(?:TPD|RPD)\b/i.test(await res.clone().text().catch(() => ''));
+      if (daily) break;
+      const after = Number(res.headers.get('retry-after'));
+      await sleep(env.LLM_RETRY_MS ? Number(env.LLM_RETRY_MS) : Math.min(60, after > 0 ? after + 1 : 5 * (attempt + 1)) * 1000);
     }
     if (res!.status !== 429) break; // 429 on this model: its quota is used up, try the next one
   }
