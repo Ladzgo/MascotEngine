@@ -43,6 +43,8 @@ const SCALE_W: Record<string, number> = {hundred: 100, thousand: 1000, million: 
 const NUM_RUN = new RegExp(`\\b(?:a\\s+(?=(?:hundred|thousand|million|billion)\\b))?(?:(?:${[...Object.keys(NUM_W), ...Object.keys(SCALE_W)].join('|')})(?:[\\s-]+(?:and[\\s-]+)?(?=(?:${[...Object.keys(NUM_W), ...Object.keys(SCALE_W)].join('|')})\\b))?)+\\b(\\s+(?:dollars?|bucks|percent)\\b)?`, 'gi');
 /** English number words as numerals ("eighteen hundred dollars" = "$1,800") so captions, labels and grounding see digits; TTS spells them out again. Small bare counts ("ten years") stay words. */
 export function numeralize(text: string): string {
+  // "two point five million" -> "2.5 million" first; the run matcher below would read only "five million" and leave "two point 5,000,000"
+  text = text.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\s+point\s+(zero|one|two|three|four|five|six|seven|eight|nine)\b(\s+(?:million|billion|thousand))?/gi, (_m, a: string, b: string, sc?: string) => `${NUM_W[a.toLowerCase()]}.${NUM_W[b.toLowerCase()]}${sc ? `_${sc.trim()}` : ''}`); // '_' (a word char) hides the scale word from the run matcher's \b; restored below
   return text.replace(NUM_RUN, (m: string, unit?: string) => {
     const words = m.slice(0, unit ? m.length - unit.length : m.length).toLowerCase().split(/[\s-]+/).filter(w => w !== 'and');
     // "one two three" is a list, not a number: a word-number may only follow a tens word ("twenty five") or a scale
@@ -58,7 +60,7 @@ export function numeralize(text: string): string {
     if (!u && n < 100) return m;
     const f = n.toLocaleString('en-US');
     return u === 'percent' ? `${f}%` : u ? `$${f}` : f;
-  });
+  }).replace(/(\d\.\d)_(million|billion|thousand)\b/gi, '$1 $2');
 }
 
 export function autoFixEpisode(ep: Episode): Episode {

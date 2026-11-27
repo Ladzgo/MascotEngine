@@ -117,3 +117,8 @@ test('fixClosing: a closing that is one "But..." sentence loses the turn word in
   assert.equal(out.scenes[1].narration, 'Rent control keeps tenants in place.');
   assert.ok(!closingContradiction(out.scenes[1].narration));
 });
+test('numeralize: "two point five million" becomes 2.5 million, never "two point 5,000,000"', async () => {
+  const {numeralize} = await import('./lint.js');
+  assert.equal(numeralize('Two point five million rivets hold them.'), '2.5 million rivets hold them.');
+  assert.equal(numeralize('It is eleven point eight psi.'), 'It is eleven point eight psi.'); // tens+ words are left for the speech layer
+});
