@@ -333,7 +333,7 @@ const LoopBackdrop: React.FC<{file: string; w: number; h: number; pal: [string, 
   return (
     <div style={{position: 'absolute', inset: 0, background: pal[2]}}>
       <OffthreadVideo src={staticFile(file)} muted style={{position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', filter: `${grade} brightness(0.78)`}} />
-      <div style={{position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0) 30%, rgba(0,0,0,0.25) 62%, ${pal[2]}ee 100%)`}} />
+      <div style={{position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0) 30%, rgba(0,0,0,0.22) 62%, ${pal[2]}aa 100%)`}} />
     </div>
   );
 };
@@ -443,7 +443,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
                   );
                 })}
                 {sl.main && ac.overlay && (() => { const os = Math.min(size, w * 0.9); return <div style={{position: 'absolute', left: sx0 - os / 2, top: sy0 - os / 2, width: os, height: os, opacity: 1 - out}}><ActionOverlay kind={ac.overlay} u={lt} size={os} /></div>; })()} {/* the overlay box stays inside the frame: on a full-size hero (1242 px box) the check badge sat off the right edge (ep016) */}
-                <svg viewBox="0 0 400 400" width={size} height={size} style={{position: 'absolute', left: sx0 - size / 2, top: sy0 - size / 2 + bob + 0.65 * size, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5) * 0.22, transform: `scaleY(-1) scale(${over})`, WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', maskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', filter: 'blur(2px)', pointerEvents: 'none'}}>
+                <svg viewBox="0 0 400 400" width={size} height={size} style={{position: 'absolute', left: sx0 - size / 2, top: sy0 - size / 2 + bob + 0.65 * size, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5) * (tall ? 0.36 : 0.22), transform: `scaleY(-1) scale(${over})`, WebkitMaskImage: `linear-gradient(to top, #000 0%, transparent ${tall ? 68 : 52}%)`, maskImage: `linear-gradient(to top, #000 0%, transparent ${tall ? 68 : 52}%)`, filter: 'blur(2px)', pointerEvents: 'none'}}>
                   {isChart && scene.type === 'chart' && sl.main ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={lt} /> : <O t={lt} accent={accent} value={undefined} />}
                 </svg>
                 {sl.main && <div style={{position: 'absolute', inset: 0, opacity: 1 - out}}><Particles t={lt} w={w} h={h} cx={sx0} cy={sy0} money={MONEY.has(sl.kind)} accent={accent} seed={index * 7 + i} /></div>}
