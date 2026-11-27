@@ -205,6 +205,8 @@ export function concrete(t: string): boolean {
   return false;
 }
 /** Beat pairs (i, i+1) from beat 1 on where neither beat carries a number or a name: "a number or a name in every 2nd beat". Returns i. */
+/** The line names an everyday first-name person ("Alex visits a casino..."). */
+export const namesPerson = (t: string) => [...t.matchAll(/\b[A-Z][a-z]{2,}\b/g)].some(m => FIRST_NAMES.has(m[0].toLowerCase()));
 export function concreteGaps(narr: string[]): number[] {
   const out: number[] = [];
   for (let i = 1; i + 1 < narr.length; i += 2) if (!concrete(narr[i]) && !concrete(narr[i + 1])) out.push(i);
@@ -331,8 +333,10 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
       const same = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) === b.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
       if (lines.length > narr.length - 2 && same(lines[0], narr[0])) lines.shift();
       if (lines.length > narr.length - 2 && same(lines.at(-1)!, narr.at(-1)!)) lines.pop();
-      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : !nameOk(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
-      const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
+      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : !nameOk(l) ? 'full name' : cur.scenes[k + 1]?.type !== 'talk' && spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
+      // talk lines may hand their number to a neighbour (the person needs a line of setup; sd-roulette retell died on "lost its number"); data beats keep theirs, and no number may vanish
+      const said = new Set(lines.flatMap(spokenNumbers)), gone = narr.slice(1, -1).flatMap(spokenNumbers).filter(x => !said.has(x));
+      const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : gone.length ? `dropped ${gone.slice(0, 3).join(', ')}` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
       const ok = !why;
       if (ok) {
         const next = {...cur, scenes: cur.scenes.map((s, i) => i > 0 && i < narr.length - 1 ? {...s, narration: lines[i - 1]} : s) as Episode['scenes']}, nj = await judgeStory(client, next, o.model);
