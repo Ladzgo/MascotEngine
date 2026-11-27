@@ -125,6 +125,8 @@ export async function render(idArg: string, mode: 'preview' | 'final') {
     for (const f of fs.readdirSync(cdir)) if (f.endsWith('.mp4') && !keep.has(f)) fs.rmSync(`${cdir}${f}`, {force: true});
   }
 
+  // Remotion leaves every bundle in the OS temp dir (26 GB of 1.6 GB copies had piled up here); the video is done with it
+  if (/remotion-webpack-bundle-/.test(bundled)) fs.rmSync(bundled, {recursive: true, force: true});
   const totalSec = totalFrames / fps;
   const wav = await mixAudio(dir, ep, decisions, timings, totalSec);
 
