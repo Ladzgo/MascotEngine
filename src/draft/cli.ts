@@ -77,7 +77,7 @@ try {
   const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
   let ep = fit.ep;
   for (let round = 0; round < 2 && !values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW; round++) { const next = await rewriteWeak(client, ep, {model, lang, log}); if (next === ep) break; ep = next; } // up to 2 rounds while under 75
-  if (storyOn && !values['no-rewrite'] && concreteGaps(ep.scenes.map(s => s.narration)).length) ep = await fillConcrete(client, ep, {model, log, maxWords: values.short ? 12 : 20, name: ep.scenes.map(s => s.narration.match(/\b(Anna|Alex|Ben|Clara|David|Emma|Jack|Kate|Leo|Mia|Noah|Sam|Sarah|Tom|Maria|Lisa|John|Mike|Jane)\b/)?.[1]).find(Boolean)});
+  if (storyOn && !values['no-rewrite'] && concreteGaps(ep.scenes.map(s => s.narration)).length) ep = await fillConcrete(client, ep, {model, log, maxWords: values.short ? 12 : 20});
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const titled = storyOn ? await pickTitle(client, ep, {model, log}) : {title: ep.title, score: 0};
   ep = {...ep, title: titled.title};

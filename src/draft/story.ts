@@ -173,21 +173,25 @@ export function concreteGaps(narr: string[]): number[] {
   return out;
 }
 
-/** Rewrites one talk beat per gap so it carries a number the script already says or an example person's first name; kept per line only when valid. */
-export async function fillConcrete(client: Client, ep: Episode, o: {model?: string; name?: string; maxWords?: number; log?: (m: string) => void}): Promise<Episode> {
+/** Rewrites one talk beat per gap so it carries a figure (number + unit) the script already says; kept per line only when valid. */
+export async function fillConcrete(client: Client, ep: Episode, o: {model?: string; maxWords?: number; log?: (m: string) => void}): Promise<Episode> {
   const narr = ep.scenes.map(s => s.narration), gaps = concreteGaps(narr);
   const targets = gaps.map(i => [i + 1, i].find(k => k < narr.length - 2 && ep.scenes[k].type === 'talk' && !/follow|subscribe|channel/i.test(narr[k]))).filter((k): k is number => k !== undefined); // never the CTA or the closing line ("Follow Sam for more" happened)
   if (!targets.length) return ep;
-  const heard = [...new Set(narr.flatMap(spokenNumbers))], name = o.name ?? 'Sam', max = o.maxWords ?? 14;
+  // only a figure WITH its unit, copied from the script ("80%", "$5", "0 degrees"): bare numbers and forced names read as nonsense ("It's 2 physics", "Sam's chemistry")
+  const figures = [...new Set(narr.join(' ').match(/\$\d[\d,.]*(?:\s?(?:k|million|billion))?|\d[\d,.]*\s?(?:%|percent|degrees|°[CF]|dollars|hours|minutes|years|days|months|weeks|times)/gi) ?? [])];
+  if (!figures.length) return ep;
+  const max = o.maxWords ?? 14;
   try {
-    const r = await client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: `You edit lines of a spoken explainer script. Rewrite each numbered line so it carries something concrete: either one of these numbers already used in the script (${heard.join(', ') || 'none'}) or the example person ${name} by first name. Keep the meaning and the flow, plain spoken, contractions are fine, ${max} words or fewer. Never add any other number. Output ONLY JSON: {"rewrites": [{"i": number, "narration": string}]}`, messages: [{role: 'user', content: targets.map(i => `${i}: ${narr[i]}\n(before: ${narr[i - 1]})`).join('\n')}]});
+    const r = await client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: `You edit lines of a spoken explainer script. Rewrite each numbered line so it naturally carries one of these figures from the script, copied exactly: ${figures.join(', ')}. The sentence must make sense on its own and fit the line before it. Plain spoken, contractions are fine, ${max} words or fewer. No other numbers. If no figure fits naturally, return the line unchanged. Output ONLY JSON: {"rewrites": [{"i": number, "narration": string}]}`, messages: [{role: 'user', content: targets.map(i => `${i}: ${narr[i]}\n(before: ${narr[i - 1]})`).join('\n')}]});
     const j = extractJson(text(r)) as {rewrites?: {i: number; narration: string}[]};
     const scenes = ep.scenes.map(s => ({...s}));
     let n = 0;
     for (const w of j.rewrites ?? []) {
       if (!targets.includes(w.i) || typeof w.narration !== 'string') continue;
       const t = w.narration.trim();
-      const why = wcount(t) > max ? `${wcount(t)} words` : !concrete(t) ? 'still no number or name' : !spokenNumbers(t).every(x => heard.includes(x)) ? 'new number' : slopHits(t).length ? 'stock phrase' : '';
+      if (t === narr[w.i]) continue;
+      const why = wcount(t) > max ? `${wcount(t)} words` : !figures.some(f => t.includes(f)) ? 'no script figure' : !spokenNumbers(t).every(x => spokenNumbers(narr.join(' ')).includes(x)) ? 'new number' : slopHits(t).length ? 'stock phrase' : '';
       if (why) { o.log?.(`concrete: beat ${w.i + 1} rewrite rejected (${why}): ${t}`); continue; }
       scenes[w.i].narration = t; n++;
     }
