@@ -13,7 +13,7 @@ import {draftByOutline} from './outline.js';
 import {rewriteWeak, scoreScript, SCORE_REWRITE_BELOW} from './score.js';
 import {storyboard} from './storyboard.js';
 import {estSec, fitDuration, SCENE_PAD, spreadVisuals} from '../director/shortsPro.js';
-import {addScenes, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
+import {addScenes, tightenLong, expandThin, punchUpHook, draftEpisode, loadVoice, buildSystem, buildUser, writeDraft, MODEL} from './draft.js';
 
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
 const {values, positionals} = parseArgs({
@@ -69,7 +69,9 @@ try {
   const padded = values.short && secs(closed) < 40 ? await addScenes(client, closed, {model, lang, log, minWords: closed.scenes.reduce((n, s) => n + s.narration.split(/\s+/).length, 0) + Math.round((46 - secs(closed)) * 2.3), max: 3, before: 2}) : closed;
   if (padded !== closed) log(`short length: est ${secs(closed).toFixed(1)} s -> ${secs(padded).toFixed(1)} s`);
   const split = splitBeats(padded, values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
-  const spread = values.short ? spreadVisuals(split) : {ep: split, fixed: 0};
+  // a data or talk beat over ~5 s ("3000 mAh ... 600 mAh at zero degrees" read 7.4 s) becomes two sentences, then splits again
+  const tight = values.short ? splitBeats(await tightenLong(client, split, {model, est: estSec, log}), {max: 11, clauses: true}) : split;
+  const spread = values.short ? spreadVisuals(tight) : {ep: tight, fixed: 0};
   const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
   let ep = fit.ep;
   for (let round = 0; round < 2 && !values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW; round++) { const next = await rewriteWeak(client, ep, {model, lang, log}); if (next === ep) break; ep = next; } // up to 2 rounds while under 75
@@ -81,7 +83,7 @@ try {
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
   const sc = scoreScript(ep);
   console.log(`DRAFT_NOTE script score ${sc.total}/100 (${sc.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`);
-  if (fit.dropped) console.log(`DRAFT_NOTE ${fit.dropped} beats dropped to fit a 52 s Short`);
+  if (fit.dropped) console.log(`DRAFT_NOTE ${fit.dropped} beats dropped to fit a 50 s (est.) Short`);
   if (spread.fixed) console.log(`DRAFT_NOTE ${spread.fixed} repeated visual kinds changed`);
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);

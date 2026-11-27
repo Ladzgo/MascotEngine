@@ -102,3 +102,13 @@ test('splitBeats never cuts a decimal number ("4.8%") as a sentence end', async 
   const out = splitBeats(ep, {max: 7, clauses: true}).scenes.map(s => s.narration);
   assert.ok(out.includes('At 32°F it drops 4.8% and more.'), out.join(' | '));
 });
+
+test('tightenLong: long Short beats become two sentences only when every number survives', async () => {
+  const {tightenLong} = await import('./draft.js');
+  const client = {messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({rewrites: [{i: 1, narration: 'A 3000 mAh phone. It loses 600 at zero.'}, {i: 2, narration: 'Short. And new 99.'}]})}]})}} as any;
+  const mk = (n: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration: n});
+  const ep = {id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'short', scenes: [mk('Hook.'), mk('Measurements show a 3000 mAh phone loses 600 mAh at zero degrees.'), mk('A long line with 5 things said in a very slow and winding way here.')]} as any;
+  const out = await tightenLong(client, ep, {est: s => s.narration.split(' ').length / 2});
+  assert.equal(out.scenes[1].narration, 'A 3000 mAh phone. It loses 600 at zero.');
+  assert.equal(out.scenes[2].narration, ep.scenes[2].narration); // 99 is a new number: rejected
+});

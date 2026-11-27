@@ -250,3 +250,22 @@ export async function addScenes(client: Client, ep: Episode, o: {model?: string;
   }
   return {...ep, scenes: scenes as Episode['scenes']};
 }
+
+/** Shorts: a beat that takes longer than `maxSec` to say (estimate) is rewritten as two short sentences with the same numbers, then split by the caller. */
+export async function tightenLong(client: Client, ep: Episode, o: {model?: string; maxSec?: number; est: (s: {narration: string}) => number; log?: (m: string) => void}): Promise<Episode> {
+  const max = o.maxSec ?? 4.8, long = ep.scenes.map((s, i) => ({s, i})).filter(({s, i}) => i > 0 && o.est(s) > max);
+  if (!long.length) return ep;
+  try {
+    const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: 'You tighten lines of a spoken vertical Short. Rewrite each numbered line as TWO short spoken sentences of 4 to 9 words each, same facts, every number kept exactly as written, no new numbers, units in plain words people say. Output ONLY JSON: {"rewrites": [{"i": number, "narration": string}]}', messages: [{role: 'user', content: long.map(({s, i}) => `${i}: ${s.narration}`).join('\n')}]});
+    const j = extractJson(res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('')) as {rewrites?: {i: number; narration: string}[]};
+    const scenes = [...ep.scenes];
+    let n = 0;
+    for (const w of j.rewrites ?? []) {
+      const s = scenes[w.i]; if (!s || !long.some(l => l.i === w.i) || typeof w.narration !== 'string') continue;
+      const t = w.narration.trim(), same = spokenNumbers(t).sort().join() === spokenNumbers(s.narration).sort().join();
+      if (same && (t.match(/[.!?](\s|$)/g) ?? []).length >= 2) { scenes[w.i] = {...s, narration: t} as Episode['scenes'][number]; n++; }
+    }
+    o.log?.(`${long.length} beats over ${max} s, ${n} tightened`);
+    return {...ep, scenes: scenes as Episode['scenes']};
+  } catch (e) { o.log?.(`tighten skipped (${(e as Error).message.slice(0, 60)})`); return ep; }
+}
