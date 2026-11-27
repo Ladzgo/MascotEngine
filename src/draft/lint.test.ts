@@ -102,3 +102,11 @@ test('schema keeps hookOverlay up to 7 words and drops longer ones without faili
   assert.equal(Episode.parse({...base, hookOverlay: 'one two three four five six seven eight'}).hookOverlay, undefined);
   assert.equal(Episode.parse(base).hookOverlay, undefined);
 });
+
+test('autoFix merges talk runs AFTER grounding, so demoted big_numbers cannot leave a run of 7', async () => {
+  const {autoFixEpisode, talkRuns} = await import('./lint.js');
+  const t = (n: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration: n});
+  const scenes = [t('Hook here.'), t('One a.'), t('Two b.'), t('Three c.'), {type: 'big_number', emotion: 'neutral', emphasis: [], narration: 'Big rise.', value: 999}, t('Four d.'), t('Five e.'), t('Six f.'), t('Seven g.'), t('End.')];
+  const out = autoFixEpisode({id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'wide', look: 'paper', scenes} as any);
+  assert.equal(talkRuns(out.scenes).length, 0);
+});
