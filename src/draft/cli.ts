@@ -90,7 +90,7 @@ try {
   for (const n of criticNotes(ep)) console.log(`DRAFT_WARN ${n}`);
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);
-  const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted, ...(lastHookPick?.overlay ? {hookOverlay: lastHookPick.overlay} : {})} as typeof ep); // 5-7 word on-screen line for muted viewers (renderer: beat 1)
+  const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted, ...(lastHookPick?.overlay ? {hookOverlay: lastHookPick.overlay} : {})}); // 5-7 word on-screen line for muted viewers (renderer: beat 1)
   fs.writeFileSync(path.join(path.dirname(file), 'script-score.json'), JSON.stringify({...sc, hook: lastHookPick, story, title: titled, concreteGaps: concreteGaps(ep.scenes.map(s => s.narration))}, null, 2));
   if (Object.keys(flags.notes).length) fs.writeFileSync(path.join(path.dirname(file), 'notes.json'), JSON.stringify({notes: flags.notes}, null, 2));
   for (const n of Object.values(flags.notes).flat()) console.log(`DRAFT_WARN ${n}`);

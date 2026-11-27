@@ -94,6 +94,8 @@ export const Episode = z.object({
   look: z.enum(['paper', 'fullbleed']).default('paper'),
   /** Narrative device the script was written with (src/draft/story.ts); used to avoid repeating it in the next episodes. */
   device: z.string().max(24).optional(),
+  /** 5-7 word on-screen line for muted viewers, drawn on beat 1 (src/draft/story.ts pickHook). Longer than 7 words is dropped, never a load error. */
+  hookOverlay: z.preprocess(v => typeof v === 'string' && v.trim() && v.trim().split(/\s+/).length <= 7 ? v.trim() : undefined, z.string().optional()),
 });
 export type Episode = z.infer<typeof Episode>;
 

@@ -94,3 +94,11 @@ test('numeralize leaves word lists alone', async () => {
   const {numeralize} = await import('./lint.js');
   assert.equal(numeralize('One two three four five six seven.'), 'One two three four five six seven.');
 });
+
+test('schema keeps hookOverlay up to 7 words and drops longer ones without failing the load', async () => {
+  const {Episode} = await import('../schema.js');
+  const base = {id: 'x', title: 't', scenes: [{type: 'title', narration: 'Hi.', emotion: 'neutral'}]};
+  assert.equal(Episode.parse({...base, hookOverlay: 'Stop charging in freezing temps'}).hookOverlay, 'Stop charging in freezing temps');
+  assert.equal(Episode.parse({...base, hookOverlay: 'one two three four five six seven eight'}).hookOverlay, undefined);
+  assert.equal(Episode.parse(base).hookOverlay, undefined);
+});
