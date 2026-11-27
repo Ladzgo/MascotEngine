@@ -95,3 +95,10 @@ test('addScenes inserts before the closing scene, rejects new numbers', async ()
   assert.equal(out.scenes[2].narration.startsWith('Think of a grocery'), true);
   assert.equal(out.scenes[3].narration, 'So keep it simple.');
 });
+
+test('splitBeats never cuts a decimal number ("4.8%") as a sentence end', async () => {
+  const {splitBeats} = await import('./beats.js');
+  const ep = {id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'short', look: 'fullbleed', scenes: [{type: 'title', narration: 'Hook 5.', emotion: 'neutral', emphasis: []}, {type: 'talk', narration: 'At 32°F it drops 4.8% and more. So yes, it is a lot.', emotion: 'neutral', emphasis: []}, {type: 'talk', narration: 'End.', emotion: 'neutral', emphasis: []}]} as any;
+  const out = splitBeats(ep, {max: 7, clauses: true}).scenes.map(s => s.narration);
+  assert.ok(out.includes('At 32°F it drops 4.8% and more.'), out.join(' | '));
+});

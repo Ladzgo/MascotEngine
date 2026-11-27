@@ -15,7 +15,7 @@ export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {
   const last = ep.scenes.length - 1;
   const out: Sc[] = [];
   ep.scenes.forEach((s, i) => {
-    const real = s.narration.match(/[^.!?]+[.!?]+["')]*|[^.!?]+$/g)?.map(x => x.trim()).filter(Boolean) ?? [];
+    const real = s.narration.match(/(?:[^.!?]|\.(?=\d))+[.!?]+["')]*|(?:[^.!?]|\.(?=\d))+$/g)?.map(x => x.trim()).filter(Boolean) ?? []; // "4.8%" is not a sentence end
     let sents = real;
     // shorts-pro: a sentence longer than the cap is cut after a comma/semicolon near its middle
     if (o.clauses) sents = sents.flatMap(x => {

@@ -185,11 +185,15 @@ const keyWords = (t: string) => t.toLowerCase().replace(/[^a-z\s]/g, ' ').split(
 export async function closeLoop(o: {client: Client; hook: string; topic: string; lang?: string; model?: string; log?: (m: string) => void}): Promise<string | null> {
   if (isHu(o.lang)) return null; // shortcut: English only (the product is English-only now), Hungarian keeps the stock closer
   const hookKeys = keyWords(o.hook);
+  if (!hookKeys.length) return null;
   try {
-    const r = await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 300, system: 'You write the last spoken line of a short explainer video. 12 words or fewer, plain spoken English, starts with "So" or "Next time", reuses one key word from the opening line so the video loops, lands the one thing to remember. No advice or guarantee wording, no new numbers, no "follow" or "subscribe". Output ONLY JSON: {"lines": [3 different lines]}', messages: [{role: 'user', content: `Topic: ${o.topic}\nOpening line: ${o.hook}`}]});
-    const j = extractJson(r.content.filter(c => c.type === 'text').map(c => (c as {text?: string}).text ?? '').join('')) as {lines?: unknown};
-    const ok = (Array.isArray(j.lines) ? j.lines : []).map(x => String(x).trim()).find(l => wcount(l) <= 14 && !/\d/.test(l) && !slopHits(l).length && !/follow|subscribe/i.test(l) && keyWords(l).some(w => hookKeys.includes(w)));
-    o.log?.(ok ? `closing line loops to the hook: "${ok}"` : 'no closing line reused the hook; keeping the stock closer');
-    return ok ?? null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await o.client.messages.create({model: o.model ?? MODEL, max_tokens: 300, system: `You write the last spoken line of a short explainer video. One complete, grammatical sentence of 6 to 12 words, plain spoken English, starting with "So" or "Next time". It MUST contain one of these words from the opening line, so the video loops: ${hookKeys.join(', ')}. It lands the one thing to remember. No advice or guarantee wording, no numbers, no "follow" or "subscribe". Output ONLY JSON: {"lines": [3 different lines]}`, messages: [{role: 'user', content: `Topic: ${o.topic}\nOpening line: ${o.hook}`}]});
+      const j = extractJson(r.content.filter(c => c.type === 'text').map(c => (c as {text?: string}).text ?? '').join('')) as {lines?: unknown};
+      const ok = (Array.isArray(j.lines) ? j.lines : []).map(x => String(x).trim()).find(l => wcount(l) >= 5 && wcount(l) <= 14 && !/\d/.test(l) && !slopHits(l).length && !/follow|subscribe/i.test(l) && keyWords(l).some(w => hookKeys.includes(w)));
+      if (ok) { o.log?.(`closing line loops to the hook: "${ok}"`); return ok; }
+    }
+    o.log?.('no closing line reused the hook; keeping the stock closer');
+    return null;
   } catch (e) { o.log?.(`closing line skipped (${(e as Error).message.slice(0, 60)})`); return null; }
 }
