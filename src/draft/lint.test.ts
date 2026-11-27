@@ -117,6 +117,14 @@ test('fixClosing: a closing that is one "But..." sentence loses the turn word in
   assert.equal(out.scenes[1].narration, 'Rent control keeps tenants in place.');
   assert.ok(!closingContradiction(out.scenes[1].narration));
 });
+test('numeralize: paired amounts and years; times stay words', async () => {
+  const {numeralize} = await import('./lint.js');
+  assert.equal(numeralize('That is eighteen twenty-five dollars a year.'), 'That is $1,825 a year.');
+  assert.equal(numeralize('Back in nineteen eighty-four.'), 'Back in 1984.');
+  assert.equal(numeralize('Meet at eleven thirty.'), 'Meet at eleven thirty.');
+  assert.equal(numeralize('You could spend one thousand eight hundred twenty five dollars a year.'), 'You could spend $1,825 a year.');
+});
+
 test('numeralize: "two point five million" becomes 2.5 million, never "two point 5,000,000"', async () => {
   const {numeralize} = await import('./lint.js');
   assert.equal(numeralize('Two point five million rivets hold them.'), '2.5 million rivets hold them.');

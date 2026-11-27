@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import fs from 'node:fs';
+import {numeralize} from './pipeline/speech';
 
 export const Emotion = z.enum([
   'neutral', 'smug', 'worried', 'shocked', 'happy', 'excited', 'thinking',
@@ -109,7 +110,9 @@ export function loadEpisode(idOrPrefix: string): Episode {
     fs.readdirSync(root).find(d => d.startsWith(idOrPrefix));
   if (!match) throw new Error(`Episode not found: ${idOrPrefix}`);
   const raw = JSON.parse(fs.readFileSync(`${root}${match}/episode.json`, 'utf8'));
-  const ep = Episode.parse(raw);
+  const parsed = Episode.parse(raw);
+  // every later step (TTS, captions, labels, QA) sees digits even when a rewrite or an old file left "twenty five dollars" spelled out
+  const ep = {...parsed, scenes: parsed.scenes.map(s => ({...s, narration: numeralize(s.narration)})) as Episode['scenes']};
   // Numbers shown on screen must come from the file: sanity-check big_number values.
   for (const [i, s] of ep.scenes.entries()) {
     if (s.type === 'big_number' && !Number.isFinite(s.value)) {

@@ -9,7 +9,7 @@ import {closeLoop, concreteGaps, dropFlat, fillConcrete, improveStory, judgeStor
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
-import {sourceFlags} from './lint.js';
+import {numeralize, sourceFlags} from './lint.js';
 import {draftByOutline, lastAllowed} from './outline.js';
 import {rewriteWeak, scoreScript, SCORE_REWRITE_BELOW} from './score.js';
 import {storyboard} from './storyboard.js';
@@ -95,6 +95,7 @@ try {
   const story = {...story0, score: improved.score, history: improved.history};
   // story rewrites may run long; Shorts re-tighten and re-split before the storyboard sees the final text
   if (values.short && improved.history.length > 1) ep = splitBeats(await tightenLong(client, ep, {model, est: estSec, maxSec: 4.4, log}), {max: 11, clauses: true});
+  ep = {...ep, scenes: ep.scenes.map(s => ({...s, narration: numeralize(s.narration)})) as typeof ep.scenes}; // story/tighten rewrites run after autoFix and can spell amounts out again (ep011-v3 "one thousand eight hundred twenty five dollars")
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
   const sc = scoreScript(ep);

@@ -1,4 +1,4 @@
-import {spoken} from '../pipeline/speech.js';
+import {numeralize, spoken} from '../pipeline/speech.js';
 import type {Episode} from '../schema.js';
 import {scrubSlop} from './critic.js';
 import {HU_BANNED, huWordValue} from './lang.js';
@@ -38,30 +38,7 @@ export function lintEpisode(ep: Episode): string[] {
 }
 
 /** Deterministic fixes for what small models get wrong: drop banned sentences, force the disclaimer, shorten a long hook. Never rewrites numbers. */
-const NUM_W: Record<string, number> = {zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90};
-const SCALE_W: Record<string, number> = {hundred: 100, thousand: 1000, million: 1e6, billion: 1e9};
-const NUM_RUN = new RegExp(`\\b(?:a\\s+(?=(?:hundred|thousand|million|billion)\\b))?(?:(?:${[...Object.keys(NUM_W), ...Object.keys(SCALE_W)].join('|')})(?:[\\s-]+(?:and[\\s-]+)?(?=(?:${[...Object.keys(NUM_W), ...Object.keys(SCALE_W)].join('|')})\\b))?)+\\b(\\s+(?:dollars?|bucks|percent)\\b)?`, 'gi');
-/** English number words as numerals ("eighteen hundred dollars" = "$1,800") so captions, labels and grounding see digits; TTS spells them out again. Small bare counts ("ten years") stay words. */
-export function numeralize(text: string): string {
-  // "two point five million" -> "2.5 million" first; the run matcher below would read only "five million" and leave "two point 5,000,000"
-  text = text.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\s+point\s+(zero|one|two|three|four|five|six|seven|eight|nine)\b(\s+(?:million|billion|thousand))?/gi, (_m, a: string, b: string, sc?: string) => `${NUM_W[a.toLowerCase()]}.${NUM_W[b.toLowerCase()]}${sc ? `_${sc.trim()}` : ''}`); // '_' (a word char) hides the scale word from the run matcher's \b; restored below
-  return text.replace(NUM_RUN, (m: string, unit?: string) => {
-    const words = m.slice(0, unit ? m.length - unit.length : m.length).toLowerCase().split(/[\s-]+/).filter(w => w !== 'and');
-    // "one two three" is a list, not a number: a word-number may only follow a tens word ("twenty five") or a scale
-    for (let k = 1; k < words.length; k++) if (words[k] in NUM_W && words[k - 1] in NUM_W && !(NUM_W[words[k - 1]] >= 20 && NUM_W[words[k - 1]] % 10 === 0 && NUM_W[words[k]] < 10)) return m;
-    let total = 0, cur = 0;
-    for (const w of words) {
-      if (w === 'a') cur = 1;
-      else if (w in NUM_W) cur += NUM_W[w];
-      else if (w === 'hundred') cur = (cur || 1) * 100;
-      else { total += (cur || 1) * SCALE_W[w]; cur = 0; }
-    }
-    const n = total + cur, u = unit?.trim().toLowerCase();
-    if (!u && n < 100) return m;
-    const f = n.toLocaleString('en-US');
-    return u === 'percent' ? `${f}%` : u ? `$${f}` : f;
-  }).replace(/(\d\.\d)_(million|billion|thousand)\b/gi, '$1 $2');
-}
+export {numeralize}; // lives in speech.ts so loadEpisode can apply it without the draft/LLM imports
 
 export function autoFixEpisode(ep: Episode): Episode {
   const scenes = ep.scenes.map((s, i) => {
