@@ -52,7 +52,8 @@ export function withArt(ep: Episode, dir: string): {episode: Episode; publicDir:
   });
   if (!found.some(Boolean)) return {episode: ep, publicDir: `${ROOT}assets`, cleanup: () => {}};
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'public-'));
-  fs.cpSync(`${ROOT}assets`, tmp, {recursive: true, dereference: true});
+  // links, not copies: assets/ is 1.6 GB with the stock cache and the asset library (the bundler forwards links into the bundle)
+  for (const e of fs.readdirSync(`${ROOT}assets`)) fs.symlinkSync(`${ROOT}assets/${e}`, path.join(tmp, e));
   fs.mkdirSync(path.join(tmp, 'art'), {recursive: true});
   for (const f of found) if (f) fs.copyFileSync(path.join(artSrc, f), path.join(tmp, 'art', f));
   return {
@@ -71,7 +72,9 @@ export async function render(idArg: string, mode: 'preview' | 'final') {
   const fps = 30;
 
   let bundled: string;
-  try { bundled = await bundle({entryPoint: `${ROOT}src/index.ts`, publicDir}); } finally { cleanup(); } // bundle holds its own copy
+  // the plain assets dir is linked, not copied (was 1.6 GB per bundle); an art dir is a temp dir of links, copied as links (cheap), then removed
+  const linkPublic = publicDir === `${ROOT}assets`;
+  try { bundled = await bundle({entryPoint: `${ROOT}src/index.ts`, publicDir, symlinkPublicDir: linkPublic}); } finally { cleanup(); }
   const inputProps = {episode: ep, timings, decisions, assets};
   const comp = await selectComposition({serveUrl: bundled, id: 'Episode', inputProps});
 
