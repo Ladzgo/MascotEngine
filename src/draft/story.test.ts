@@ -88,3 +88,13 @@ test('retention loop: a device viewers leave sits out of the rotation', () => {
   for (const t of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) assert.notEqual(pickDevice(t, [], undefined, ret).id, weak);
   assert.equal(pickDevice('x', [], undefined, {}).id, pickDevice('x', [], undefined, {}).id);
 });
+test('dropFlat removes a flat beat of an empty pair while the Short stays long enough; judgeStory caps a judge that quotes no real line', async () => {
+  const {dropFlat, judgeStory, concreteGaps} = await import('./story.js');
+  const ep = mk(['Hook 5.', 'It adds up quietly.', 'Nobody notices it.', 'Then $40 a month.', 'Plain line here.', 'So next time 5.', 'End 5.']);
+  const r = dropFlat(ep, () => 10, 20);
+  assert.equal(r.dropped, 1); assert.deepEqual(concreteGaps(r.ep.scenes.map(s => s.narration)), []);
+  assert.equal(dropFlat(ep, () => 1, 36).dropped, 0); // too short to lose a beat
+  const client = (o: object) => ({messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify(o)}]})}}) as any;
+  assert.equal((await judgeStory(client({score: 100, weakest: 'not in the script'}), ep)).score, 60);
+  assert.equal((await judgeStory(client({score: 80, weakest: 'Nobody notices it.'}), ep)).score, 80);
+});

@@ -4,7 +4,7 @@ import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
 import {splitBeats} from './beats.js';
-import {closeLoop, concreteGaps, fillConcrete, judgeStory, lastHookPick, pickTitle} from './story.js';
+import {closeLoop, concreteGaps, dropFlat, fillConcrete, judgeStory, lastHookPick, pickTitle} from './story.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
@@ -78,6 +78,7 @@ try {
   let ep = fit.ep;
   for (let round = 0; round < 2 && !values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW; round++) { const next = await rewriteWeak(client, ep, {model, lang, log}); if (next === ep) break; ep = next; } // up to 2 rounds while under 75
   if (storyOn && !values['no-rewrite'] && concreteGaps(ep.scenes.map(s => s.narration)).length) ep = await fillConcrete(client, ep, {model, log, maxWords: values.short ? 12 : 20});
+  if (values.short && concreteGaps(ep.scenes.map(s => s.narration)).length) { const d = dropFlat(ep, estSec); if (d.dropped) { log(`concrete: ${d.dropped} flat beats dropped`); ep = d.ep; } }
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const titled = storyOn ? await pickTitle(client, ep, {model, log}) : {title: ep.title, score: 0};
   ep = {...ep, title: titled.title};

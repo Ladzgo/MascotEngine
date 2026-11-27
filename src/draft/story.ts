@@ -218,12 +218,20 @@ export async function closeLoop(o: {client: Client; hook: string; topic: string;
   } catch (e) { o.log?.(`closing line skipped (${(e as Error).message.slice(0, 60)})`); return null; }
 }
 
-/** "Would a friend repeat this?" judge, 0-100: one surprising fact (25), a concrete person or example in the middle (20), a counter-intuitive turn (20), the ending pays off the hook (20), retellable in one sentence (15). */
-export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; fix?: string}> {
+// anchors keep the judge honest: without them a 7B-120B model gave a weak, invented-fact script 100
+const STORY_ANCHORS = `ANCHOR WEAK (score 35): "Batteries are important. Cold affects them. Think of it like honey. It is a problem. Keep your phone warm. Follow for more." - no surprising fact, no example, no turn, vague lines.
+ANCHOR OK (score 62): "Your phone loses 20% in the cold. Lithium ions slow down. At 0 degrees you get 80% power. Warm it up and it comes back. So keep it in your pocket." - one fact, mechanism, but no person, no turn, flat ending.
+ANCHOR STRONG (score 88): "Anna's phone died at 40% on a ski lift. It wasn't broken. At minus 10, the ions inside crawl, so the phone reads empty early. Back in her pocket, it showed 38% again. The charge was never gone. So next time it dies at 40%, warm it before you panic." - surprising fact, concrete person, counter-intuitive turn, ending pays off the hook, retellable.`;
+/** "Would a friend repeat this?" judge, 0-100, calibrated with weak/ok/strong anchors; it must quote the weakest line. */
+export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
+  const lines = ep.scenes.map(s => s.narration);
   try {
-    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 400, system: 'You are a tough YouTube Shorts editor. Score the script 0-100: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Output ONLY JSON: {"score": number, "fix": "the single change that would raise the score most, one sentence"}', messages: [{role: 'user', content: ep.scenes.map((s, i) => `${i + 1}. ${s.narration}`).join('\n')}]}))) as {score?: unknown; fix?: unknown};
-    const score = Math.max(0, Math.min(100, Number(j.score) || 0));
-    return {score, ...(typeof j.fix === 'string' && j.fix ? {fix: j.fix.slice(0, 200)} : {})};
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. Quote the weakest line exactly. Output ONLY JSON: {"weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown};
+    let score = Math.max(0, Math.min(100, Number(j.score) || 0));
+    const weakest = typeof j.weakest === 'string' ? j.weakest.trim() : '';
+    // a judge that cannot point at a real line has not read the script: cap it
+    if (!weakest || !lines.some(l => l.includes(weakest.replace(/^"|"$/g, '').slice(0, 25)))) score = Math.min(score, 60);
+    return {score, ...(weakest ? {weakest} : {}), ...(typeof j.fix === 'string' && j.fix ? {fix: j.fix.slice(0, 200)} : {})};
   } catch { return {score: 0}; }
 }
 
@@ -240,4 +248,18 @@ export async function pickTitle(client: Client, ep: Pick<Episode, 'title' | 'sce
     o.log?.(`title chosen from ${cands.length} (${best.s}/100): "${best.t}"`);
     return {title: best.t, score: best.s};
   } catch (e) { o.log?.(`title pick skipped (${(e as Error).message.slice(0, 60)})`); return {title: ep.title, score: 0}; }
+}
+
+/** Gaps the rewrite could not fill: drop a plain talk beat of the pair (never the hook or the last two) while the Short stays >= `minSec` (estimate). */
+export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, minSec = 36): {ep: Episode; dropped: number} {
+  let scenes = [...ep.scenes], dropped = 0;
+  const total = () => scenes.reduce((a, s) => a + est(s) + 0.36, 0);
+  for (let guard = 0; guard < 4; guard++) {
+    const g = concreteGaps(scenes.map(s => s.narration))[0];
+    if (g === undefined) break;
+    const cand = [g, g + 1].filter(k => k > 0 && k < scenes.length - 2 && scenes[k].type === 'talk').sort((a, b) => wcount(scenes[a].narration) - wcount(scenes[b].narration))[0];
+    if (cand === undefined || total() - est(scenes[cand]) - 0.36 < minSec) break;
+    scenes = scenes.filter((_, k) => k !== cand); dropped++;
+  }
+  return {ep: {...ep, scenes: scenes as Episode['scenes']}, dropped};
 }

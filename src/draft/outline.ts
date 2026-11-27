@@ -108,7 +108,8 @@ export function planParts(o: Outline, short = false, device?: Device): Part[] {
   parts.push({key: 'twist', label: 'The catch', min: 2, max: 4, feature: 'compare', facts: `Twist: ${o.twist}`, brief: 'start with a short turn ("but" is fine here), then explain the catch concretely.'});
   if (device && parts[0]) { parts[0].brief = `${device.opening} ${parts[0].brief}`; if (o.extras) parts[0].facts += `\nStory facts (use these exact names and numbers): ${JSON.stringify(o.extras)}`; }
   parts.push({key: 'closing', label: 'Recap and call to action', min: 2, max: 3, facts: `Recap: ${o.recap}\nCall to action: ${o.cta}`, brief: `a one-line recap (a checklist scene is good), then the call to action as the very last beat.${device ? ` The last beat must call back to the opening line ("${o.hook}") by reusing one of its key words, so the loop closes.` : ''}`, callback: o.hook});
-  if (short) return parts.filter(p => p.key !== 'twist' || o.twist).map(p => ({...p, min: 2, max: p.key === 'opening' ? 3 : 2, minWords: p.key === 'closing' ? 12 : 16, maxBeat: 14, feature: p.key === 'opening' || p.key === 'closing' ? undefined : p.feature, brief: `${p.brief} Shorts pacing: every beat is ONE short sentence of 6 to 14 words (about 3 seconds spoken).`}));
+  // 2-3 beats, 12+ words: exactly 2 beats with 16+ words made most Short parts retry 2-3 times (zzb-h3: 8 retries, zzb-h4: 6)
+  if (short) return parts.filter(p => p.key !== 'twist' || o.twist).map(p => ({...p, min: 2, max: 3, minWords: 12, maxBeat: 14, feature: p.key === 'opening' || p.key === 'closing' ? undefined : p.feature, brief: `${p.brief} Shorts pacing: every beat is ONE short sentence of 6 to 14 words (about 3 seconds spoken).`}));
   return parts;
 }
 
