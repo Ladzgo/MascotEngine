@@ -177,13 +177,13 @@ const MONEY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'card', 'bars3d
 
 /** Callout label: pill with a leader line that draws to the hero. */
 const calloutWidth = (text: string, size: number, maxW: number) => Math.min(size * 0.6 * text.length + size * 1.8, maxW);
-const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right' | 'down'; maxW: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW}) => {
+const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right' | 'down'; maxW: number; hp?: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW, hp}) => {
   const e = easeOut((t - at) / 0.35);
   if (e <= 0) return null;
-  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : align === 'down' ? x + wpx / 2 : x, ay0 = align === 'down' ? y + size * 1.6 : y + size * 0.8;
+  const wpx = calloutWidth(text, size, maxW), ax = align === 'left' ? x + wpx : align === 'down' ? x + wpx / 2 : x, ay0 = align === 'down' ? y + (hp ?? size * 1.6) : y + size * 0.8;
   return (
     <>
-      {align !== 'down' && <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
+      {(align !== 'down' || hp) && <svg style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none'}}>
         {[['#0b0d1e', size * 0.2], ['#fff', size * 0.11]].map(([c, sw], k) => <line key={k} x1={ax} y1={ay0} x2={ax + (tx - ax) * e} y2={ay0 + (ty - ay0) * e} stroke={String(c)} strokeWidth={Number(sw)} strokeLinecap="round" />)}
         <circle cx={tx} cy={ty} r={size * 0.26 * e} fill={accent} stroke="#fff" strokeWidth={size * 0.09} /><circle cx={tx} cy={ty} r={size * 0.26 * e + size * 0.13} fill="none" stroke="#0b0d1e" strokeOpacity={0.5} strokeWidth={size * 0.05} />
       </svg>}
@@ -441,7 +441,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
         const size = tall ? 48 : 44, maxW = tall ? w * 0.86 : w * 0.4;
         const cut = (raw: string) => (raw.length > 38 ? raw.slice(0, 36).replace(/[\s,;:]+\S*$/, '') + '…' : raw);
         const hOf = (txt: string) => Math.max(1, Math.ceil((txt.length * size * 0.6) / Math.max(1, calloutWidth(txt, size, maxW) - size * 1.8))) * size * 1.12 + size * 1.29;
-        // tall: no leader lines (they read as debug pins), so the stack sits just above the object it labels; pills stack by their real wrapped height
+        // tall: the stack sits just above the object it labels (pills by their real wrapped height); ONE short leader from the stack's last pill down to the object
+        // ties the data to the thing (reference) - a line per pill crossed the other pills and read as debug pins
         const total = ctxText.reduce((a, r) => a + hOf(cut(r)), 0), objTop = h * 0.62 + (cy - 0.41 * hs - h * 0.62) * sc;
         let y = tall ? Math.max(h * 0.075, objTop - total - size * 0.4) : h * 0.14;
         return ctxText.map((raw, i) => {
@@ -450,7 +451,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           const x = tall ? (w - wp) / 2 : w * 0.04;
           const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
           const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move
-          return <Callout key={i} text={txt} t={t} at={at} x={x} y={yy} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.62 + (py - h * 0.62) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} />;
+          return <Callout key={i} text={txt} t={t} at={at} x={x} y={yy} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.62 + (py - h * 0.62) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} hp={tall && i === ctxText.length - 1 ? hOf(txt) - size * 0.5 : undefined} />;
         });
       })()}
       {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));

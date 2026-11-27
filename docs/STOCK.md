@@ -71,3 +71,12 @@ callouts need the drawn growth picture). The 7B model is coarse: it answers 0 or
 | episode | stock before -> after | semantic median |
 |---|---|---|
 | ep011-v3 coffee | 6 beats (incl. cash clip on "if you invested", corridor man) -> 4 (coffee mug, coffee clip, espresso, jar; corridor kept at 5) | 5 -> 6 |
+
+## Reference gaps (2026-11-27, ep015 + ep016 contact sheets vs docs/REFERENCE-ANALYSIS.md)
+1. **Data callouts read as a slide** (9:16): label pills stacked above a small object, not tied to it; the reference puts callouts with leader lines on the object.
+   Fixed first: the stack now ends in ONE short leader down to the part of the object it names (a line per pill crossed the other pills and read as debug pins).
+   Still open: pills beside their anchors (needs a side-column layout; the hero is ~500 px wide in callout beats, too little room at 48 px type).
+2. **Generic symbols on abstract sentences**: a shield grid for "the real reason", a brain for the hook, a crossed cart for "$6 extra". The semantic weak beats are
+   these; the drawn set needs more concrete, sentence-named objects (more Fluent assets as heroes when the storyboard subject is a WEAK symbol).
+3. **Empty floor band under the captions** on drawn beats (lower ~25%): the reference keeps picture to the frame edge. Partly YouTube's own UI zone on Shorts,
+   but footage-loop beats look fuller than procedural floors; more loop/photo backdrops or a richer floor would close it.
