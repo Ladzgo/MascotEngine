@@ -136,7 +136,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
 }
 const SUBJECT_SET = new Set(Object.keys(OBJECTS));
 // symbols any sentence could carry: a topic object the sentence names beats them (en-sleep title: a clock for "memory after missing eight hours of sleep" scored 5)
-const WEAK = new Set(['clock', 'calendar', 'hourglass', 'gears', 'bulb', 'people', 'magnifier', 'shield', 'lock', 'scale', 'pie', 'percent', 'arrow_up', 'arrow_down', 'doc', 'clipboard']);
+const WEAK = new Set(['hole', 'clock', 'calendar', 'hourglass', 'gears', 'bulb', 'people', 'magnifier', 'shield', 'lock', 'scale', 'pie', 'percent', 'arrow_up', 'arrow_down', 'doc', 'clipboard']);
 const TOPICAL = new Set(['sport', 'health', 'travel', 'tech', 'food', 'science', 'sleep'].flatMap(g => GROUPS[g]).filter(k => !WEAK.has(k) && !['person_walking', 'globe', 'sun'].includes(k)));
 
 /** Variety numbers of a plan: share of plain beats (one centred object on a talk beat), distinct pictures, closest repeat, stock share, layout mix. Targets: plain <= 25%, distinct >= 60%, repeat gap >= 8. */
@@ -176,6 +176,7 @@ const CONCEPTS: [RegExp, string[]][] = [
   [/^(sleep\w*|asleep|nap\w*)$/, ['bed', 'moon']],
   [/^(fees?|surcharges?|charges)$/, ['receipts', 'bills']],
   [/^(calculat\w*|math|numbers|verify|check)$/, ['calculator']],
+  [/^(disasters?|crack\w*|broken|break\w*|fail\w*|danger\w*|risk\w*)$/, ['asset:fluent-warning']],
   [/^(lose|loses|losing|lost|wast(e|es|ed|ing))$/, ['asset:fluent-money-with-wings']],
   [/^(run|runs|running|walk\w*|steps?)$/, ['shoe', 'person_walking']],
 ];
