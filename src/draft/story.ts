@@ -89,7 +89,8 @@ export function extraNumbers(x: unknown): number[] {
 }
 
 /** "Elon Musk noticed...": a first + last name in a hook is a claim about a real person the facts do not support. */
-export const fullName = (h: string) => /\b[A-Z][a-z]+ [A-Z][a-z]{2,}\b/.test(h);
+const STARTERS = new Set(['imagine', 'meet', 'say', 'take', 'picture', 'when', 'if', 'so', 'but', 'and', 'then', 'now', 'ask', 'like', 'even', 'only', 'today', 'every']);
+export const fullName = (h: string) => [...h.matchAll(/\b([A-Z][a-z]+) ([A-Z][a-z]{2,})\b/g)].some(m => !STARTERS.has(m[1].toLowerCase())); // "Imagine Jane saves" is a first name, not "Elon Musk"
 
 const NUMW = /\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand|million|billion|half|double|egy|kettő|két|három|négy|öt|hat|hét|nyolc|kilenc|tíz|száz|ezer|millió)\b/i;
 const wcount = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;

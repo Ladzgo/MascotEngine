@@ -117,3 +117,7 @@ test('hook and overlay shape rules', async () => {
   assert.ok(badHookShape('Coffee? It costs $5.') && !badHookShape('Why does your $5 coffee cost $1,825?') && !badHookShape('Your $5 coffee costs $1,825.'));
   assert.ok(!overlayOk('Hidden fifty loss explained today') && !overlayOk('Mind the cost?') && overlayOk('Your coffee costs $1,825 a year'));
 });
+test('fullName: "Imagine Jane" is a first name, "Elon Musk" is a full name', async () => {
+  const {fullName} = await import('./story.js');
+  assert.ok(!fullName('Imagine Jane saves $10,000.') && fullName('Elon Musk saves $10,000.') && !fullName('Meet Anna, 28.'));
+});
