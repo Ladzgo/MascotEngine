@@ -114,7 +114,7 @@ test('improveStory rewrites the quoted weakest line and keeps it only when the r
 test('hook and overlay shape rules', async () => {
   const {badHookShape, overlayOk} = await import('./story.js');
   assert.ok(badHookShape("The reason you lose 50 dollars isn't what you think—why?"));
-  assert.ok(badHookShape('Coffee? It costs $5.') && !badHookShape('Why does your $5 coffee cost $1,825?') && !badHookShape('Your $5 coffee costs $1,825.'));
+  assert.ok(badHookShape('Your rent can double in 10.') && !badHookShape('Your rent can double in 10 years.') && badHookShape('Coffee? It costs $5.') && !badHookShape('Why does your $5 coffee cost $1,825?') && !badHookShape('Your $5 coffee costs $1,825.'));
   assert.ok(!overlayOk('Hidden fifty loss explained today') && !overlayOk('Mind the cost?') && overlayOk('Your coffee costs $1,825 a year'));
 });
 test('fullName: "Imagine Jane" is a first name, "Elon Musk" is a full name', async () => {

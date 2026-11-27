@@ -157,8 +157,8 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
   return best.h;
 }
 
-/** "...isn't what you think—why?", "Coffee? Costs?": a dangling question tacked on, or a question mark mid-line. */
-export const badHookShape = (h: string) => /[—–-]\s*\w{1,8}\?\s*$/.test(h) || /\?\s*\S/.test(h.trim()) || /\?\s*\?/.test(h);
+/** "...isn't what you think—why?", "Coffee? Costs?", "...double in 10.": a dangling question, a mid-line question mark, or a number that lost its unit. */
+export const badHookShape = (h: string) => /[—–-]\s*\w{1,8}\?\s*$/.test(h) || /\?\s*\S/.test(h.trim()) || /\?\s*\?/.test(h) || /\b(in|by|for|over|within|after)\s+\d[\d,.]*[.!?]?\s*$/i.test(h.trim()); // "...double in 10." has lost its unit
 /** Overlay rules: 4-7 words, no filler tags ("explained", "today", "revealed"), no bare number word glued to a noun ("fifty loss"), no trailing question fragment. */
 export const overlayOk = (t: string) => {
   const w = wcount(t);
