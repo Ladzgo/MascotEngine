@@ -135,15 +135,20 @@ test('queue: 20 active runs max (429), identical queued run is 409, cancel frees
   }
 });
 
-test('interrupted job: after a restart a running run is an error with Retry text, queued runs resume', async () => {
+test('interrupted job: after a restart a running run is an error with Retry text, queued runs resume', {timeout: 180000}, async () => {
   const file = `${os.tmpdir()}/studio-test-jobs-restart-${process.pid}.json`, port = 5800 + (process.pid % 1500);
   const base = {stages: ['preview'], current: 'preview', done: [], log: [], engine: 'auto', progress: 0.4};
   fs.writeFileSync(file, JSON.stringify([{...base, id: 'j-run', episode: 'zz-x', status: 'running', createdAt: 1}, {...base, id: 'j-wait', episode: 'zz-y', status: 'queued', current: null, createdAt: 2}]));
-  const c = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(port), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: file}, stdio: 'ignore'});
+  const c = spawn(`${ROOT}node_modules/.bin/tsx`, [`${ROOT}studio/server.ts`], {cwd: ROOT, env: {...process.env, STUDIO_PORT: String(port), STUDIO_TEST: '1', STUDIO_TEST_FAKE_JOBS: '1', STUDIO_JOBS_FILE: file}, stdio: ['ignore', 'pipe', 'pipe']});
   try {
-    let q: {running: {jobId: string} | null; recent: {jobId: string; status: string; error?: string}[]} | undefined;
-    for (let i = 0; i < 100 && !q; i++) { try { q = await (await fetch(`http://localhost:${port}/api/queue`)).json() as typeof q; } catch { await new Promise(r => setTimeout(r, 300)); } }
-    assert.ok(q);
+    // wait for the server's own "listening" line (or its exit) instead of a fixed polling window: a loaded CI runner needed > 30 s to start tsx
+    let err = '';
+    c.stderr!.on('data', d => { err += String(d); });
+    await new Promise<void>((ok, bad) => {
+      c.stdout!.on('data', d => { if (/Mascot Engine Studio:/.test(String(d))) ok(); });
+      c.on('exit', code => bad(new Error(`server exited (${code}) before listening: ${err.slice(-400)}`)));
+    });
+    const q = await (await fetch(`http://localhost:${port}/api/queue`)).json() as {running: {jobId: string} | null; recent: {jobId: string; status: string; error?: string}[]};
     const dead = q.recent.find(j => j.jobId === 'j-run');
     assert.equal(dead?.status, 'error'); assert.match(dead?.error ?? '', /Interrupted.*Retry/);
     assert.equal(q.running?.jobId, 'j-wait');
