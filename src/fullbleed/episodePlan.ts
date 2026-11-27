@@ -175,6 +175,7 @@ const CONCEPTS: [RegExp, string[]][] = [
   [/^(sav(e|es|ed|ing|ings))$/, ['piggy', 'jar_fill']],
   [/^(sleep\w*|asleep|nap\w*)$/, ['bed', 'moon']],
   [/^(fees?|surcharges?|charges)$/, ['receipts', 'bills']],
+  [/^(calculat\w*|math|numbers|verify|check)$/, ['calculator']],
   [/^(lose|loses|losing|lost|wast(e|es|ed|ing))$/, ['asset:fluent-money-with-wings']],
   [/^(run|runs|running|walk\w*|steps?)$/, ['shoe', 'person_walking']],
 ];
