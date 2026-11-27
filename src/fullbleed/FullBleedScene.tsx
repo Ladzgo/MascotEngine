@@ -259,7 +259,14 @@ const Notification: React.FC<{app: string; text: string; t: number; w: number; h
 /** Whether the top text zone of a beat is taken by the scene itself (then no punch word over it). */
 export const topBusy = (scene: Scene, plan: ScenePlan | undefined, index: number, hook?: string) => ['big_number', 'title', 'chart', 'compare', 'before_after', 'list', 'checklist', 'stats', 'table', 'timeline'].includes(scene.type)
   || plan?.layout === 'kinetic' || (index === 0 && !!hook) || techBanner(scene, plan);
-const techBanner = (scene: Scene, plan: ScenePlan | undefined) => scene.type === 'talk' && (plan?.layout === 'hero' || plan?.layout === 'pip') && TECH.test(scene.narration) && !!scene.shot?.label;
+const techBanner = (scene: Scene, plan: ScenePlan | undefined) => scene.type === 'talk' && (plan?.layout === 'hero' || plan?.layout === 'pip') && TECH.test(scene.narration);
+/** What the notification says: a system app a phone really has, and the sentence's first clause as a short line ("So stop charging your phone in the freezing cold." -> "Stop charging your phone in the freezing cold."). */
+export function notice(sentence: string): {app: string; text: string} {
+  const app = /batter|charg/i.test(sentence) ? 'Battery' : /wifi|internet|online|data/i.test(sentence) ? 'Wi-Fi' : /apps?\b/i.test(sentence) ? 'App Store' : 'Settings';
+  const clause = sentence.split(/[,.;:!?]/)[0].trim().replace(/^(so|but|and|then|now|plus)\s+/i, '').split(/\s+/).slice(0, 8);
+  while (clause.length > 2 && /^(the|a|an|in|of|to|your|and|for|on|at|with|is|are)$/i.test(clause[clause.length - 1])) clause.pop(); // never end on a dangling word
+  return {app, text: clause.join(' ').replace(/^\w/, c => c.toUpperCase()) + '.'};
+}
 
 const Versus: React.FC<{a: {title: string; value: string}; b: {title: string; value: string}; t: number; w: number; h: number; y: number; accent: string}> = ({a, b, t, w, h, y, accent}) => {
   const tall = h > w, cw = tall ? w * 0.78 : w * 0.34, ch = tall ? 190 : 170;
@@ -448,7 +455,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       })()}
       {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
         return <div style={{position: 'absolute', left: w * 0.06, width: w * 0.42, top: h * 0.2, fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.02, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 16px 36px rgba(0,0,0,0.5)`, opacity: e2, transform: `translateX(${(1 - e2) * -40}px)`}}>{kw}<div style={{marginTop: fs * 0.25, height: fs * 0.12, width: `${60 * easeOut((t - 0.35) / 0.4)}%`, background: accent, borderRadius: fs * 0.06}} /></div>; })()}
-      {techBanner(scene, plan) && !showHook && <Notification app={(scene.narration.match(TECH)?.[0] ?? 'Phone').replace(/^\w/, c => c.toUpperCase())} text={scene.shot!.label!} t={t} w={w} h={h} />}
+      {techBanner(scene, plan) && !showHook && <Notification {...notice(scene.narration)} t={t} w={w} h={h} />}
       {/* reaction after the detail: in a beat with sub-shots the character enters on the last one (wide -> close -> reaction) */}
       {plan.character && !sideTitle && <Character id={plan.character} t={t - (nSub >= 2 ? (nSub - 1) * dur / nSub - 0.45 : 0)} w={w} feet={groundY} left={index % 2 === 0} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />

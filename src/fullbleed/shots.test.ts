@@ -131,3 +131,9 @@ test('reselect: a swap is kept only when its re-score rises', async () => {
   assert.deepEqual(r.kept, [1]); assert.deepEqual(r.reverted, [0]);
   assert.equal(r.ep.scenes[0].shot?.subject, 'lock'); assert.equal(r.ep.scenes[1].shot?.subject, 'battery');
 });
+
+test('tech notification: system app name and a short first-clause line', async () => {
+  const {notice} = await import('./FullBleedScene');
+  assert.deepEqual(notice('So stop charging your phone in the freezing cold.'), {app: 'Battery', text: 'Stop charging your phone in the freezing cold.'});
+  assert.deepEqual(notice('Cold screens lag, forcing you to tap twice.'), {app: 'Settings', text: 'Cold screens lag.'});
+});
