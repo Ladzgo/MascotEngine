@@ -4,6 +4,7 @@ import type {Episode} from '../schema.js';
 import type {EpisodeDecisions, SfxKind} from '../director/types.js';
 import type {Timings} from './tts.js';
 import {CATALOG} from '../assets/catalog.js';
+import {bedBpm, musicOffset} from '../director/beatSnap.js';
 
 const SR = 44100;
 
@@ -192,8 +193,7 @@ export async function mixAudio(dir: string, ep: Episode, dec: EpisodeDecisions, 
   let filter: string;
   if (track) {
     // per-episode variation: the bed starts at a seed-chosen bar (beds are loop-safe, so any bar works)
-    const bpm = (() => { try { return JSON.parse(fs.readFileSync(`${musicDir}index.json`, 'utf8'))[track]?.bpm as number | undefined; } catch { return undefined; } })();
-    const bar = [...(ep.id ?? '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 16, (ep.seed ?? 0) % 16), offset = bpm ? bar * 240 / bpm : 0;
+    const offset = musicOffset(ep.id, ep.seed, bedBpm(track, musicDir)); // same bar the director snapped the cuts to
     args.push('-stream_loop', '-1', '-i', `${musicDir}${track}`);
     const swell = swellExpr(dec, totalSec);
     // music at -22 dB, sidechain-ducked by the voice, then summed with voice + ducked sfx

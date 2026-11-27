@@ -160,7 +160,7 @@ export function concreteGaps(narr: string[]): number[] {
 /** Rewrites one talk beat per gap so it carries a number the script already says or an example person's first name; kept per line only when valid. */
 export async function fillConcrete(client: Client, ep: Episode, o: {model?: string; name?: string; maxWords?: number; log?: (m: string) => void}): Promise<Episode> {
   const narr = ep.scenes.map(s => s.narration), gaps = concreteGaps(narr);
-  const targets = gaps.map(i => [i + 1, i].find(k => k < narr.length - 1 && ep.scenes[k].type === 'talk')).filter((k): k is number => k !== undefined);
+  const targets = gaps.map(i => [i + 1, i].find(k => k < narr.length - 2 && ep.scenes[k].type === 'talk' && !/follow|subscribe|channel/i.test(narr[k]))).filter((k): k is number => k !== undefined); // never the CTA or the closing line ("Follow Sam for more" happened)
   if (!targets.length) return ep;
   const heard = [...new Set(narr.flatMap(spokenNumbers))], name = o.name ?? 'Sam', max = o.maxWords ?? 14;
   try {

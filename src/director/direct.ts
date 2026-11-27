@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {bedBpm, musicOffset, snapCuts} from './beatSnap.js';
 import {episodeDir, loadEpisode, type Scene} from '../schema.js';
 import type {Timings} from '../pipeline/tts.js';
 import {sfxForShot} from './sfxMap.js';
@@ -411,9 +412,13 @@ export async function direct(idArg: string, opts: {final: boolean; weights?: Rec
     cursor += durSec;
   });
 
+  const track = moodTrack(mood, rand), bpm = bedBpm(track);
+  const snapped = snapCuts(decided, bpm, musicOffset(ep.id, ep.seed, bpm)); // cuts on the music's beat when it is within 80 ms
+  const total = decided.length ? decided.at(-1)!.startSec + decided.at(-1)!.durSec : cursor;
+  if (snapped) console.log(`${snapped} cuts moved onto the music beat (${bpm} bpm)`);
   const out: EpisodeDecisions = {
     episodeId: ep.id, seed: ep.seed, accent, background, captionStyle, intro,
-    music: {mood, track: moodTrack(mood, rand)}, totalSec: round(cursor), scenes: decided, ...(capPrefs ? {captions: capPrefs} : {}),
+    music: {mood, track}, totalSec: round(total), scenes: decided, ...(capPrefs ? {captions: capPrefs} : {}),
     ...(decided[0]?.hook ? {hook: decided[0].hook} : {}),
   };
   fs.writeFileSync(`${dir}build/decisions.json`, JSON.stringify(out, null, 2));
