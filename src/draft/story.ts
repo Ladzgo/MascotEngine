@@ -294,12 +294,12 @@ export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, m
 }
 
 /** Story pass driven by the judge: rewrites up to 3 lines (always the quoted weakest one) by its note, re-judges, keeps only a gain. Numbers must already be in the script. */
-export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
+export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void; /** sourced outline numbers the rewrite may also use */ facts?: number[]} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
   let cur = ep, j = first;
   const history = [first.score];
   // a weak script (< 60) gets one whole-body retell first: hook and last line stay, every middle line may change, same beat types, script numbers only
   if (j.score < 60) {
-    const narr = cur.scenes.map(s => s.narration), heard = [...new Set(narr.flatMap(spokenNumbers))], max = o.maxWords ?? 14;
+    const narr = cur.scenes.map(s => s.narration), heard = [...new Set([...narr.flatMap(spokenNumbers), ...(o.facts ?? [])])], max = o.maxWords ?? 14;
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
       const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim());
@@ -317,7 +317,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
   for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75); r++) {
     const narr = cur.scenes.map(s => s.narration), key = (j.weakest ?? '').replace(/^"|"$/g, '').slice(0, 25);
     const weak = key ? narr.findIndex((l, i) => i > 0 && l.includes(key)) : -1;
-    const heard = [...new Set(narr.flatMap(spokenNumbers))], max = o.maxWords ?? 14, last = narr.length - 1;
+    const heard = [...new Set([...narr.flatMap(spokenNumbers), ...(o.facts ?? [])])], max = o.maxWords ?? 14, last = narr.length - 1;
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: `You are the story editor of a spoken vertical Short. Rewrite at most 3 lines so the script gains what the editor's note asks for: a concrete everyday person or example in the middle, a counter-intuitive turn, a payoff of the opening line. ${weak > 0 ? `Line ${weak} must be one of them. ` : ''}Never touch line 0 (the hook) or line ${last} (the last line). Each new line: ${max} words or fewer, plain spoken, fits the lines around it. Use only numbers already in the script (${heard.join(', ') || 'none'}); an example person gets a first name only. Output ONLY JSON: {"rewrites": [{"i": number, "line": string}]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? 'add a concrete person and a surprising turn'}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
       const rw = ((extractJson(out) as {rewrites?: {i: number; line: string}[]}).rewrites ?? []).slice(0, 3);

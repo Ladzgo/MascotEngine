@@ -222,6 +222,10 @@ export async function expandPart(o: {client: Client; part: Part; system: string;
   return lines.map((l, i) => ({type: i === 0 && p.key === 'opening' ? 'title' : 'talk', emotion: 'explaining', emphasis: [], narration: /[.!?]$/.test(l) ? l : `${l}.`}) as Sc);
 }
 
+/** Numbers the last outline allows (its sourced facts + simple arithmetic): later passes may use them, not just the numbers the script already says. */
+// shortcut: module state like lastHookPick; pass it explicitly if drafts ever run concurrently in one process
+export let lastAllowed: number[] = [];
+
 /** Outline first, then one call per part; assembled, validated with the usual guards. Returns the episode (and the outline for tests/logs). */
 export async function draftByOutline(o: {
   client: Client; topic: string; id: string; angle?: string; voice: string; model?: string; channel?: string; channelContext?: string; lang?: string; stats?: DraftStats;
@@ -236,7 +240,9 @@ export async function draftByOutline(o: {
     const okH = (h: string) => unsupportedNumbers(h, allowedNumbers(outline)).length === 0;
     outline.hook = await pickHook({client: o.client, topic: o.topic, outlineHook: outline.hook, stakes: outline.stakes, device, lang: o.lang, model: o.model, allowedOk: okH, log: o.log});
   }
-  const parts = planParts(outline, o.short, device), allowed = allowedNumbers(outline), system = beatSystem(o.voice, o.channelContext, o.lang, o.short) + langNote(o.lang);
+  const parts = planParts(outline, o.short, device), allowed = allowedNumbers(outline);
+  lastAllowed = allowed;
+  const system = beatSystem(o.voice, o.channelContext, o.lang, o.short) + langNote(o.lang);
   const scenes: Sc[] = [];
   o.progress?.(0, parts.length, 'Outline ready');
   for (const [i, part] of parts.entries()) {

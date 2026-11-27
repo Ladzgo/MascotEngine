@@ -9,7 +9,7 @@ import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
 import {sourceFlags} from './lint.js';
-import {draftByOutline} from './outline.js';
+import {draftByOutline, lastAllowed} from './outline.js';
 import {rewriteWeak, scoreScript, SCORE_REWRITE_BELOW} from './score.js';
 import {storyboard} from './storyboard.js';
 import {estSec, fitDuration, SCENE_PAD, spreadVisuals} from '../director/shortsPro.js';
@@ -87,7 +87,7 @@ try {
   ep = {...ep, title: titled.title};
   const story0 = storyOn ? await judgeStory(client, ep, model) : {score: 0};
   // the judge quotes its weakest line: rewrite that line by its note, re-judge, keep only a gain (2 rounds)
-  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28}) : {ep, score: story0.score, history: [story0.score]};
+  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)}) : {ep, score: story0.score, history: [story0.score]};
   ep = improved.ep;
   const story = {...story0, score: improved.score, history: improved.history};
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
