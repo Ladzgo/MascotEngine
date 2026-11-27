@@ -217,6 +217,8 @@ const Callout: React.FC<{text: string; t: number; at: number; x: number; y: numb
 export const SUB_FRAMES: [number, number, number][] = [[1, 0.05, -0.01], [1.04, 0, -0.02], [1, -0.05, -0.01], [0.97, 0, -0.01]]; // gentle, and never downwards: a bigger punch-in cut the hero off, a lower one ran it into the captions
 /** How many 2-3 s sub-shots a beat of `dur` seconds gets (one per started 2.8 s). */
 export const subShots = (dur: number) => Math.max(1, Math.ceil(dur / 2.8));
+/** Objects drawn edge to edge in their 400 box: at full hero size (box 1.15x the frame width) their sides were cut (ep016 receipts). */
+const WIDE_ART = new Set(['receipts', 'bills', 'skyline', 'people', 'coin_stacks', 'bars3d', 'stacked_bars', 'line_chart', 'map_route', 'tax_form', 'person_bills', 'groceries', 'cart']);
 const CHARTY = new Set(['line_chart', 'bars3d', 'bars_arrow', 'chart', 'pie', 'gauge']);
 
 const calloutTexts = (s: Scene): string[] => {
@@ -391,7 +393,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
   // 16:9: a chart drawn at full size lost its top labels, and the right-third hero ran under the side title (golden fbw-03/05)
-  const hs = base * scale * (tall ? 1 : charty ? 0.78 : plan.layout === 'hero' && scene.type === 'talk' && !scene.stockFile ? 0.82 : 1), groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
+  const hs = base * scale * (tall ? (WIDE_ART.has(shots[0]?.kind ?? '') && scale === 1 ? 0.84 : 1) : charty ? 0.78 : plan.layout === 'hero' && scene.type === 'talk' && !scene.stockFile ? 0.82 : 1), groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
   // top of the hero box after the close framing (feet at 82.5% of the 400 box, push <= 1.12 about 62% height): text above it never overlaps the art
   const heroTop = h * 0.62 + (groundY - 0.825 * hs - h * 0.62) * 1.12;
   const showHook = !!hook && tall && !hasCallouts && !versus && scene.type !== 'big_number';
