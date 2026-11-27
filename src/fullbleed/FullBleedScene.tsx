@@ -286,7 +286,9 @@ const techBanner = (scene: Scene, plan: ScenePlan | undefined) => scene.type ===
 /** What the notification says: a system app a phone really has, and the sentence's first clause as a short line ("So stop charging your phone in the freezing cold." -> "Stop charging your phone in the freezing cold."). */
 export function notice(sentence: string): {app: string; text: string} {
   const app = /batter|charg/i.test(sentence) ? 'Battery' : /wifi|internet|online|data/i.test(sentence) ? 'Wi-Fi' : /apps?\b/i.test(sentence) ? 'App Store' : 'Settings';
-  const clause = sentence.split(/[,.;:!?]/)[0].trim().replace(/^(so|but|and|then|now|plus)\s+/i, '').split(/\s+/).slice(0, 8);
+  // the clause that carries the tech word, else the longest one: a lead-in like 'In winter,' alone said nothing (fbw-ep014)
+  const parts = sentence.split(/[,.;:!?]/).map(x => x.trim()).filter(Boolean), pick = parts.find(x => TECH.test(x) && x.split(/\s+/).length >= 3) ?? [...parts].sort((a, b) => b.length - a.length)[0] ?? '';
+  const clause = pick.replace(/^(so|but|and|then|now|plus)\s+/i, '').split(/\s+/).slice(0, 8);
   while (clause.length > 2 && /^(the|a|an|in|of|to|your|and|for|on|at|with|is|are)$/i.test(clause[clause.length - 1])) clause.pop(); // never end on a dangling word
   return {app, text: clause.join(' ').replace(/^\w/, c => c.toUpperCase()) + '.'};
 }
@@ -389,7 +391,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const stage = fixedStage ? `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})` : `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
   // hero stands on the ground plane (y = 70% of a tall frame, so it ends above the captions at 72-80%; 74% of a wide one, above its captions at 78%+); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.15 : h * 0.86; // wider objects (scale, bars, calendar) span the whole 400 box: bigger and they get cut at the frame edge
-  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' || (lay === 'hero' && techBanner(scene, plan)) ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
+  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' || (lay === 'hero' && techBanner(scene, plan)) ? 0.66 : lay === 'pip' || lay === 'broll' ? (tall ? 0.46 : 0.62) : 1; // over real footage the drawn subject is an accent, not the picture
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
   // 16:9: a chart drawn at full size lost its top labels, and the right-third hero ran under the side title (golden fbw-03/05)
@@ -481,7 +483,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       })()}
       {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
         return <div style={{position: 'absolute', left: w * 0.06, width: w * 0.42, top: h * 0.2, fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.02, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 16px 36px rgba(0,0,0,0.5)`, opacity: e2, transform: `translateX(${(1 - e2) * -40}px)`}}>{kw}<div style={{marginTop: fs * 0.25, height: fs * 0.12, width: `${60 * easeOut((t - 0.35) / 0.4)}%`, background: accent, borderRadius: fs * 0.06}} /></div>; })()}
-      {techBanner(scene, plan) && !showHook && <Notification {...notice(scene.narration)} t={t} w={w} h={h} />}
+      {techBanner(scene, plan) && !showHook && !sideTitle && <Notification {...notice(scene.narration)} t={t} w={w} h={h} />}
       {/* reaction after the detail: in a beat with sub-shots the character enters on the last one (wide -> close -> reaction) */}
       {plan.character && !sideTitle && <Character id={plan.character} t={t - (nSub >= 2 ? (nSub - 1) * dur / nSub - 0.45 : 0)} w={w} feet={groundY} left={index % 2 === 0} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
