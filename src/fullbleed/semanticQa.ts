@@ -41,13 +41,22 @@ const file = arg('file') ?? [`${b}${ep.id}-final.mp4`, `${b}${ep.id}-preview.mp4
 if (!file) { console.error(`no rendered video in ${b}`); process.exit(2); }
 const dec = JSON.parse(fs.readFileSync(`${b}decisions.json`, 'utf8'));
 const model = arg('model') ?? process.env.VLM_MODEL ?? 'qwen2.5vl:7b', host = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+// the model host is shared (agent B falls back to a local text model): start only when no other model is loaded, else every call times out (max 10 min)
+async function waitForFreeOllama(maxMs = 600000): Promise<boolean> {
+  for (const t0 = Date.now(); Date.now() - t0 < maxMs; await new Promise(r => setTimeout(r, 10000))) {
+    try { const ps = await (await fetch(`${host}/api/ps`, {signal: AbortSignal.timeout(5000)})).json() as {models?: {name: string}[]}; if (!(ps.models ?? []).some(m => m.name !== model)) return true; } catch { return true; } // no /api/ps: just try
+    console.error('ollama busy with another model, waiting...');
+  }
+  return false;
+}
+if (!(await waitForFreeOllama())) { console.error(`semantic QA ${ep.id}: busy (another model stayed loaded for 10 min), no result written`); process.exit(3); }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semqa-'));
 
 export type Item = {scene: number; sentence: string; score: number; shown: string; reason: string};
 async function ask(png: string, sentence: string): Promise<{score: number; shown: string; reason: string}> {
   const prompt = `This is one frame of an explainer video. At this moment the narrator says: "${sentence}"\nDoes the picture illustrate what is said (the objects, scene or data shown make sense for those words)? Ignore captions and text overlays when judging; judge the artwork. Reply with JSON only: {"score": integer 0-10 (0 = unrelated, 5 = loosely related, 10 = exactly what is described), "shown": "what the picture shows, in 8 words", "reason": "one short sentence"}`;
   const res = await fetch(`${host}/api/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(240000),
-    body: JSON.stringify({model, stream: false, format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})});
+    body: JSON.stringify({model, stream: false, keep_alive: '30s', format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})});
   if (!res.ok) throw new Error(`Ollama HTTP ${res.status} (is ${model} pulled?)`);
   const j: any = JSON.parse(((await res.json()) as any).message?.content ?? '{}');
   return {score: Math.max(0, Math.min(10, Number(j.score) || 0)), shown: String(j.shown ?? '').slice(0, 80), reason: String(j.reason ?? '').slice(0, 140)};
