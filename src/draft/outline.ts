@@ -52,6 +52,12 @@ export function parseOutline(raw: any, lenient = false, minSections = 4): {outli
   const o = {title: s(raw.title), sources, hook: s(raw.hook), stakes: s(raw.stakes), sections, twist: s(raw.twist), recap: s(raw.recap), cta: s(raw.cta), badResults, ...(s(raw.rehook) ? {rehook: s(raw.rehook)} : {}), ...(raw.extras && typeof raw.extras === 'object' ? {extras: raw.extras} : {})};
   if (!o.title || !o.hook || !o.twist || !o.recap || !o.cta || !o.stakes) errors.push('title, hook, stakes, twist, recap and cta are all required, non-empty strings.');
   if (wc(o.hook) > 15) errors.push(`hook has ${wc(o.hook)} words; 15 or fewer.`);
+  // long-form (4+ sections): every chapter needs its mini-hook and the video its mid re-hook; the last, lenient try lets them go
+  if (minSections >= 4 && !lenient) {
+    if (!o.rehook) errors.push('"rehook" is missing: one line for the middle of the video that teases the twist still to come.');
+    const noTease = sections.map((x: {tease?: string}, i: number) => x.tease ? 0 : i + 1).filter(Boolean);
+    if (noTease.length) errors.push(`Sections ${noTease.join(', ')} have no "tease" (the one-line question that opens the chapter).`);
+  }
   if (sections.length < minSections) errors.push(`Only ${sections.length} usable sections (each needs heading and fact); write ${minSections} to 6.`);
   return {outline: errors.length ? undefined : o, errors};
 }

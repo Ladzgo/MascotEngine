@@ -46,6 +46,7 @@ try {
   const legacy = () => draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model});
   // outline first, then one call per section (progress lines feed the Studio); the one-shot storyboard prompt is the fallback
   const ep0 = values.legacy && !values.short ? await legacy() : await draftByOutline({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model, log, short: values.short, device: values.device, epsRoot: path.join(root, 'episodes'), progress: (d, n, label) => console.log(`DRAFT_PROGRESS ${d}/${n} ${label}`)}).catch(e => { log(`outline draft failed (${(e as Error).message.replace(/\s*\n- /g, ' | ').slice(0, 300)}); using the one-shot prompt`); return legacy(); });
+  log(`first draft: ${ep0.scenes.length} beats, ${ep0.scenes.reduce((n, s) => n + s.narration.split(/\s+/).length, 0)} words`);
   // the one-shot fallback knows nothing about Shorts: a --short draft is a 9:16 full-bleed episode whichever path wrote it (ep014 came out 16:9)
   if (values.short) Object.assign(ep0, {format: 'short', look: 'fullbleed'});
   // the opening part call sometimes rewrites beat 1; the judged hook is the one that ships

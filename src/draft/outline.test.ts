@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {safeCalc, parseOutline, allowedNumbers, unsupportedNumbers, planParts, draftByOutline} from './outline.js';
 import {FALLBACK_VOICE} from './draft.js';
 
-const sec = (i: number, extra: any = {}) => ({heading: `Part ${i}`, point: 'p', fact: `A loan of 20000 dollars at 6 percent costs 1200 dollars a year`, numbers: [20000, 6, 1200], calc: {expr: '20000*0.06', result: 1200}, ...extra});
-const outline = (over: any = {}) => ({title: 'Car Loans', sources: ['https://www.federalreserve.gov/x'], hook: 'Your car loan hides a second price tag.', stakes: 'It can add 3000 dollars.', sections: [sec(1), sec(2), sec(3), sec(4)], twist: 'The catch is the term.', recap: 'Check the term.', cta: 'Follow for more.', ...over});
+const sec = (i: number, extra: any = {}) => ({heading: `Part ${i}`, point: 'p', fact: `A loan of 20000 dollars at 6 percent costs 1200 dollars a year`, numbers: [20000, 6, 1200], calc: {expr: '20000*0.06', result: 1200}, tease: `Why does part ${i} cost so much?`, ...extra});
+const outline = (over: any = {}) => ({title: 'Car Loans', sources: ['https://www.federalreserve.gov/x'], hook: 'Your car loan hides a second price tag.', stakes: 'It can add 3000 dollars.', sections: [sec(1), sec(2), sec(3), sec(4)], twist: 'The catch is the term.', rehook: 'And the biggest cost is still ahead.', recap: 'Check the term.', cta: 'Follow for more.', ...over});
 
 test('safeCalc evaluates arithmetic only', () => {
   assert.equal(safeCalc('20000*0.06'), 1200);
@@ -43,9 +43,9 @@ const mkClient = () => {
 test('draftByOutline expands each part and reports progress', async () => {
   const c = mkClient(), prog: string[] = [];
   const ep = await draftByOutline({client: c as any, topic: 't', id: 'ep-o', voice: FALLBACK_VOICE, progress: (d, n, l) => prog.push(`${d}/${n} ${l}`)});
-  assert.equal(planParts(parseOutline(outline()).outline!).length, 7);
-  assert.equal(prog.length, 8);
-  assert.equal(prog.at(-1), '7/7 Recap and call to action');
+  assert.equal(planParts(parseOutline(outline()).outline!).length, 8); // opening, 4 chapters, re-hook, twist, closing
+  assert.equal(prog.length, 9);
+  assert.equal(prog.at(-1), '8/8 Recap and call to action');
   assert.ok(ep.scenes.length >= 10);
   assert.equal(ep.scenes[0].type, 'title');
 });
@@ -69,4 +69,10 @@ test('long-form plan: chapters open with their mini-hook, 4-8 beats / 100+ words
   const s1 = parts.find(p => p.key === 's1')!;
   assert.ok(s1.min === 4 && s1.max === 8 && s1.minWords === 100 && /mini-hook/.test(s1.brief) && /Why 1\?/.test(s1.facts));
   assert.ok(!planParts(o, true).some(p => p.key === 'rehook')); // Shorts keep their tight shape
+});
+test('long-form outline must carry a re-hook and a tease per chapter (lenient last try lets them go)', () => {
+  const o = outline({rehook: undefined, sections: [sec(1, {tease: ''}), sec(2), sec(3), sec(4)]});
+  const errs = parseOutline(o).errors.join(' ');
+  assert.match(errs, /rehook/); assert.match(errs, /Sections 1 have no "tease"/);
+  assert.ok(parseOutline(o, true).outline);
 });
