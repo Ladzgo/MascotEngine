@@ -75,6 +75,8 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
     if (s.type === 'chart') shots.splice(1); // the chart IS the picture: a later object replaced the plot with a clock (fb-wide)
+    // a symbol any sentence could carry (shield, lock, magnifier...) loses the hero spot to a library object the sentence names (reference gap 2: a shield grid for 'the real reason')
+    if (!s.stockFile && !['big_number', 'chart', 'title'].includes(s.type) && WEAK.has(shots[0]?.kind ?? '')) { const a = objectAsset(s.narration ?? '', usedAssets); if (a) { usedAssets.add(a.id); shots[0] = {...shots[0], kind: `asset:${a.id}`, why: `${shots[0].why} -> asset "${a.word}" (weak symbol)`}; } }
     // library assets (Fluent 3D, src/assets): a fallback/variety picture becomes the object the sentence names; a long one-picture beat gets it as its second shot
     if (!s.stockFile && !['big_number', 'chart', 'title'].includes(s.type)) {
       for (const x of shots) if (/fallback|variety|mid-scene/.test(x.why ?? '')) { const a = objectAsset(s.narration ?? '', usedAssets); if (a) { usedAssets.add(a.id); x.why = `${x.why} -> asset "${a.word}"`; x.kind = `asset:${a.id}`; } }
