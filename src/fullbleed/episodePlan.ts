@@ -158,11 +158,11 @@ const SHAPES: Record<string, string[]> = {
 };
 export const shapeOf = (kind: string) => Object.entries(SHAPES).find(([, v]) => v.includes(kind))?.[0];
 /** Marks beat i as a match cut when it and beat i-1 are drawn heroes of the same silhouette; it also takes the previous framing so the shapes line up. */
-export function markMatchCuts(plans: ScenePlan[], scenes: {stockFile?: string}[]): void {
+export function markMatchCuts(plans: ScenePlan[], scenes: {stockFile?: string; type?: string}[]): void {
   plans.forEach((p, i) => {
     const q = plans[i - 1], a = q?.shots.at(-1)?.kind, b = p.shots[0]?.kind;
-    if (!q || !a || !b || scenes[i].stockFile || scenes[i - 1].stockFile || ![p.layout, q.layout].every(l => l === 'hero' || l === 'kinetic') || !shapeOf(a) || shapeOf(a) !== shapeOf(b)) return;
-    p.matchCut = true; p.zoom = q.zoom;
+    if (!q || !a || !b || scenes[i].stockFile || scenes[i - 1].stockFile || ![p.layout, q.layout].every(l => l === 'hero' || l === 'kinetic') || scenes[i].type !== 'talk' || scenes[i - 1].type !== 'talk' || !shapeOf(a) || shapeOf(a) !== shapeOf(b)) return;
+    p.matchCut = true; p.zoom = q.zoom; p.layout = q.layout; p.shots[0] = {...p.shots[0], at: 0}; // the shape must be on screen on the cut frame
   });
 }
 

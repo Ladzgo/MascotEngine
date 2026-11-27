@@ -403,7 +403,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
         {qaMarks() && <QaMarks c="stage" w={w} h={h} />}
         {shots.map((s, i) => {
-          const Obj = objectOf(s.kind), local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
+          const Obj = objectOf(s.kind), local = t - s.at + (plan.matchCut && i === 0 ? 1.2 : 0), end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
           if (local < 0 || out >= 1 || !Obj) return null;
           const inE = easeOut(local / 0.3), bob = Math.sin(t * 1.3 + i) * hs * 0.008, over = 0.8 + 0.2 * pop(local, 0, 0.5);
           const isChart = scene.type === 'chart' && i === 0;

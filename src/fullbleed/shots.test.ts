@@ -142,7 +142,7 @@ test('match cut: same silhouette in a row cuts hard and keeps the framing', asyn
   const {markMatchCuts} = await import('./episodePlan.js');
   const p = (kind: string, zoom: 'wide' | 'close') => ({env: 'room', pal: 0, camera: 0, zoom, layout: 'hero', shots: [{kind, at: 0, action: 'pop_in'}]}) as any;
   const plans = [p('battery', 'wide'), p('thermometer', 'close'), p('clock', 'wide')];
-  markMatchCuts(plans, [{}, {}, {}]);
+  markMatchCuts(plans, [{type: 'talk'}, {type: 'talk'}, {type: 'talk'}]);
   assert.equal(plans[1].matchCut, true); assert.equal(plans[1].zoom, 'wide'); assert.equal(plans[2].matchCut, undefined);
 });
 
