@@ -74,7 +74,7 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
       {pw && (() => {
         // three designed looks, rotating per punch (the same tilted pill every time read as a template): accent pill, white word over a wiping accent bar, accent word on its own
         const e = easeOut(clamp((t - pw.start) / 0.14)), word = pw.w.replace(/[.,;:!?]+$/, ''), look = [...sched].indexOf(idx) % 3;
-        const ps = Math.min(tall ? 200 : 170, (w * 0.8) / (Math.max(3, word.replace(/\W/g, '').length) * 0.8 + 0.5)); // fits the frame incl. padding and the tilt (BEFORE was clipped, ep011)
+        const ps = Math.min(tall ? 200 : 170, (w * 0.8) / (Math.max(3, word.replace(/\W/g, '').length) * 0.95 + 0.6)); // fits the frame incl. padding and the tilt (BEFORE was clipped, ep011; SCREENS at 0.8 em/glyph too, ep015)
         const wipe = easeOut(clamp((t - pw.start - 0.08) / 0.25)), base: React.CSSProperties = {fontFamily: DISPLAY, fontSize: ps, textTransform: 'uppercase', display: 'inline-block', lineHeight: 1};
         return (
           <div style={{position: 'absolute', left: 0, right: 0, top: tall ? 330 : h * 0.1, textAlign: 'center', opacity: e, transform: look === 0 ? `rotate(${-4 * e}deg) scale(${0.6 + 0.4 * e})` : look === 1 ? `translateY(${(1 - e) * 40}px)` : `scale(${1.25 - 0.25 * e})`}}>
