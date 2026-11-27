@@ -62,7 +62,7 @@ const PAUSE: Record<string, number> = {'.': 280, '?': 340, '!': 280, ';': 200, '
 /** Tiny deterministic jitter so repeated runs sound the same but sentences differ from each other. */
 const jit = (seed: number, i: number) => { const x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); };
 
-/** Cut narration into clauses (sentence ends, commas in long sentences) with a speed (0.86-0.98, numbers 0.8-0.83) and a pause after each. */
+/** Cut narration into clauses (sentence ends, commas in long sentences) with a speed (0.83-0.94, numbers 0.78-0.80) and a pause after each. */
 export function segmentize(text: string, o: {lang?: string; seed?: number; emphasis?: string[]} = {}): Segment[] {
   const seed = o.seed ?? 1, out: Segment[] = [];
   const sents = text.replace(/\s+/g, ' ').trim().match(/[^.!?…]+(?:\.{3}|[.!?…])?["')]*|[^.!?…]+$/g)?.map(s => s.trim()).filter(Boolean) ?? [];
@@ -70,15 +70,15 @@ export function segmentize(text: string, o: {lang?: string; seed?: number; empha
     const parts = s.split(/(?<=[,;:])\s+|\s+(?:—|–|-)\s+/).reduce<string[]>((a, p) => { if (a.length && a[a.length - 1].split(' ').length < 4) a[a.length - 1] += ` ${p}`; else a.push(p); return a; }, []);
     parts.forEach((p, pi) => {
       const last = pi === parts.length - 1, end = p.trim().slice(-1);
-      let speed = 0.89 + 0.09 * jit(seed, si * 7 + pi); // kokoro at 1.0 talks ~176 wpm; the references sit at 150-170
+      let speed = 0.85 + 0.08 * jit(seed, si * 7 + pi); // kokoro at 1.0 talks ~176 wpm; 0.89-0.98 still read Short beats at 173 wpm (zzb-h3); the references sit at 150-170
       if (o.emphasis?.some(e => e && p.toLowerCase().includes(e.toLowerCase()))) speed -= 0.03; // linger on the stressed phrase
       if (last && end === '?') speed += 0.02;
       // spelled-out amounts are many short words that the voice rushes ("one thousand eight hundred twenty five"): a narrator slows down on numbers
       const numeric = (p.match(/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b/gi) ?? []).length >= 3;
-      if (numeric) speed = Math.min(speed, 0.9) - 0.07;
+      if (numeric) speed = Math.min(speed, 0.87) - 0.07;
       const base = last ? (si === sents.length - 1 ? 0 : (PAUSE[end] ?? 280)) : (PAUSE[end] ?? 120);
       const pauseMs = base ? Math.max(40, Math.round(base + (jit(seed, si * 13 + pi + 50) * 2 - 1) * 60)) : 0;
-      out.push({text: p.replace(/[—–]/g, ',').trim(), speed: Math.round(Math.min(0.98, Math.max(numeric ? 0.8 : 0.86, speed)) * 1000) / 1000, pauseMs});
+      out.push({text: p.replace(/[—–]/g, ',').trim(), speed: Math.round(Math.min(0.94, Math.max(numeric ? 0.78 : 0.83, speed)) * 1000) / 1000, pauseMs});
     });
   });
   return out;

@@ -101,7 +101,8 @@ export class NeuralTTS implements TTSAdapter {
     const scenes: SceneTiming[] = [];
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`, wav = `${outDir}audio/scene-${index + 1}.wav`;
-      const key = audioKey(this.name, voice, 'neural5', neuralPost(), lang ?? '', aligner ?? '', s.narration), cached = cacheGet(file, key);
+      const segs = segmentize(spoken(s.narration, L), {lang: L, seed: index + 1, emphasis: 'emphasis' in s ? s.emphasis : []}).map(x => `${x.text}@${x.speed}/${x.pauseMs}`).join('|'); // speed/pause changes re-voice on their own
+      const key = audioKey(this.name, voice, 'neural5', neuralPost(), lang ?? '', aligner ?? '', s.narration, segs), cached = cacheGet(file, key);
       let dur: number, rel: RelWord[];
       if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
         renderSpeech(this.name, s.narration, L, wav, {seed: index + 1, emphasis: 'emphasis' in s ? s.emphasis : []});

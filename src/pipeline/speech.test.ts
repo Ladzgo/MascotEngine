@@ -15,7 +15,7 @@ test('Hungarian numerals', () => {
 });
 test('segmentize: clauses, speeds in range, pauses jittered, none after the last', () => {
   const s = segmentize('Pay the minimum, and the debt barely moves. Really? Yes.', {seed: 3});
-  assert.ok(s.length >= 3 && s.every(x => x.speed >= 0.86 && x.speed <= 0.98));
+  assert.ok(s.length >= 3 && s.every(x => x.speed >= 0.83 && x.speed <= 0.94));
   assert.equal(s.at(-1)!.pauseMs, 0);
   assert.ok(s.slice(0, -1).every(x => x.pauseMs >= 40));
   assert.deepEqual(segmentize('One. Two.', {seed: 3}), segmentize('One. Two.', {seed: 3}));
@@ -23,5 +23,5 @@ test('segmentize: clauses, speeds in range, pauses jittered, none after the last
 
 test('segmentize: a clause full of spelled-out numbers is read slower than plain talk', () => {
   const [n] = segmentize(spoken('You could spend $1,825 a year.'), {seed: 2}), [t] = segmentize('You could spend all of it this year.', {seed: 2});
-  assert.ok(n.speed <= 0.83 && n.speed >= 0.8 && t.speed >= 0.86 && n.speed < t.speed, `${n.speed} vs ${t.speed}`);
+  assert.ok(n.speed <= 0.8 && n.speed >= 0.78 && t.speed >= 0.83 && n.speed < t.speed, `${n.speed} vs ${t.speed}`);
 });

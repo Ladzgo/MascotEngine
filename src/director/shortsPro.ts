@@ -33,7 +33,7 @@ export function fitDuration(ep: Episode, maxSec = 52): {ep: Episode; dropped: nu
   return {ep: {...ep, scenes: scenes as Episode['scenes']}, dropped};
 }
 
-/** Spoken seconds of a scene before TTS exists: spoken words ("$1,825" = six) at 153 wpm, the kokoro rate with in-scene pauses at speed 0.89-0.98 (ep011/ep012 measured 165-167 at 0.95-1.05). */
-export const estSec = (s: {narration: string}, wpm = 153) => spoken(s.narration).split(/\s+/).filter(Boolean).length * 60 / wpm;
+/** Spoken seconds of a scene before TTS exists: spoken words ("$1,825" = six) at 164 wpm, the kokoro rate with in-scene pauses at speed 0.83-0.94 (zzb-h3: 101 words, 11 beats, 40.9 s real). */
+export const estSec = (s: {narration: string}, wpm = 164) => spoken(s.narration).split(/\s+/).filter(Boolean).length * 60 / wpm;
 /** Lead, tail and gap per scene, measured on rendered Shorts (0.35-0.37 s). */
 export const SCENE_PAD = 0.36;

@@ -134,7 +134,9 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
     if (pool[0]) bar = `\nThe best line so far scored ${pool[0].s}/100: "${pool[0].h}". Write 5 sharper lines that beat it: more specific, shorter, a clearer open question.`;
   }
   const best = pool[0] ?? {h: o.outlineHook, s: 0};
-  lastHookPick = {hook: best.h, score: best.s, formula: best.formula, overlay: best.overlay, tried};
+  // the overlay must stand alone for muted viewers: 4-8 words, no question-only fragments like "Mind the cost?"
+  const overlay = best.overlay && wcount(best.overlay) >= 4 && wcount(best.overlay) <= 8 ? best.overlay : undefined;
+  lastHookPick = {hook: best.h, score: best.s, formula: best.formula, overlay, tried};
   o.log?.(`hook chosen from ${tried} (${best.formula ?? 'outline'}, ${best.s}/100${best.s < HOOK_TARGET ? `, under ${HOOK_TARGET}` : ''}): "${best.h}"`);
   return best.h;
 }
