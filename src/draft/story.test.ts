@@ -104,12 +104,12 @@ test('improveStory rewrites the quoted weakest line and keeps it only when the r
   let judged = 0;
   const client = {messages: {create: async (r: {system: string}) => ({content: [{type: 'text', text: /tough YouTube/.test(r.system)
     ? JSON.stringify({score: [80, 70][judged++] ?? 70, weakest: 'Then $40 a month.'})
-    : JSON.stringify({line: 'Anna pays $40 a month for it.'})}]})}} as any;
+    : JSON.stringify({rewrites: [{i: 1, line: 'Anna pays $40 a month for it.'}]})}]})}} as any;
   const r = await improveStory(client, ep, {score: 50, weakest: 'It is a problem.', fix: 'add a person'});
   assert.equal(r.ep.scenes[1].narration, 'Anna pays $40 a month for it.');
   assert.equal(r.score, 80); assert.deepEqual(r.history, [50, 80]);
-  const bad = {messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({line: 'It costs $999 now.'})}]})}} as any;
-  assert.equal((await improveStory(bad, ep, {score: 50, weakest: 'It is a problem.'})).ep, ep); // invented number: rejected
+  const bad = {messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({rewrites: [{i: 1, line: 'It costs $999 now.'}, {i: 0, line: 'New hook.'}]})}]})}} as any;
+  assert.equal((await improveStory(bad, ep, {score: 50, weakest: 'It is a problem.'})).ep, ep); // invented number and the hook: both rejected
 });
 test('hook and overlay shape rules', async () => {
   const {badHookShape, overlayOk} = await import('./story.js');

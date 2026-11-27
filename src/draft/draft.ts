@@ -235,7 +235,7 @@ export async function addScenes(client: Client, ep: Episode, o: {model?: string;
   // elaboration that needs no new figures: what a long-form editor adds between the data beats
   const asks = ['a concrete everyday example with a person in it (no numbers)', 'what happens next as a consequence', 'a plain analogy from daily life', 'the most common mistake people make', 'why it feels different from what people expect', 'what a sensible person does about it (no advice phrasing)', 'the question a viewer would ask right now, and its short answer', 'what this looks like a year later'];
   const max = o.max ?? 4;
-  for (let k = 0; k < max * 2 && k < asks.length * 2 && count() < (o.minWords ?? 560) && scenes.length >= 3; k++) {
+  for (let k = 0; k < max * 3 && count() < (o.minWords ?? 560) && scenes.length >= 3; k++) {
     try {
       const at = o.spread ? Math.max(2, Math.min(scenes.length - 2, Math.round(((k % max) + 1) * scenes.length / (max + 1)))) : scenes.length - (o.before ?? 1);
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
@@ -248,7 +248,7 @@ export async function addScenes(client: Client, ep: Episode, o: {model?: string;
       const others = scenes.map(x => x.narration);
       const emo = EMOTIONS.includes(String(j.emotion)) ? String(j.emotion) : 'explaining';
       const cand = autoFixEpisode({...ep, scenes: [{...scenes[0], narration: 'x'}, {type: 'talk', emotion: emo, emphasis: [], narration: kept.join(' ') || 'x'}] as Episode['scenes']}).scenes[1]?.narration ?? '';
-      const n = cand.split(/\s+/).length, rep = repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length;
+      const n = cand.split(/\s+/).length, rep = repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length + (o.spread ? 1 : 0); // long scripts share everyday 4-grams: one is fine
       if (n < 10 || n > 70 || rep || numsIn(cand).some(x => !known.has(x))) { o.log?.(`addScenes: rejected candidate ${k + 1} (${n}w${rep ? ', repeat' : ''}): ${raw.slice(0, 80)}`); continue; }
       scenes.splice(at, 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
     } catch { /* skip */ }

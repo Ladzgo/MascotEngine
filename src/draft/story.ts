@@ -249,7 +249,7 @@ ANCHOR STRONG (score 88): "Anna's phone died at 40% on a ski lift. It wasn't bro
 export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
   const lines = ep.scenes.map(s => s.narration);
   try {
-    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. Quote the weakest line exactly. Output ONLY JSON: {"weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown};
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. Quote the weakest line of THIS script exactly. The anchors only calibrate the scale: never quote them or reuse their people, numbers or topic in your fix; the fix must be about this script's topic. Output ONLY JSON: {"weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown};
     let score = Math.max(0, Math.min(100, Number(j.score) || 0));
     const weakest = typeof j.weakest === 'string' ? j.weakest.trim() : '';
     // a judge that cannot point at a real line has not read the script: cap it
@@ -287,31 +287,29 @@ export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, m
   return {ep: {...ep, scenes: scenes as Episode['scenes']}, dropped};
 }
 
-/** Rewrites the beat the story judge quoted as weakest, following its fix; kept only when a re-judge scores higher. Numbers must already be in the script. */
+/** Story pass driven by the judge: rewrites up to 3 lines (always the quoted weakest one) by its note, re-judges, keeps only a gain. Numbers must already be in the script. */
 export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
   let cur = ep, j = first;
   const history = [first.score];
-  for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75) && j.weakest; r++) {
-    const narr = cur.scenes.map(s => s.narration), key = j.weakest.replace(/^"|"$/g, '').slice(0, 25);
-    const idx = narr.findIndex((l, i) => i > 0 && l.includes(key));
-    if (idx < 0) break;
-    const heard = narr.flatMap(spokenNumbers), max = o.maxWords ?? 14;
+  for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75); r++) {
+    const narr = cur.scenes.map(s => s.narration), key = (j.weakest ?? '').replace(/^"|"$/g, '').slice(0, 25);
+    const weak = key ? narr.findIndex((l, i) => i > 0 && l.includes(key)) : -1;
+    const heard = [...new Set(narr.flatMap(spokenNumbers))], max = o.maxWords ?? 14, last = narr.length - 1;
     try {
-      const sys = `You fix one line of a spoken vertical Short so the story gets better. Follow the editor's note. One or two short spoken sentences, ${max} words or fewer, plain words, it must fit between the line before and the line after. Use only numbers already in the script (${[...new Set(heard)].join(', ') || 'none'}); no new figures, no real person's full name. Output ONLY JSON: {"line": string}`;
-      const msgs: {role: 'user' | 'assistant'; content: string}[] = [{role: 'user', content: `Editor's note: ${j.fix ?? 'make this line concrete and surprising'}\nBefore: ${narr[idx - 1] ?? ''}\nLINE TO REWRITE: ${narr[idx]}\nAfter: ${narr[idx + 1] ?? ''}`}];
-      let line = '', why = '';
-      for (let t = 0; t < 2; t++) { // one retry with the reason (the first answers ran 20 words for a 14-word slot)
-        const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 400, system: sys, messages: msgs}));
-        line = String((extractJson(out) as {line?: unknown}).line ?? '').trim();
-        why = !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words, the limit is ${max}` : !spokenNumbers(line).every(n => heard.includes(n)) ? 'it adds a number that is not in the script' : slopHits(line).length ? 'it uses a stock phrase' : fullName(line) ? 'it names a real person' : '';
-        if (!why) break;
-        msgs.push({role: 'assistant', content: out.slice(0, 600)}, {role: 'user', content: `Rejected: ${why}. Output the fixed {"line"} again.`});
+      const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 900, system: `You are the story editor of a spoken vertical Short. Rewrite at most 3 lines so the script gains what the editor's note asks for: a concrete everyday person or example in the middle, a counter-intuitive turn, a payoff of the opening line. ${weak > 0 ? `Line ${weak} must be one of them. ` : ''}Never touch line 0 (the hook) or line ${last} (the last line). Each new line: ${max} words or fewer, plain spoken, fits the lines around it. Use only numbers already in the script (${heard.join(', ') || 'none'}); an example person gets a first name only. Output ONLY JSON: {"rewrites": [{"i": number, "line": string}]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? 'add a concrete person and a surprising turn'}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
+      const rw = ((extractJson(out) as {rewrites?: {i: number; line: string}[]}).rewrites ?? []).slice(0, 3);
+      const scenes = cur.scenes.map(s => ({...s}));
+      let n = 0;
+      for (const w of rw) {
+        const line = String(w.line ?? '').trim(), i = Number(w.i);
+        const why = !(i > 0 && i < last) ? 'hook or last line' : !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words` : !spokenNumbers(line).every(x => heard.includes(x)) ? 'new number' : slopHits(line).length ? 'stock phrase' : fullName(line) ? 'full name' : '';
+        if (why) { o.log?.(`story: line ${i + 1} rejected (${why}): ${line}`); continue; }
+        scenes[i].narration = line; n++;
       }
-      if (why) { o.log?.(`story: rewrite of beat ${idx + 1} rejected (${why}): ${line}`); break; }
-      const next = {...cur, scenes: cur.scenes.map((s, i) => i === idx ? {...s, narration: line} : s) as Episode['scenes']};
-      const nj = await judgeStory(client, next, o.model);
+      if (!n) break;
+      const next = {...cur, scenes: scenes as Episode['scenes']}, nj = await judgeStory(client, next, o.model);
       history.push(nj.score);
-      o.log?.(`story: beat ${idx + 1} "${narr[idx]}" -> "${line}" (${j.score} -> ${nj.score})`);
+      o.log?.(`story round ${r + 1}: ${n} lines rewritten, judge ${j.score} -> ${nj.score}`);
       if (nj.score <= j.score) break;
       cur = next; j = nj;
     } catch (e) { o.log?.(`story rewrite skipped (${(e as Error).message.slice(0, 60)})`); break; }
