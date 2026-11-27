@@ -19,7 +19,7 @@ const RULES: [string, RegExp][] = [
   ['shopping_bag', /^(shopp\w+|retail|purchas\w+|buy\w*|bought|spree|spend\w*|splurg\w+)$/], ['keys', /^(keys?|landlord|tenants?|lease|renter|renting|rent)$/], ['tax_form', /^(tax\w*|irs|deduct\w*|filing|returns?)$/],
   ['ticker', /^(stocks?|shares?|ticker|trad(e|es|ing|er|ers)|dividends?|nasdaq|s&p)$/], ['rocket', /^(skyrocket\w*|rocket\w*|soar\w*|moon|boom\w*|surg\w+)$/], ['ladder', /^(ladder|climb\w*|steps?|rungs?|career|promotion)$/],
   ['safe', /^(safe|stash\w*|savings|secure\w*)$/], ['hourglass', /^(wait\w*|patien\w*|years?|decades?|eventually|slowly|deadline|forever|retire\w*|long-term)$/], ['thermometer', /^(inflation|heat\w*|hot|overheat\w*|temperatures?|prices|degrees|celsius|fahrenheit|cold|colder|freez\w*|frozen|warm\w*|winter)$/],
-  ['gas_pump', /^(gas|fuel|petrol|gasoline)$/], ['groceries', /^(grocer\w*|food|supermarket|meals?|eggs|milk|bread)$/], ['coffee', /^(coffee|latte|lattes|cafe|espresso)$/], ['subscriptions', /^(subscri\w+|streaming|netflix|memberships?|recurring)$/],
+  ['gas_pump', /^(gas|fuel|petrol|gasoline)$/], ['groceries', /^(grocer\w*|food|supermarket|meals?|eggs|milk|bread)$/], ['coffee', /^(coffee|latte|lattes|cafe|espresso|cups?|mugs?|barista)$/], ['subscriptions', /^(subscri\w+|streaming|netflix|memberships?|recurring)$/],
   ['trophy', /^(win\w*|winners?|champion\w*|goals?|achiev\w+|success\w*|best)$/], ['tree', /^(tree|seeds?|plant\w*|compound\w*|decades)$/], ['anchor', /^(anchor\w*|burden\w*|drag\w*|heavy|weigh\w*)$/], ['hole', /^(hole|pit|spiral\w*|drain\w*|sink\w*|trapped)$/],
   ['flame', /^(burn\w*|wast\w+|fire|blow\w*|squander\w*)$/], ['dice', /^(risks?|risky|gambl\w*|luck\w*|chance|odds|bets?|volatil\w*)$/], ['umbrella', /^(rainy|emergenc\w+|cushion|buffer|unexpected)$/],
   ['calculator', /^(calculat\w+|math\w*|maths|compute\w*|totals?|sum|add\w*)$/], ['map_route', /^(route|path|roadmap|map|road)$/], ['donut', /^(breakdown|portion|percentage|slices?|allocat\w+)$/], ['line_chart', /^(trend\w*|history|historical\w*|curve|chart\w*)$/],
@@ -42,7 +42,7 @@ const RULES: [string, RegExp][] = [
   ['skyline', /^(econom\w+|business\w*|compan(y|ies)|corporat\w+|recession|industry)$/],
 ];
 const POOL = ['coin_stacks', 'bars_arrow', 'skyline', 'cash', 'pie', 'receipts', 'wallet', 'calendar']; // neutral, on-topic fillers only (no people/clock/bulb unless the text is about them)
-const GENERIC = new Set(['people', 'clock', 'bulb', 'gears', 'pin', 'handshake', 'magnifier', 'scale', 'shield', 'lock']);
+const GENERIC = new Set(['people', 'clock', 'hourglass', 'calendar', 'bulb', 'gears', 'pin', 'handshake', 'magnifier', 'scale', 'shield', 'lock']);
 const DET = new Set(['the', 'a', 'an', 'your', 'their', 'this', 'that', 'its', 'every', 'each', 'any', 'of', 'on', 'in', 'at', 'for', 'with']);
 const DEBT = /\b(debts?|owe[sd]?|owing|loans?|borrow\w*)\b/i; // red 'you owe' styling only when the beat is about owing
 const cleanWord = (w: string) => w.toLowerCase().replace(/[^a-z0-9%$]/g, '');

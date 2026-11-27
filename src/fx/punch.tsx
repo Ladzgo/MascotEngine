@@ -63,10 +63,18 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
           return <span key={i} style={{fontFamily: DISPLAY, fontSize: size, lineHeight: 1.05, textTransform: 'uppercase', color: active ? '#ffe033' : '#fff', WebkitTextStroke: stroke, paintOrder: 'stroke fill', textShadow: '0 5px 0 rgba(0,0,0,0.5)', transform: `scale(${active ? 1.04 : 1})`, display: 'inline-block'}}>{x.w.replace(/[.,;:!?]+$/, '')}</span>;
         })}
       </div>
-      {pw && (() => { const e = easeOut(clamp((t - pw.start) / 0.14)), ps = Math.min(tall ? 200 : 170, (w * 0.8) / (Math.max(3, pw.w.replace(/\W/g, '').length) * 0.8 + 0.5)); return ( // fits the frame incl. padding and the -4deg tilt (BEFORE was clipped, ep011)
-        <div style={{position: 'absolute', left: 0, right: 0, top: tall ? 330 : h * 0.1, textAlign: 'center', opacity: e, transform: `rotate(${-4 * e}deg) scale(${0.6 + 0.4 * e})`}}>
-          <span style={{fontFamily: DISPLAY, fontSize: ps, textTransform: 'uppercase', color: '#fff', background: accent, padding: `0 ${ps * 0.2}px`, borderRadius: ps * 0.12, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', WebkitTextStroke: `${ps * 0.03}px rgba(0,0,0,0.35)`, display: 'inline-block'}}>{pw.w.replace(/[.,;:!?]+$/, '')}</span>
-        </div>); })()}
+      {pw && (() => {
+        // three designed looks, rotating per punch (the same tilted pill every time read as a template): accent pill, white word over a wiping accent bar, accent word on its own
+        const e = easeOut(clamp((t - pw.start) / 0.14)), word = pw.w.replace(/[.,;:!?]+$/, ''), look = Math.floor(idx / 4) % 3;
+        const ps = Math.min(tall ? 200 : 170, (w * 0.8) / (Math.max(3, word.replace(/\W/g, '').length) * 0.8 + 0.5)); // fits the frame incl. padding and the tilt (BEFORE was clipped, ep011)
+        const wipe = easeOut(clamp((t - pw.start - 0.08) / 0.25)), base: React.CSSProperties = {fontFamily: DISPLAY, fontSize: ps, textTransform: 'uppercase', display: 'inline-block', lineHeight: 1};
+        return (
+          <div style={{position: 'absolute', left: 0, right: 0, top: tall ? 330 : h * 0.1, textAlign: 'center', opacity: e, transform: look === 0 ? `rotate(${-4 * e}deg) scale(${0.6 + 0.4 * e})` : look === 1 ? `translateY(${(1 - e) * 40}px)` : `scale(${1.25 - 0.25 * e})`}}>
+            {look === 0 && <span style={{...base, color: '#fff', background: accent, padding: `0.06em ${ps * 0.2}px`, borderRadius: ps * 0.12, boxShadow: '0 12px 40px rgba(0,0,0,0.5)', WebkitTextStroke: `${ps * 0.03}px rgba(0,0,0,0.35)`}}>{word}</span>}
+            {look === 1 && <span style={{...base, position: 'relative', color: '#fff', textShadow: '0 6px 24px rgba(0,0,0,0.6)'}}><span style={{position: 'absolute', left: '-4%', bottom: '-2%', height: '32%', width: `${108 * wipe}%`, background: accent, borderRadius: ps * 0.06, zIndex: -1}} />{word}</span>}
+            {look === 2 && <span style={{...base, color: accent, WebkitTextStroke: `${ps * 0.035}px #fff`, paintOrder: 'stroke fill', textShadow: '0 10px 0 rgba(0,0,0,0.35), 0 20px 50px rgba(0,0,0,0.5)'}}>{word}</span>}
+          </div>);
+      })()}
     </>
   );
 };

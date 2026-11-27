@@ -97,7 +97,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     const companion = GROUPS[g]?.find(k => OBJECTS[k] && (money || !MONEY_ONLY.has(k)) && !shots.some(x => x.kind === k) && !lastSix().includes(k));
     if (typeof sh.layout === 'string' && (LAYOUTS as readonly string[]).includes(sh.layout)) layout = sh.layout as Layout;
     else if (s.type === 'chart') layout = 'dataviz';
-    else if (s.stockFile) layout = talkN % 2 ? 'pip' : 'broll';
+    else if (s.stockFile) layout = shots[0]?.why?.startsWith('shot.') ? 'pip' : 'broll'; // footage + the named object as an accent reads as "exactly this" (semantic QA: bare snow footage for "zero degrees" scored 5)
     else if (s.type !== 'talk') layout = 'hero';
     else {
       const order: Layout[] = ['hero', 'kinetic', 'split', 'grid', 'hero', 'kinetic'];
