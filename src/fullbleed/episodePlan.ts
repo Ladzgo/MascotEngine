@@ -121,7 +121,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       if (layout === prevLayout) layout = layout === 'hero' ? 'kinetic' : 'hero';
     }
     if ((layout === 'pip' || layout === 'broll') && !s.stockFile) layout = 'hero';
-    if (layout === 'grid' && WEAK.has(shots[0]?.kind ?? '')) layout = 'hero'; // six shields for 'the real reason' read as clip art (ep016)
+    if (layout === 'grid' && WEAK.has(shots[0]?.kind ?? '')) layout = 'kinetic'; // six shields for 'the real reason' read as clip art (ep016); a full-size lone symbol was clipped, so the headline carries it
     const own = loopCats(s.narration ?? ''), loop = !s.stockFile && layout !== 'dataviz' && s.type !== 'chart' && (own.length || !prevLoop) ? loopAsset([...own, ...(topCat ? [topCat] : [])], new Set(looks.slice(-2).filter(l => l.startsWith('loop:')).map(l => l.slice(5))), usedLoops) : undefined;
     if (loop) usedLoops.add(loop.file);
     if (!s.stockFile) prevLoop = !!loop;
