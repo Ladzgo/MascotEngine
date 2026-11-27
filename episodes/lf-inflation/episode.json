@@ -1,0 +1,1569 @@
+{
+  "id": "lf-inflation",
+  "title": "Your Savings Account is Lying to You",
+  "channel": "default",
+  "series": "money-myths",
+  "seed": 0,
+  "scenes": [
+    {
+      "type": "title",
+      "narration": "$10,000. Ten years. 7,000 left.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "shot": {
+        "subject": "arrow_down",
+        "action": "slides",
+        "setting": "savings account",
+        "label": "$10,000",
+        "mood": "tense",
+        "camera": "pan_left"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Imagine you put $10,000 in a savings account in 2013.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "visual": {
+        "kind": "scale"
+      },
+      "shot": {
+        "subject": "clock",
+        "action": "stacks",
+        "setting": "savings account",
+        "mood": "curious",
+        "camera": "push",
+        "at": "2013"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "By 2023, it's only worth $5,700.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "stopwatch",
+        "action": "grows",
+        "setting": "savings account",
+        "mood": "tense",
+        "camera": "tilt_down"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "That's a 43% loss to inflation.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "percent",
+        "action": "swipes",
+        "setting": "savings account",
+        "label": "43%",
+        "mood": "serious",
+        "camera": "pull",
+        "at": "43%"
+      }
+    },
+    {
+      "type": "big_number",
+      "narration": "At 3% inflation, $10,000 buys about $7,400 worth of stuff in ten years.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "chart_down"
+      },
+      "value": 7400,
+      "prefix": "In ten years,",
+      "suffix": "'s worth of stuff",
+      "label": "Seven thousand four hundred dollars",
+      "decimals": 0,
+      "shot": {
+        "subject": "gauge",
+        "action": "fills",
+        "setting": "savings account",
+        "label": "7,400",
+        "mood": "serious",
+        "camera": "orbit"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Imagine your savings account is slowly eating away at your purchasing power.",
+      "shot": {
+        "subject": "shield",
+        "action": "drains",
+        "setting": "savings account",
+        "mood": "serious",
+        "camera": "pan_right"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Meet Tom. He saved up $500 for a new bike.",
+      "shot": {
+        "subject": "jar_fill",
+        "action": "grows",
+        "setting": "savings account",
+        "mood": "serious",
+        "camera": "pull",
+        "at": "bike"
+      },
+      "stock": {
+        "query": "bicycle with helmet",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Inflation made his savings less useful.",
+      "shot": {
+        "subject": "clock",
+        "action": "fills",
+        "setting": "savings account",
+        "mood": "serious",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Imagine Jane, who saved $10,000 for her daughter's education.",
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "flips",
+        "setting": "living room",
+        "mood": "curious",
+        "camera": "tilt_down",
+        "at": "imagine"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "By the time she needs it, it barely covers a fraction of tuition.",
+      "shot": {
+        "subject": "gradcap",
+        "action": "shrinks",
+        "setting": "bank",
+        "label": "10,000",
+        "number": 10000,
+        "mood": "serious",
+        "camera": "push"
+      },
+      "stock": {
+        "query": "woman holding cash",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "To understand why, let's look at history.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "calendar"
+      },
+      "shot": {
+        "subject": "calendar",
+        "action": "counts",
+        "setting": "desk",
+        "mood": "tense",
+        "camera": "tilt_up",
+        "at": "look"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Hyperinflation in Venezuela reached 833,997% in 2018.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "battery",
+        "action": "spins",
+        "setting": "screen",
+        "label": "833,997%",
+        "number": 833997,
+        "mood": "upbeat",
+        "camera": "orbit",
+        "at": "hyperinflation"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "But that's extreme.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "gauge",
+        "action": "shrinks",
+        "setting": "screen",
+        "mood": "calm",
+        "camera": "pull",
+        "at": "extreme"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Even in the 16th century, prices in Europe rose sixfold over 150 years.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "thermometer",
+        "action": "grows",
+        "setting": "table",
+        "mood": "serious",
+        "camera": "push",
+        "at": "century"
+      },
+      "stock": {
+        "query": "coin stack",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Inflation is a long-term reality, even if it's not as dramatic.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "clock",
+        "action": "stacks",
+        "setting": "wall",
+        "mood": "serious",
+        "camera": "pull",
+        "at": "even"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "So, what’s next? You might need to save more just to stay even.",
+      "shot": {
+        "subject": "arrow_up",
+        "action": "crosses",
+        "setting": "screen",
+        "mood": "upbeat",
+        "camera": "orbit",
+        "at": "next"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "With inflation at 50% in a single year,",
+      "shot": {
+        "subject": "price_up",
+        "action": "swipes",
+        "setting": "office desk",
+        "label": "50%",
+        "number": 50,
+        "mood": "serious",
+        "camera": "push",
+        "at": "inflation"
+      },
+      "stock": {
+        "query": "inflation gauge",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "a $100 bill might as well be a $50 bill by the end of the year.",
+      "shot": {
+        "subject": "bills",
+        "action": "shrinks",
+        "setting": "office desk",
+        "label": "50%",
+        "number": 50,
+        "mood": "serious",
+        "camera": "pull",
+        "at": "bill"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Can you believe your savings account might be making you poorer?",
+      "emotion": "thinking",
+      "emphasis": [],
+      "chapter": "Inflation",
+      "shot": {
+        "subject": "shield",
+        "action": "grows",
+        "setting": "office desk",
+        "label": "poorer",
+        "mood": "tense",
+        "camera": "pull",
+        "at": "account"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Your savings account is like a car with a flat tire.",
+      "shot": {
+        "subject": "car",
+        "action": "fills",
+        "setting": "flat tire",
+        "mood": "tense",
+        "camera": "push",
+        "at": "tire"
+      },
+      "stock": {
+        "query": "flat tire car",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "You're not going anywhere, and you might be losing ground.",
+      "shot": {
+        "subject": "arrow_down",
+        "action": "drains",
+        "setting": "office desk",
+        "mood": "tense",
+        "camera": "pull"
+      },
+      "stock": {
+        "query": "leaky bucket",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Imagine your savings account as a leaky bucket.",
+      "shot": {
+        "subject": "safe",
+        "action": "counts",
+        "setting": "office desk",
+        "mood": "tense",
+        "camera": "orbit"
+      },
+      "stock": {
+        "query": "water dripping from bucket",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Every year, a little water leaks out, making your money less valuable.",
+      "shot": {
+        "subject": "hourglass",
+        "action": "slides",
+        "setting": "office desk",
+        "mood": "tense",
+        "camera": "orbit",
+        "at": "water"
+      }
+    },
+    {
+      "type": "compare",
+      "narration": "Compare that to a savings account that pays only 1% interest over ten years.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "left": {
+        "title": "Inflation",
+        "value": "7,400"
+      },
+      "right": {
+        "title": "Savings Account",
+        "value": "8,000"
+      },
+      "shot": {
+        "subject": "gauge",
+        "action": "splits",
+        "setting": "office desk",
+        "label": "1%",
+        "number": 1,
+        "mood": "upbeat",
+        "camera": "push",
+        "at": "interest"
+      },
+      "stock": {
+        "query": "interest rate gauge",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "thinking",
+      "emphasis": [],
+      "narration": "You'd end up with a bit more than $8,000.",
+      "shot": {
+        "subject": "cash",
+        "action": "grows",
+        "setting": "bank",
+        "label": "$8,000",
+        "number": 8000,
+        "mood": "upbeat",
+        "camera": "push"
+      },
+      "stock": {
+        "query": "cash in bank",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Most people think higher interest rates save them. Not so fast.",
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "stacks",
+        "setting": "savings jar",
+        "label": "higher rates",
+        "mood": "tense",
+        "camera": "tilt_up",
+        "at": "rates"
+      },
+      "stock": {
+        "query": "savings jar coins",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "So, your savings account might be making you poorer.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "arrow_down"
+      },
+      "shot": {
+        "subject": "piggy",
+        "action": "fills",
+        "setting": "piggy bank",
+        "label": "savings",
+        "mood": "serious",
+        "camera": "tilt_down",
+        "at": "savings"
+      },
+      "stock": {
+        "query": "piggy bank savings",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Can you imagine inflation so high, it makes your savings disappear?",
+      "emotion": "thinking",
+      "emphasis": [],
+      "chapter": "Venezuela",
+      "shot": {
+        "subject": "thermometer",
+        "action": "drains",
+        "setting": "inflation",
+        "label": "inflation",
+        "mood": "tense",
+        "camera": "orbit",
+        "at": "inflation"
+      },
+      "stock": {
+        "query": "inflation meter",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Imagine an inflation rate so high, your savings disappear in just 53 days.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "price_up",
+        "action": "counts",
+        "setting": "clock",
+        "label": "53",
+        "number": 53,
+        "mood": "serious",
+        "camera": "tilt_up",
+        "at": "days"
+      },
+      "stock": {
+        "query": "clock countdown",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "That's what happened in Venezuela in 2018.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "arrow_down",
+        "action": "flips",
+        "setting": "map",
+        "label": "Venezuela",
+        "mood": "serious",
+        "camera": "pan_right",
+        "at": "venezuela"
+      },
+      "stock": {
+        "query": "map venezuela",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "People expected their savings to grow, but it feels like they're shrinking.",
+      "shot": {
+        "subject": "cash",
+        "action": "drains",
+        "setting": "bank",
+        "label": "savings",
+        "mood": "tense",
+        "camera": "pull",
+        "at": "savings"
+      },
+      "stock": {
+        "query": "bank cash drains",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Imagine planting a seed and expecting a tree, but getting a shrub instead.",
+      "shot": {
+        "subject": "tree",
+        "action": "drops",
+        "setting": "garden",
+        "label": "tree",
+        "mood": "curious",
+        "camera": "orbit",
+        "at": "tree"
+      },
+      "stock": {
+        "query": "seed sprout garden",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Inflation's like a sneaky thief.",
+      "shot": {
+        "subject": "drop",
+        "action": "shrinks",
+        "setting": "city street",
+        "mood": "tense",
+        "camera": "pan_right",
+        "at": "thief"
+      },
+      "stock": {
+        "query": "thief stealing money city",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "It creeps up, and before you know it, your savings are gone.",
+      "shot": {
+        "subject": "safe",
+        "action": "grows",
+        "setting": "bank vault",
+        "mood": "serious",
+        "camera": "tilt_down",
+        "at": "savings"
+      },
+      "stock": {
+        "query": "bank vault savings",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "People thought higher rates would save them, but inflation made their money shrink faster.",
+      "shot": {
+        "subject": "people",
+        "action": "swipes",
+        "setting": "financial market",
+        "mood": "curious",
+        "camera": "push",
+        "at": "rates"
+      },
+      "stock": {
+        "query": "financial market rates rising",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "In October 2018,",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "percent"
+      },
+      "shot": {
+        "subject": "chip",
+        "action": "stacks",
+        "setting": "calendar",
+        "mood": "calm",
+        "camera": "tilt_up"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Venezuela's inflation rate hit 833,997%.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "thermometer",
+        "action": "pops",
+        "setting": "city street",
+        "mood": "serious",
+        "camera": "pull"
+      },
+      "stock": {
+        "query": "city street country",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "That means a 100% loss every 53 days.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "mountain",
+        "action": "drops",
+        "setting": "mountain",
+        "mood": "upbeat",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "mountain",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "A sensible person moves their money to a currency stable as a mountain.",
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "splits",
+        "setting": "calculator",
+        "mood": "serious",
+        "camera": "orbit"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "100 divided by 833,997 equals 0.0 zero one nine.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "paycheck",
+        "action": "shrinks",
+        "setting": "bank vault",
+        "number": 100,
+        "mood": "serious",
+        "camera": "tilt_down"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "It's like winning a lottery and then losing it in a single day.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "trophy",
+        "action": "crosses",
+        "setting": "desert",
+        "mood": "tense",
+        "camera": "pan_left",
+        "at": "lottery"
+      },
+      "stock": {
+        "query": "lottery ticket losing",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Imagine a king traveling with a camel train the size of a city.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "chapter": "Mansa Musa",
+      "visual": {
+        "kind": "people"
+      },
+      "shot": {
+        "subject": "plane",
+        "action": "counts",
+        "setting": "desert",
+        "mood": "upbeat",
+        "camera": "orbit",
+        "at": "king"
+      },
+      "stock": {
+        "query": "king on camel",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Mansa Musa’s hajj in 1324 had thousands of people and nearly 100 camels.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "visual": {
+        "kind": "arrow_up"
+      },
+      "shot": {
+        "subject": "people",
+        "action": "grows",
+        "setting": "desert",
+        "mood": "upbeat",
+        "camera": "orbit"
+      }
+    },
+    {
+      "type": "big_number",
+      "narration": "Inflation was so high, it could have been a 50% loss in a single year.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "value": 50,
+      "prefix": "",
+      "suffix": "%",
+      "label": "Mansa Musa",
+      "decimals": 0,
+      "shot": {
+        "subject": "thermometer",
+        "action": "counts",
+        "setting": "economy",
+        "number": 50,
+        "mood": "serious",
+        "camera": "tilt_down",
+        "at": "inflation"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "A year later, your $100 could buy you a mere $50 worth of goods.",
+      "shot": {
+        "subject": "hourglass",
+        "action": "drains",
+        "setting": "store",
+        "number": 100,
+        "mood": "serious",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "money draining from piggy bank",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "That means a 50% loss in just one year.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "visual": {
+        "kind": "arrow_down"
+      },
+      "shot": {
+        "subject": "arrow_down",
+        "action": "drops",
+        "setting": "store",
+        "number": 50,
+        "mood": "serious",
+        "camera": "tilt_down"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "If you had 100 dollars, it would be worth only 50 dollars the next year.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "wallet"
+      },
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "drains",
+        "setting": "store",
+        "number": 50,
+        "mood": "serious",
+        "camera": "tilt_down",
+        "at": "50"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "But what if you think you're doing okay with your savings? Think again.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "brain",
+        "action": "stacks",
+        "setting": "bank",
+        "mood": "curious",
+        "camera": "tilt_up",
+        "at": "savings"
+      },
+      "stock": {
+        "query": "savings account question",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Imagine you have 100 dollars.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "cash",
+        "action": "grows",
+        "setting": "stack of bills",
+        "number": 100,
+        "mood": "upbeat",
+        "camera": "push",
+        "at": "dollars"
+      },
+      "stock": {
+        "query": "stack of hundred dollar bills",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "In just one year, it could be worth less than half.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "hourglass",
+        "action": "drains",
+        "setting": "savings account",
+        "mood": "tense",
+        "camera": "pull",
+        "at": "year"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Imagine Tom, who thought his $500 in a savings account was safe.",
+      "shot": {
+        "subject": "safe",
+        "action": "drops",
+        "setting": "savings account",
+        "number": 500,
+        "mood": "serious",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "savings account screen",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "After a year, he could only buy half the groceries he used to.",
+      "shot": {
+        "subject": "groceries",
+        "action": "counts",
+        "setting": "grocery store",
+        "mood": "tense",
+        "camera": "pull",
+        "at": "groceries"
+      },
+      "stock": {
+        "query": "woman counting groceries",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "After a year, it buys him a fraction of the trip he planned.",
+      "shot": {
+        "subject": "shopping_bag",
+        "action": "shrinks",
+        "setting": "map",
+        "mood": "curious",
+        "camera": "tilt_down",
+        "at": "trip"
+      },
+      "stock": {
+        "query": "map of travel destinations",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Picture Sarah, who thought her savings were safe.",
+      "shot": {
+        "subject": "jar_fill",
+        "action": "drops",
+        "setting": "savings account",
+        "number": 100,
+        "mood": "serious",
+        "camera": "tilt_up",
+        "at": "savings"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "She put $100 aside, thinking it would grow.",
+      "shot": {
+        "subject": "brain",
+        "action": "stacks",
+        "setting": "stack of bills",
+        "number": 100,
+        "mood": "upbeat",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Instead, it bought her less each year.",
+      "shot": {
+        "subject": "cart",
+        "action": "drains",
+        "setting": "savings account",
+        "mood": "tense",
+        "camera": "pull",
+        "at": "year"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Imagine prices rising sixfold over 150 years. Is that possible today?",
+      "emotion": "thinking",
+      "emphasis": [],
+      "chapter": "Price Revolution",
+      "shot": {
+        "subject": "scale",
+        "action": "slides",
+        "setting": "timeline",
+        "mood": "curious",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "scale timeline price inflation",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Now, consider a longer timeline. Think about 150 years ago.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "calendar"
+      },
+      "shot": {
+        "subject": "clock",
+        "action": "swipes",
+        "setting": "time lapse",
+        "mood": "serious",
+        "camera": "tilt_up"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "So, what happens next?",
+      "shot": {
+        "subject": "piggy",
+        "action": "drops",
+        "setting": "savings jar",
+        "mood": "tense",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Your $10,000 might as well be $5,700 by 2023—less buying power, more stress.",
+      "shot": {
+        "subject": "pricetag",
+        "action": "drains",
+        "setting": "savings jar",
+        "label": "10,000",
+        "number": 10000,
+        "mood": "tense",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "pricetag money savings",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "From the second half of the 15th century to the first half of the 17th,",
+      "emotion": "shocked",
+      "emphasis": [],
+      "visual": {
+        "kind": "clock"
+      },
+      "shot": {
+        "subject": "calendar",
+        "action": "splits",
+        "setting": "150 years",
+        "mood": "serious",
+        "camera": "orbit"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Western Europe saw a major inflationary cycle.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "shot": {
+        "subject": "house",
+        "action": "grows",
+        "setting": "time period",
+        "mood": "upbeat",
+        "camera": "pull"
+      },
+      "stock": {
+        "query": "house time period",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Over 150 years, prices on average rose perhaps sixfold, a 500% increase.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "chart_up"
+      },
+      "shot": {
+        "subject": "gauge",
+        "action": "fills",
+        "setting": "inflation",
+        "label": "500%",
+        "number": 500,
+        "mood": "serious",
+        "camera": "tilt_up"
+      },
+      "stock": {
+        "query": "gauge inflation",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Think of your savings as a plant. Without water, it withers. With inflation, even less grows.",
+      "shot": {
+        "subject": "brain",
+        "action": "grows",
+        "setting": "garden",
+        "mood": "serious",
+        "camera": "orbit"
+      },
+      "stock": {
+        "query": "plant wither garden",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "big_number",
+      "narration": "That means, if you had 100 dollars in 1500, it would be worth about 600 dollars by 1650.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "value": 600,
+      "prefix": "",
+      "suffix": "",
+      "label": "Price Revolution",
+      "decimals": 0,
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "drops",
+        "setting": "old vault",
+        "number": 100,
+        "mood": "tense",
+        "camera": "push",
+        "at": "that"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "thinking",
+      "emphasis": [],
+      "narration": "In real terms.",
+      "shot": {
+        "subject": "apple",
+        "action": "shrinks",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "pull"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "This happened over three generations. Inflation can be a long game.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "people"
+      },
+      "shot": {
+        "subject": "clock",
+        "action": "counts",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "tilt_down"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "So, imagine prices rising sixfold over 150 years. Is that possible today?",
+      "emotion": "thinking",
+      "emphasis": [],
+      "visual": {
+        "kind": "question"
+      },
+      "shot": {
+        "subject": "scale",
+        "action": "swipes",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "orbit"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "It's a historical fact,",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "cash"
+      },
+      "shot": {
+        "subject": "line_chart",
+        "action": "flips",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "tilt_up"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "but it shows how much your money can lose in value over time.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "drains",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "pull"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "It feels like your money is keeping up, but it’s actually losing ground.",
+      "shot": {
+        "subject": "cash",
+        "action": "drops",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "tilt_down"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Your savings account feels like it’s keeping pace, but in reality, it’s just standing still.",
+      "shot": {
+        "subject": "safe",
+        "action": "drains",
+        "setting": "old vault",
+        "mood": "tense",
+        "camera": "orbit"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "How much has your money really lost to inflation in the last decade?",
+      "emotion": "thinking",
+      "emphasis": [],
+      "chapter": "BLS CPI",
+      "shot": {
+        "subject": "arrow_down",
+        "action": "shrinks",
+        "setting": "Living room",
+        "number": 10000,
+        "mood": "tense",
+        "camera": "pan_right",
+        "at": "inflation"
+      },
+      "stock": {
+        "query": "10000 dollar bills",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "From 2013 to 2023, the inflation rate was about 130%.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "visual": {
+        "kind": "calendar"
+      },
+      "shot": {
+        "subject": "thermometer",
+        "action": "grows",
+        "setting": "Living room",
+        "number": 5700,
+        "mood": "tense",
+        "camera": "pan_left"
+      },
+      "stock": {
+        "query": "5700 dollar bills",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "A sensible person might start investing in assets that historically hold their value,",
+      "shot": {
+        "subject": "shield",
+        "action": "drops",
+        "setting": "Office",
+        "mood": "serious",
+        "camera": "orbit",
+        "at": "investing"
+      },
+      "stock": {
+        "query": "shield protecting assets",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "like real estate or stocks.",
+      "shot": {
+        "subject": "ticker",
+        "action": "crosses",
+        "setting": "Living room",
+        "mood": "upbeat",
+        "camera": "pull"
+      },
+      "stock": {
+        "query": "stock market screen",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "big_number",
+      "narration": "If you had $10,000 in 2013, by 2023, it would only buy about $5,700 worth of stuff.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "value": 5700,
+      "prefix": "$",
+      "suffix": " worth of stuff",
+      "label": "BLS CPI, 2023",
+      "decimals": 0,
+      "shot": {
+        "subject": "shopping_bag",
+        "action": "drains",
+        "setting": "Living room",
+        "number": 10000,
+        "mood": "tense",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "That's because the BLS CPI shows a 130% increase in prices over that decade.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "chart_up"
+      },
+      "shot": {
+        "subject": "arrow_up",
+        "action": "fills",
+        "setting": "Living room",
+        "number": 5700,
+        "mood": "tense",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "list",
+      "narration": "So, here are three key points to remember: First, inflation is real.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "percent"
+      },
+      "items": [
+        "Inflation is real",
+        "It reduces buying power",
+        "It's not just short-term"
+      ],
+      "shot": {
+        "subject": "card",
+        "action": "stacks",
+        "setting": "Living room",
+        "label": "key points",
+        "mood": "serious",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Second, it can significantly reduce the buying power of your savings. Third, it's not just a short-term issue.",
+      "shot": {
+        "subject": "globe",
+        "action": "counts",
+        "setting": "Living room",
+        "label": "inflation",
+        "mood": "serious",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "globe showing world",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "So, what's the solution? Keep your money in a mattress?",
+      "shot": {
+        "subject": "coin_stacks",
+        "action": "slides",
+        "setting": "living room",
+        "mood": "curious",
+        "camera": "tilt_down",
+        "at": "solution"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "In fact, the maths shows that your $10,000 in 2013 would only be worth $5,700 in 2023.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "coins"
+      },
+      "shot": {
+        "subject": "brain",
+        "action": "shrinks",
+        "setting": "bedroom desk",
+        "label": "$10,000",
+        "number": 10000,
+        "mood": "serious",
+        "camera": "push"
+      },
+      "stock": {
+        "query": "dollar bill 2013",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "This is why it's important to keep an eye on inflation when planning your savings.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "wallet"
+      },
+      "shot": {
+        "subject": "calendar",
+        "action": "slides",
+        "setting": "office desk",
+        "mood": "serious",
+        "camera": "pan_right"
+      },
+      "stock": {
+        "query": "calendar 2023",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "A year later, Tom’s bike is out of reach.",
+      "shot": {
+        "subject": "hourglass",
+        "action": "fills",
+        "setting": "playground",
+        "mood": "tense",
+        "camera": "push",
+        "at": "bike"
+      },
+      "stock": {
+        "query": "out of reach bike",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "His $500 now buys only a helmet.",
+      "shot": {
+        "subject": "shopping_bag",
+        "action": "flips",
+        "setting": "playground",
+        "number": 500,
+        "mood": "serious",
+        "camera": "pull",
+        "at": "helmet"
+      },
+      "stock": {
+        "query": "helmet on ground",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "But inflation is a silent thief, quietly stealing your purchasing power.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "clock",
+        "action": "splits",
+        "setting": "living room",
+        "mood": "tense",
+        "camera": "tilt_up",
+        "at": "inflation"
+      }
+    },
+    {
+      "type": "compare",
+      "narration": "For example, in 2013, $10,000 could buy a lot.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "left": {
+        "title": "2013",
+        "value": "$10,000"
+      },
+      "right": {
+        "title": "2023",
+        "value": "$5,700"
+      },
+      "shot": {
+        "subject": "stacked_bars",
+        "action": "drops",
+        "setting": "office",
+        "mood": "upbeat",
+        "camera": "orbit"
+      },
+      "stock": {
+        "query": "comparison of 2013 and 2023",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "But by 2023, the same amount could only buy about half that.",
+      "shot": {
+        "subject": "cart",
+        "action": "swipes",
+        "setting": "office desk",
+        "label": "$5,000",
+        "mood": "serious",
+        "camera": "push"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "Stay tuned to see how you can protect your money from inflation.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "visual": {
+        "kind": "shield"
+      },
+      "shot": {
+        "subject": "shield",
+        "action": "shrinks",
+        "setting": "bank counter",
+        "number": 10000,
+        "mood": "serious",
+        "camera": "tilt_down"
+      },
+      "stock": {
+        "query": "dollar bill money inflation",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "neutral",
+      "emphasis": [],
+      "narration": "So $10,000 can shrink to 7,000 in seven years.",
+      "shot": {
+        "subject": "arrow_down",
+        "action": "drains",
+        "setting": "bank counter",
+        "number": 7000,
+        "mood": "serious",
+        "camera": "tilt_down"
+      }
+    }
+  ],
+  "sources": [
+    "https://www.bls.gov/cpi/"
+  ],
+  "disclaimer": true,
+  "format": "wide",
+  "look": "paper",
+  "device": "before_after"
+}

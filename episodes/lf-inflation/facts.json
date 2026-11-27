@@ -1,0 +1,32 @@
+{
+  "topic": "Why inflation quietly shrinks your savings",
+  "facts": [
+    {
+      "text": "The hyperinflation in Venezuela is the highest in the world, with an annual inflation rate of 833,997% as of October 2018.",
+      "numbers": [
+        833997,
+        2018
+      ],
+      "source": "https://en.wikipedia.org/wiki/Inflation",
+      "title": "Inflation"
+    },
+    {
+      "text": "During the Malian king Mansa Musa's hajj to Mecca in 1324, he was reportedly accompanied by a camel train that included thousands of people and nearly a hundred camels.",
+      "numbers": [
+        1324
+      ],
+      "source": "https://en.wikipedia.org/wiki/Inflation",
+      "title": "Inflation"
+    },
+    {
+      "text": "From the second half of the 15th century to the first half of the 17th, Western Europe experienced a major inflationary cycle referred to as the 'price revolution', with prices on average rising perhaps sixfold over 150 years.",
+      "numbers": [
+        15,
+        17,
+        150
+      ],
+      "source": "https://en.wikipedia.org/wiki/Inflation",
+      "title": "Inflation"
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "total": 84,
+  "items": [
+    {
+      "name": "hook",
+      "got": 20,
+      "max": 20,
+      "note": "5 words; 10/10 on length, number, plain opener, person/stake"
+    },
+    {
+      "name": "concrete",
+      "got": 19.3,
+      "max": 20,
+      "note": "45/90 beats carry a number, 12 a name"
+    },
+    {
+      "name": "voice",
+      "got": 12.2,
+      "max": 15,
+      "note": "31/90 address the viewer, 19/90 use contractions"
+    },
+    {
+      "name": "rhythm",
+      "got": 14.1,
+      "max": 15,
+      "note": "sentence length sd 4.1, 24 short, 13 long"
+    },
+    {
+      "name": "clean",
+      "got": 0,
+      "max": 10,
+      "note": "1 stock phrases, 8 filler openers"
+    },
+    {
+      "name": "payoff",
+      "got": 10,
+      "max": 10,
+      "note": "the ending echoes the hook"
+    },
+    {
+      "name": "variety",
+      "got": 8,
+      "max": 10,
+      "note": "1 beats start like the one before, 5 scene types"
+    }
+  ],
+  "weak": [
+    {
+      "beat": 15,
+      "why": "filler opener"
+    },
+    {
+      "beat": 26,
+      "why": "filler opener"
+    },
+    {
+      "beat": 57,
+      "why": "filler opener"
+    },
+    {
+      "beat": 58,
+      "why": "filler opener"
+    },
+    {
+      "beat": 67,
+      "why": "filler opener"
+    },
+    {
+      "beat": 78,
+      "why": "filler opener"
+    },
+    {
+      "beat": 80,
+      "why": "filler opener"
+    },
+    {
+      "beat": 88,
+      "why": "stock phrase: stay tuned to see how you can protect your money from inflation."
+    },
+    {
+      "beat": 89,
+      "why": "filler opener"
+    },
+    {
+      "beat": 9,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 25,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 31,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 34,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 38,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 41,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 49,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 51,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 52,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 53,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 66,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 74,
+      "why": "flat: no number, no \"you\", no contraction"
+    },
+    {
+      "beat": 83,
+      "why": "flat: no number, no \"you\", no contraction"
+    }
+  ],
+  "pass": true,
+  "hook": {
+    "hook": "Ten thousand dollars. Ten years. Seven thousand left.",
+    "score": 0,
+    "tried": 11
+  },
+  "story": {
+    "score": 62,
+    "weakest": "Imagine a king traveling with a camel train the size of a city.",
+    "fix": "Meet Tom, who saved $500 for a new bike in 2013, and by 2023, his savings can only buy a helmet.",
+    "history": [
+      62,
+      62
+    ]
+  },
+  "title": {
+    "title": "Your Savings Account is Lying to You",
+    "score": 85
+  },
+  "concreteGaps": [
+    9,
+    19,
+    21,
+    25,
+    31,
+    33,
+    69,
+    71,
+    79
+  ]
+}
