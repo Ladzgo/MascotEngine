@@ -112,3 +112,10 @@ test('fitText: whole words only, fits the box, hook key is the number or longest
   assert.equal(hookKey('Stop charging in freezing temps'), 'charging');
   assert.equal(hookKey('Why 600 mAh loss? Not just cold'), '600');
 });
+
+test('punch cadence: at most one punch word per 6.5 s', async () => {
+  const {punchSchedule, PUNCH_GAP} = await import('../fx/punch.js');
+  const ph = Array.from({length: 20}, (_, i) => ({start: i * 1.5, end: i * 1.5 + 1.2, words: [{w: 'thousands', start: i * 1.5, end: i * 1.5 + 0.5}]}));
+  const s = [...punchSchedule(ph)].map(i => ph[i].start);
+  assert.ok(s.length >= 3 && s.every((t, k) => !k || t - s[k - 1] >= PUNCH_GAP));
+});

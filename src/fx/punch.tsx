@@ -44,6 +44,14 @@ function chunkClause(c: CaptionWord[]): CaptionWord[][] {
 
 const isKey = (w: string) => /\d|%|\$/.test(w) || !isFunctionWord(w);
 /** A phrase deserves a punch word when it carries a number or a long content word; only every 4th such phrase gets one so it stays special. */
+/** Phrases that get the big punch word: a qualifying word, and at least PUNCH_GAP s after the previous punch (QUALITY-PLAN 9: max 1 per 6-8 s). */
+export const PUNCH_GAP = 6.5;
+export function punchSchedule(phrases: Phrase[]): Set<number> {
+  const out = new Set<number>();
+  let last = -Infinity;
+  phrases.forEach((p, i) => { if (p.start - last >= PUNCH_GAP && punchWord(p, 0)) { out.add(i); last = p.start; } });
+  return out;
+}
 export const punchWord = (p: Phrase, n: number): CaptionWord | undefined => (n % 4 === 0 ? [...p.words].sort((a, b) => (/\d|%|\$/.test(b.w) ? 99 : b.w.length) - (/\d|%|\$/.test(a.w) ? 99 : a.w.length)).find(w => (/\d|%|\$/.test(w.w) || w.w.replace(/\W/g, '').length >= 6) && isKey(w.w) && !NO_PUNCH.test(w.w)) : undefined);
 // framing words ("The takeaway: ...") say nothing about the sentence: never the big punch word
 const NO_PUNCH = /^(takeaways?|yourself|insights?|follow|basically|actually|remember)\W*$|['’]s\W*$/i; // possessives ("PHONE'S") read as a typo on their own
@@ -53,7 +61,7 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
   phrases.forEach((p, i) => { if (t >= p.start - 0.04 && t <= p.end + 0.3) idx = i; });
   if (idx < 0) return null;
   const phrase = phrases[idx], enter = clamp((t - (phrase.start - 0.04)) / 0.12), tall = h > w;
-  const size = tall ? 70 : 64, pw = punch ? punchWord(phrase, idx) : undefined;
+  const size = tall ? 70 : 64, sched = React.useMemo(() => punchSchedule(phrases), [phrases]), pw = punch && sched.has(idx) ? punchWord(phrase, 0) : undefined;
   const stroke = `${size * 0.11}px #000`; // the stroke paints outside the glyph box, so the gap below must cover it plus the active-word scale
   return (
     <>
@@ -65,7 +73,7 @@ export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: stri
       </div>
       {pw && (() => {
         // three designed looks, rotating per punch (the same tilted pill every time read as a template): accent pill, white word over a wiping accent bar, accent word on its own
-        const e = easeOut(clamp((t - pw.start) / 0.14)), word = pw.w.replace(/[.,;:!?]+$/, ''), look = Math.floor(idx / 4) % 3;
+        const e = easeOut(clamp((t - pw.start) / 0.14)), word = pw.w.replace(/[.,;:!?]+$/, ''), look = [...sched].indexOf(idx) % 3;
         const ps = Math.min(tall ? 200 : 170, (w * 0.8) / (Math.max(3, word.replace(/\W/g, '').length) * 0.8 + 0.5)); // fits the frame incl. padding and the tilt (BEFORE was clipped, ep011)
         const wipe = easeOut(clamp((t - pw.start - 0.08) / 0.25)), base: React.CSSProperties = {fontFamily: DISPLAY, fontSize: ps, textTransform: 'uppercase', display: 'inline-block', lineHeight: 1};
         return (
