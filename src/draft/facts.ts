@@ -11,9 +11,9 @@ const UA = {'User-Agent': 'MascotEngine/0.1 (local explainer-video tool)'};
 const text = (r: {content: Array<{type: string; text?: string}>}) => r.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('');
 const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9.%\s]/g, ' ').replace(/\s+/g, ' ');
 
-/** Plain text of a Wikipedia article (first ~8000 characters) and its canonical URL; null when it does not exist. */
+/** Plain text of a whole Wikipedia article and its canonical URL; null when it does not exist. */
 export async function wikiText(title: string, f: Fetcher = fetch): Promise<{title: string; url: string; text: string} | null> {
-  const u = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info&inprop=url&explaintext=1&redirects=1&format=json&exchars=8000&titles=${encodeURIComponent(title)}`;
+  const u = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info&inprop=url&explaintext=1&redirects=1&format=json&titles=${encodeURIComponent(title)}`;
   try {
     const r = await f(u, {headers: UA, signal: AbortSignal.timeout(15000)});
     if (!r.ok) return null;
@@ -35,7 +35,7 @@ export async function researchFacts(client: Client, topic: string, o: {model?: s
   const log = o.log ?? (() => {});
   let titles: string[] = [];
   try {
-    const j = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 300, system: 'Name the 3 English Wikipedia article titles most likely to contain surprising, numeric facts about the topic. Exact article titles only. Output ONLY JSON: {"titles": [3 strings]}', messages: [{role: 'user', content: `Topic: ${topic}`}]}))) as {titles?: unknown};
+    const j = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 300, system: 'Name the 3 English Wikipedia article titles most likely to contain surprising, numeric facts about this exact topic (specific articles, not broad ones like "Inflation" when a narrower one exists). Exact article titles only. Output ONLY JSON: {"titles": [3 strings]}', messages: [{role: 'user', content: `Topic: ${topic}`}]}))) as {titles?: unknown};
     titles = (Array.isArray(j.titles) ? j.titles : []).map(x => String(x).trim()).filter(Boolean).slice(0, 3);
   } catch (e) { log(`facts: no article titles (${(e as Error).message.slice(0, 60)})`); return []; }
   const pages = (await Promise.all(titles.map(t => wikiText(t, o.fetcher)))).filter((p): p is NonNullable<typeof p> => !!p);
@@ -43,7 +43,10 @@ export async function researchFacts(client: Client, topic: string, o: {model?: s
   const out: Fact[] = [];
   for (const p of pages) {
     try {
-      const j = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 700, system: 'From the article text, copy up to 3 facts that would surprise a general viewer and relate to the topic. Each fact is ONE sentence close to the article wording and contains at least one number exactly as written in the text. Output ONLY JSON: {"facts": [strings]}', messages: [{role: 'user', content: `Topic: ${topic}\nArticle "${p.title}":\n${p.text.slice(0, 7000)}`}]}))) as {facts?: unknown};
+      // only sentences with a figure go to the model: intros are mostly definitions (0 usable facts on 'Inflation' from the first 8000 characters)
+      const numeric = (p.text.match(/[^.!?\n]+[.!?]/g) ?? []).filter(x => /\d/.test(x) && !/^\s*(\^|ISBN|doi)/i.test(x)).join(' ').slice(0, 7000);
+      if (!numeric) continue;
+      const j = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 700, system: 'From the article text, copy up to 3 facts that would surprise a general viewer and relate to the topic. Each fact is ONE sentence close to the article wording and contains at least one number exactly as written in the text. Output ONLY JSON: {"facts": [strings]}', messages: [{role: 'user', content: `Topic: ${topic}\nArticle "${p.title}" (sentences with figures):\n${numeric}`}]}))) as {facts?: unknown};
       for (const t of (Array.isArray(j.facts) ? j.facts : []).map(x => String(x).trim())) {
         if (grounded(t, p.text)) out.push({text: t, numbers: spokenNumbers(t), source: p.url, title: p.title});
         else log(`facts: dropped (not in "${p.title}"): ${t.slice(0, 90)}`);
