@@ -297,8 +297,9 @@ export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, m
 export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void; /** sourced outline numbers the rewrite may also use */ facts?: number[]} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
   let cur = ep, j = first;
   const history = [first.score];
-  // a weak script (< 60) gets one whole-body retell first: hook and last line stay, every middle line may change, same beat types, script numbers only
-  if (j.score < 60) {
+  // under the target, one whole-body retell first: hook and last line stay, every middle line may change, line jobs kept, script + outline numbers only
+  // (line-level rewrites plateaued at 59-62 on zzb-v1..v3: the missing person and turn need several lines at once)
+  if (j.score < (o.target ?? 75)) {
     const narr = cur.scenes.map(s => s.narration), heard = [...new Set([...narr.flatMap(spokenNumbers), ...(o.facts ?? [])])], max = o.maxWords ?? 14;
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
