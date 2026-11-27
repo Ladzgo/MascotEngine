@@ -243,9 +243,9 @@ export async function closeLoop(o: {client: Client; hook: string; topic: string;
 }
 
 // anchors keep the judge honest: without them a 7B-120B model gave a weak, invented-fact script 100
-const STORY_ANCHORS = `ANCHOR WEAK (score 35): "Batteries are important. Cold affects them. Think of it like honey. It is a problem. Keep your phone warm. Follow for more." - no surprising fact, no example, no turn, vague lines.
-ANCHOR OK (score 62): "Your phone loses 20% in the cold. Lithium ions slow down. At 0 degrees you get 80% power. Warm it up and it comes back. So keep it in your pocket." - one fact, mechanism, but no person, no turn, flat ending.
-ANCHOR STRONG (score 88): "Anna's phone died at 40% on a ski lift. It wasn't broken. At minus 10, the ions inside crawl, so the phone reads empty early. Back in her pocket, it showed 38% again. The charge was never gone. So next time it dies at 40%, warm it before you panic." - surprising fact, concrete person, counter-intuitive turn, ending pays off the hook, retellable.`;
+const STORY_ANCHORS = `ANCHOR WEAK (about 35): general statements ("X is important", "it is a problem"), no person, no surprising fact, an analogy instead of evidence, a generic ending.
+ANCHOR OK (about 62): one real fact with its number and the mechanism behind it, but no person, no turn, and an ending that only repeats the advice.
+ANCHOR STRONG (about 88): a named everyday person at one concrete moment; one surprising fact with its number; a turn where the obvious explanation is wrong; the last line answers the opening line; a viewer could retell it in one sentence.`;
 /** "Would a friend repeat this?" judge, 0-100, calibrated with weak/ok/strong anchors; it must quote the weakest line. */
 export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
   const lines = ep.scenes.map(s => s.narration);
@@ -298,13 +298,15 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
       const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim());
-      const ok = lines.length === narr.length - 2 && lines.every((l, k) => l && wcount(l) <= max && spokenNumbers(l).every(x => heard.includes(x)) && !slopHits(l).length && !fullName(l) && (spokenNumbers(narr[k + 1]).length === 0 || spokenNumbers(l).length > 0));
+      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : fullName(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
+      const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
+      const ok = !why;
       if (ok) {
         const next = {...cur, scenes: cur.scenes.map((s, i) => i > 0 && i < narr.length - 1 ? {...s, narration: lines[i - 1]} : s) as Episode['scenes']}, nj = await judgeStory(client, next, o.model);
         history.push(nj.score);
         o.log?.(`story retell: judge ${j.score} -> ${nj.score}`);
         if (nj.score > j.score) { cur = next; j = nj; }
-      } else o.log?.(`story retell rejected (${lines.length}/${narr.length - 2} lines or a line broke a rule)`);
+      } else o.log?.(`story retell rejected (${why})`);
     } catch (e) { o.log?.(`story retell skipped (${(e as Error).message.slice(0, 60)})`); }
   }
   for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75); r++) {
