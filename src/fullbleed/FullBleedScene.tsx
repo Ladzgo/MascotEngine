@@ -390,7 +390,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const fixedStage = hasCallouts || versus;
   const stage = fixedStage ? `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})` : `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
   // hero stands on the ground plane (y = 70% of a tall frame, so it ends above the captions at 72-80%; 74% of a wide one, above its captions at 78%+); its feet are at 82.5% of the 400 box
-  const base = tall ? w * 1.15 : h * 0.86; // wider objects (scale, bars, calendar) span the whole 400 box: bigger and they get cut at the frame edge
+  const base = tall ? w * 1.15 : h * 0.98; // 16:9 heroes at 0.86h read as small props in a wide empty frame (lf-inflation-fb) // wider objects (scale, bars, calendar) span the whole 400 box: bigger and they get cut at the frame edge
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' || (lay === 'hero' && techBanner(scene, plan)) ? 0.66 : lay === 'pip' || lay === 'broll' ? (tall ? 0.46 : 0.62) : 1; // over real footage the drawn subject is an accent, not the picture
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');

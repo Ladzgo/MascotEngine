@@ -168,7 +168,7 @@ export function qa(id: string, fileArg?: string) {
   probes.forEach(t => {
     const g = gray(file, t, W, H);
     if (stdDev(g) < LIMITS.blankStd) bad.push(`${t.toFixed(1)}s blank`);
-    const m = short ? 0 : Math.max(...marginBand.map(r => edgeDensity(g, W, H, r))); // full-bleed Shorts touch the edges by design
+    const m = short || ep.look === 'fullbleed' ? 0 : Math.max(...marginBand.map(r => edgeDensity(g, W, H, r))); // full-bleed (Shorts and 16:9) touches the edges by design
     if (m > LIMITS.marginEdge) bad.push(`${t.toFixed(1)}s content touches the side margin (${(m * 100).toFixed(0)}%)`);
     const c = edgeDensity(g, W, H, short ? {x0: 0.05, x1: 0.95, y0: 0.62, y1: 0.86} : ep.look === 'fullbleed' ? {x0: 0.1, x1: 0.9, y0: 0.74, y1: 0.92} : {x0: 0.1, x1: 0.9, y0: 0.86, y1: 0.99}); // full-bleed 16:9 captions sit at 78%
     if (c < LIMITS.captionEdge) bad.push(`${t.toFixed(1)}s caption zone empty during speech`);
