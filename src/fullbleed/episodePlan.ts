@@ -61,7 +61,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     const raw = planShots({...s, visuals: visuals?.length ? visuals : undefined}, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
     // a topic word said in the sentence ("battery", "sleep", "coffee") beats a storyboard subject the sentence never names (after-tech: pie for "sluggish chemistry")
     const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor), topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-1).flat().includes(k));
-    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || (said.includes(sh.subject) && !WEAK.has(sh.subject)))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (!METAPHOR.has(sh.subject) || said.includes(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || (said.includes(sh.subject) && !WEAK.has(sh.subject)))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
     else if (topical) raw[0] = {kind: topical, at: 0, why: `shot.topic word -> ${topical}`};
     // the drawn subject lands when the voice says its word (max 1.2 s in; before that the backdrop/footage carries the beat)
     if (typeof sh.at === 'string' && raw[0]?.why?.startsWith('shot.')) {

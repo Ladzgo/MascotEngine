@@ -61,9 +61,9 @@ import {planEpisode} from './episodePlan.js';
 test('variety engine: no subject within 6 beats, no setting/camera/layout twice in a row, explicit shot wins', () => {
   const texts = ['You pay interest on a loan every month.', 'Savings grow when you wait.', 'Rates rise and prices follow.', 'Your card balance keeps growing.', 'Stocks can drop fast.', 'A budget keeps spending in check.', 'Interest on debt snowballs quickly.', 'Savings in a bank are safe.', 'The loan has fees.', 'Inflation eats savings.'];
   const scenes = texts.map(n => ({type: 'talk', narration: n, emphasis: [], emotion: 'neutral'})) as any[];
-  scenes[3].shot = {subject: 'anchor', action: 'sink', setting: 'street'};
+  scenes[3].shot = {subject: 'house', action: 'sink', setting: 'street'}; // (a statement picture like 'anchor' is honoured only when the sentence says it)
   const plan = planEpisode(scenes, scenes.map(s => words(s.narration)), scenes.map(() => 4));
-  assert.equal(plan[3].shots[0].kind, 'anchor'); assert.equal(plan[3].shots[0].action, 'sink'); assert.equal(plan[3].env, 'street');
+  assert.equal(plan[3].shots[0].kind, 'house'); assert.equal(plan[3].shots[0].action, 'sink'); assert.equal(plan[3].env, 'street');
   plan.forEach((p, i) => {
     if (i) { assert.notEqual(p.env, plan[i - 1].env, `env repeats at ${i}`); assert.notEqual(p.camera, plan[i - 1].camera); if (!p.matchCut) assert.notEqual(p.layout, plan[i - 1].layout, `layout repeats at ${i}`); assert.notEqual(p.pal, plan[i - 1].pal); }
     const prior = plan.slice(Math.max(0, i - 6), i).flatMap(q => q.shots.map(x => x.kind));
