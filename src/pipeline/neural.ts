@@ -10,8 +10,10 @@ import {segmentize, spoken} from './speech.js';
 import {FPS, LEAD_IN, MIN_SCENE, SCENE_GAP, TRIM_AF, alignLang, audioKey, cacheGet, cachePut, episodeLang, type SceneTiming, type TTSAdapter, type Timings} from './tts.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
-export type NeuralName = 'kokoro' | 'piper' | 'edge';
+export type NeuralName = 'kokoro' | 'piper' | 'edge' | 'chatterbox';
 const py = () => process.env.TTS_PYTHON || path.join(ROOT, '.venv-tts/bin/python');
+/** Chatterbox (Resemble AI, MIT) needs torch, so it lives in its own venv: python3 -m venv data/models/chatterbox-venv && data/models/chatterbox-venv/bin/pip install chatterbox-tts 'setuptools<81' (weights ~6 GB in ~/.cache/huggingface). */
+const cbPy = () => process.env.CHATTERBOX_PYTHON || path.join(ROOT, 'data/models/chatterbox-venv/bin/python');
 const modelsDir = () => (process.env.TTS_MODELS || path.join(ROOT, 'data/models/tts')).replace(/\/?$/, '/');
 const hasPkg = (mod: string) => fs.existsSync(py()) && spawnSync(py(), ['-c', `import importlib.util as u,sys;sys.exit(0 if u.find_spec("${mod}") else 1)`]).status === 0;
 
@@ -19,17 +21,19 @@ const hasPkg = (mod: string) => fs.existsSync(py()) && spawnSync(py(), ['-c', `i
 const VOICES: Record<NeuralName, Record<string, string>> = {
   kokoro: {en: 'af_heart', gb: 'bf_emma'},
   piper: {en: 'en_US-ryan-high', hu: 'hu_HU-anna-medium'},
+  chatterbox: {en: 'chatterbox'},
   edge: {en: 'en-US-AvaMultilingualNeural', hu: 'hu-HU-NoemiNeural', de: 'de-DE-ConradNeural', es: 'es-ES-ElviraNeural'},
 };
 /** Speed factor per voice so every voice lands near af_heart's pace at the same clause speeds (measured on 3 Short scripts at speed 0.89:
  *  af_heart 148 wpm, am_fenrir 170, am_puck 175, bm_george 145, am_michael 135, bf_emma 164, piper ryan 174; kokoro's rate is not linear in speed, so these are rounded). */
-export const VOICE_RATE: Record<string, number> = {am_fenrir: 0.94, am_puck: 0.92, bf_emma: 0.95, am_michael: 1.06, 'en_US-ryan-high': 0.9};
+export const VOICE_RATE: Record<string, number> = {chatterbox: 0.85, am_fenrir: 0.94, am_puck: 0.92, bf_emma: 0.95, am_michael: 1.06, 'en_US-ryan-high': 0.9};
 export const neuralVoice = (e: NeuralName, lang: string, env: NodeJS.ProcessEnv = process.env) => env[`TTS_VOICE_${e.toUpperCase()}`] || env.TTS_VOICE_ALL || VOICES[e][lang] || VOICES[e].en;
 
 /** Why an engine can or cannot run for a language, and the one command that fixes it (shown by doctor and the Studio). */
 export function neuralStatus(e: NeuralName, lang = 'en'): {ok: boolean; detail: string; fix: string; online?: boolean} {
   const fix = 'npm run setup:voice';
   if (process.env.TTS_NEURAL === '0') return {ok: false, detail: 'disabled (TTS_NEURAL=0)', fix: ''};
+  if (e === 'chatterbox') return lang === 'en' && fs.existsSync(cbPy()) ? {ok: true, detail: 'Chatterbox (local, MIT; most expressive in our test, ~4x slower than real time on Apple MPS; output carries Resemble\'s inaudible Perth watermark)', fix: ''} : {ok: false, detail: 'Chatterbox venv is not installed (English only)', fix: 'python3 -m venv data/models/chatterbox-venv && data/models/chatterbox-venv/bin/pip install chatterbox-tts "setuptools<81"'};
   if (!fs.existsSync(py())) return {ok: false, detail: 'Python voice environment (.venv-tts) is not installed', fix};
   if (e === 'kokoro') {
     if (lang !== 'en') return {ok: false, detail: 'Kokoro is used for English only here', fix: ''};
@@ -67,7 +71,7 @@ export function renderSpeech(engine: NeuralName, text: string, lang: string, out
   fs.mkdirSync(tmp, {recursive: true});
   const ext = engine === 'edge' ? 'mp3' : 'wav';
   const job = {engine, voice: neuralVoice(engine, lang), lang, models: modelsDir(), segments: segs.map((s, i) => ({text: s.text, speed: Math.round(s.speed * (VOICE_RATE[neuralVoice(engine, lang)] ?? 1) * 1000) / 1000, out: `${tmp}/${i}.${ext}`}))};
-  const run = () => spawnSync(py(), [path.join(ROOT, 'scripts/tts/bridge.py')], {input: JSON.stringify(job), encoding: 'utf8', timeout: 600000, maxBuffer: 1 << 24});
+  const run = () => spawnSync(engine === 'chatterbox' ? cbPy() : py(), [path.join(ROOT, 'scripts/tts/bridge.py')], {input: JSON.stringify(job), encoding: 'utf8', timeout: 600000, maxBuffer: 1 << 24});
   let r = run();
   if (r.status !== 0 && /LibsndfileError|System error/.test(r.stderr ?? '')) { fs.mkdirSync(tmp, {recursive: true}); r = run(); } // a transient write error seen once on ep011; a second try passes
   if (r.status !== 0) throw new Error(`${engine} failed: ${(r.stderr || r.error?.message || '').split('\n').filter(Boolean).slice(-2).join(' ').slice(0, 300)}${engine === 'edge' ? ' (edge-tts needs an internet connection)' : ''}`);

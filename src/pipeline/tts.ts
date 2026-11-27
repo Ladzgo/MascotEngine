@@ -294,7 +294,7 @@ export function getEngine(name: string, lang = 'en'): TTSAdapter {
     case 'eleven': return new ElevenLabsTTS();
     case 'local': return new LocalRecordingTTS();
     case 'say': return new SayTTS();
-    case 'kokoro': case 'edge': return new NeuralTTS(name);
+    case 'kokoro': case 'edge': case 'chatterbox': return new NeuralTTS(name);
     case 'piper': return neuralReady('piper') ? new NeuralTTS('piper') : new CliTTS('piper');
     case 'espeak-ng': return new CliTTS(name);
     default: throw new Error(`Unknown TTS engine: ${name}`);

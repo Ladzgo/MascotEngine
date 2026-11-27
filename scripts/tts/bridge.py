@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """TTS bridge: reads a JSON job on stdin, writes one wav/mp3 per segment.
-job = {"engine": "kokoro|piper|edge", "voice": str, "lang": "en|hu|...", "models": dir, "segments": [{"text": str, "speed": 1.0, "out": path}]}
+job = {"engine": "kokoro|piper|edge|chatterbox", "voice": str, "lang": "en|hu|...", "models": dir, "segments": [{"text": str, "speed": 1.0, "out": path}]}
 Prints OK <n> on success; errors go to stderr with exit code 1."""
 import sys, json, os, asyncio, wave
 
@@ -23,6 +23,16 @@ elif eng == "piper":
         with wave.open(s["out"], "wb") as w:
             # piper length_scale is the inverse of speed
             v.synthesize_wav(s["text"], w, SynthesisConfig(length_scale=1.0 / max(0.5, s.get("speed", 1.0)), noise_scale=0.62, noise_w_scale=0.7))
+elif eng == "chatterbox":
+    # Resemble AI Chatterbox (MIT), run from its own torch venv; it has no speed control, so each clause is time-stretched to the requested speed
+    import numpy as np, soundfile as sf, librosa, torch
+    from chatterbox.tts import ChatterboxTTS
+    m = ChatterboxTTS.from_pretrained(device="mps" if torch.backends.mps.is_available() else "cpu")
+    for s in segs:
+        a = m.generate(s["text"]).squeeze(0).cpu().numpy().astype(np.float32)
+        sp = s.get("speed", 1.0)
+        if abs(sp - 1.0) > 0.01: a = librosa.effects.time_stretch(a, rate=sp)
+        sf.write(s["out"], a, m.sr)
 elif eng == "edge":
     import edge_tts
     async def go():

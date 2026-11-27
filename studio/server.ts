@@ -166,7 +166,7 @@ function enqueue(id: string, b: {stages?: unknown; engine?: unknown}) {
   if (active.length >= 20) throw new HttpError(429, 'Too many runs are waiting (20). Wait for some to finish or remove them in the Queue.');
   if (active.some(j => j.status === 'queued' && j.episode === id && j.stages.join() === stages.join())) throw new HttpError(409, 'The same run is already waiting for this episode.');
   const engine = String(b.engine ?? 'auto');
-  if (!['auto', 'say', 'espeak-ng', 'piper', 'kokoro', 'edge', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be auto, say, kokoro, piper, edge, espeak-ng, eleven, local or silent.');
+  if (!['auto', 'say', 'espeak-ng', 'piper', 'kokoro', 'chatterbox', 'edge', 'eleven', 'local', 'silent'].includes(engine)) throw new HttpError(400, 'engine must be auto, say, kokoro, chatterbox, piper, edge, espeak-ng, eleven, local or silent.');
   if (stages.includes('voice') && engine === 'eleven' && (!process.env.ELEVENLABS_API_KEY || !process.env.ELEVENLABS_VOICE_ID)) throw new HttpError(422, 'ElevenLabs key or voice ID is missing. Add them in Settings.');
   if (stages.includes('voice') && engine === 'local') {
     const miss = Array.from({length: sceneCount(d)}, (_, i) => i + 1).filter(n => !sceneAudio(d, n));
