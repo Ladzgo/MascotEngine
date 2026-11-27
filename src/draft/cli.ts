@@ -74,7 +74,7 @@ try {
   if (padded !== closed) log(`short length: est ${secs(closed).toFixed(1)} s -> ${secs(padded).toFixed(1)} s`);
   const split = splitBeats(padded, values.short ? {max: 11, clauses: true} : {max: 16, clauses: true}); // beats last: the fixers above merge short talk runs; caps keep a Short beat under 5 s (12 words at 168 wpm + padding was 5.02 s)
   // a data or talk beat over ~5 s ("3000 mAh ... 600 mAh at zero degrees" read 7.4 s) becomes two sentences, then splits again
-  const tight = values.short ? splitBeats(await tightenLong(client, split, {model, est: estSec, log}), {max: 11, clauses: true}) : split;
+  const tight = values.short ? splitBeats(await tightenLong(client, split, {model, est: estSec, maxSec: 4.4, log}), {max: 11, clauses: true}) : split;
   const spread = values.short ? spreadVisuals(tight) : {ep: tight, fixed: 0};
   const fit = values.short ? fitDuration(spread.ep) : {ep: spread.ep, dropped: 0};
   let ep = fit.ep;
@@ -87,7 +87,7 @@ try {
   ep = {...ep, title: titled.title};
   const story0 = storyOn ? await judgeStory(client, ep, model) : {score: 0};
   // the judge quotes its weakest line: rewrite that line by its note, re-judge, keep only a gain (2 rounds)
-  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)}) : {ep, score: story0.score, history: [story0.score]};
+  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40), ...(values.short ? {est: estSec, maxSec: 4.4} : {})}) : {ep, score: story0.score, history: [story0.score]};
   ep = improved.ep;
   const story = {...story0, score: improved.score, history: improved.history};
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);

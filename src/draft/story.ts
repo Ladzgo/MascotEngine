@@ -294,7 +294,7 @@ export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, m
 }
 
 /** Story pass driven by the judge: rewrites up to 3 lines (always the quoted weakest one) by its note, re-judges, keeps only a gain. Numbers must already be in the script. */
-export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void; /** sourced outline numbers the rewrite may also use */ facts?: number[]} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
+export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void; /** sourced outline numbers the rewrite may also use */ facts?: number[]; /** Shorts: spoken-length estimate and cap per beat */ est?: (s: {narration: string}) => number; maxSec?: number} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
   let cur = ep, j = first;
   const history = [first.score];
   // under the target, one whole-body retell first: hook and last line stay, every middle line may change, line jobs kept, script + outline numbers only
@@ -304,7 +304,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
       const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim());
-      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : fullName(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
+      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : fullName(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
       const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
       const ok = !why;
       if (ok) {
@@ -326,7 +326,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
       let n = 0;
       for (const w of rw) {
         const line = String(w.line ?? '').trim(), i = Number(w.i);
-        const why = !(i > 0 && i < last) ? 'hook or last line' : !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words` : !spokenNumbers(line).every(x => heard.includes(x)) ? 'new number' : slopHits(line).length ? 'stock phrase' : fullName(line) ? 'full name' : '';
+        const why = !(i > 0 && i < last) ? 'hook or last line' : !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words` : o.est && o.est({narration: line}) > (o.maxSec ?? 4.4) ? `${o.est({narration: line}).toFixed(1)} s to say` : !spokenNumbers(line).every(x => heard.includes(x)) ? 'new number' : slopHits(line).length ? 'stock phrase' : fullName(line) ? 'full name' : '';
         if (why) { o.log?.(`story: line ${i + 1} rejected (${why}): ${line}`); continue; }
         scenes[i].narration = line; n++;
       }
