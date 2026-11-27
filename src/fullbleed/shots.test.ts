@@ -183,3 +183,10 @@ test('kinetic headline: no connectives, dollar labels as $', async () => {
   assert.notEqual(kineticWord('Follow Money Myths, because the reason you lose money isn’t what you think.', []).toLowerCase(), 'because');
   assert.equal(kineticWord('A 2 dollars surcharge per basket.', [], '2 dollars'), '$2');
 });
+
+test('reselect: dropping stock is kept on a tie', async () => {
+  const {keepImproved} = await import('./reselect.js');
+  const before = {scenes: [{narration: 'a', stock: {query: 'x'}}]}, after = {scenes: [{narration: 'a'}]};
+  assert.deepEqual(keepImproved(before as any, after as any, new Map([[0, 5]]), new Map([[0, 5]])).kept, [0]);
+  assert.deepEqual(keepImproved(before as any, after as any, new Map([[0, 5]]), new Map([[0, 3]])).kept, []);
+});

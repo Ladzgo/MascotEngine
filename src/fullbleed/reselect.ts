@@ -32,7 +32,9 @@ export function keepImproved<T extends Raw>(before: T, after: T, oldScore: Map<n
   const kept: number[] = [], reverted: number[] = [];
   const scenes = after.scenes.map((s, i) => {
     if (JSON.stringify(s) === JSON.stringify(before.scenes[i])) return s;
-    if ((newScore.get(i) ?? -1) > (oldScore.get(i) ?? 10)) { kept.push(i); return s; }
+    const n = newScore.get(i) ?? -1, o = oldScore.get(i) ?? 10, droppedStock = !!before.scenes[i].stock && !s.stock;
+    // dropping footage also wins a tie: a clip the model only calls 'loosely related' (5) is the off-topic risk (ep011: a man in a hallway, a faucet), the drawn hero says exactly the word
+    if (n > o || (droppedStock && n >= o)) { kept.push(i); return s; }
     reverted.push(i); return before.scenes[i];
   });
   return {ep: {...after, scenes}, kept, reverted};
