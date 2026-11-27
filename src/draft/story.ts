@@ -197,3 +197,27 @@ export async function closeLoop(o: {client: Client; hook: string; topic: string;
     return null;
   } catch (e) { o.log?.(`closing line skipped (${(e as Error).message.slice(0, 60)})`); return null; }
 }
+
+/** "Would a friend repeat this?" judge, 0-100: one surprising fact (25), a concrete person or example in the middle (20), a counter-intuitive turn (20), the ending pays off the hook (20), retellable in one sentence (15). */
+export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; fix?: string}> {
+  try {
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 400, system: 'You are a tough YouTube Shorts editor. Score the script 0-100: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Output ONLY JSON: {"score": number, "fix": "the single change that would raise the score most, one sentence"}', messages: [{role: 'user', content: ep.scenes.map((s, i) => `${i + 1}. ${s.narration}`).join('\n')}]}))) as {score?: unknown; fix?: unknown};
+    const score = Math.max(0, Math.min(100, Number(j.score) || 0));
+    return {score, ...(typeof j.fix === 'string' && j.fix ? {fix: j.fix.slice(0, 200)} : {})};
+  } catch { return {score: 0}; }
+}
+
+/** 5 title candidates (<= 50 characters), judged on curiosity + clarity; the outline title competes too. Numbers must already be in the script. */
+export async function pickTitle(client: Client, ep: Pick<Episode, 'title' | 'scenes'>, o: {model?: string; log?: (m: string) => void} = {}): Promise<{title: string; score: number}> {
+  const heard = new Set(ep.scenes.flatMap(s => spokenNumbers(s.narration)));
+  try {
+    const j = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 500, system: 'You write YouTube Shorts titles. 5 different titles, each 50 characters or fewer, plain words, a specific promise the script keeps, curiosity without clickbait, no emoji, no hashtags, no ALL CAPS, numbers only if the script says them. Output ONLY JSON: {"titles": [5 strings]}', messages: [{role: 'user', content: `Current title: ${ep.title}\nScript: ${ep.scenes.map(s => s.narration).join(' ').slice(0, 1500)}`}]}))) as {titles?: unknown};
+    const cands = [...new Set([ep.title, ...(Array.isArray(j.titles) ? j.titles.map(x => String(x).trim()) : [])])].filter(t => t && t.length <= 60 && !/#|[\u{1F300}-\u{1FAFF}]/u.test(t) && spokenNumbers(t).every(n => heard.has(n)));
+    if (cands.length < 2) return {title: ep.title, score: 0};
+    const s = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 300, system: 'Score each YouTube Shorts title 0-100: curiosity (would you tap?) 40, clarity (you know what you get) 40, 50 characters or fewer 20 (zero if longer). Output ONLY JSON: {"scores": [one number per title, same order]}', messages: [{role: 'user', content: cands.map((t, i) => `${i + 1}. ${t}`).join('\n')}]}))) as {scores?: unknown};
+    const sc = Array.isArray(s.scores) && s.scores.length === cands.length ? s.scores.map(x => Number(x) || 0) : cands.map(() => 0);
+    const best = cands.map((t, i) => ({t, s: sc[i] - (t.length > 50 ? 30 : 0)})).sort((a, b) => b.s - a.s)[0];
+    o.log?.(`title chosen from ${cands.length} (${best.s}/100): "${best.t}"`);
+    return {title: best.t, score: best.s};
+  } catch (e) { o.log?.(`title pick skipped (${(e as Error).message.slice(0, 60)})`); return {title: ep.title, score: 0}; }
+}

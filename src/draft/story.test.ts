@@ -73,3 +73,12 @@ test('pickHook: five formula candidates, judge blend, second round only under th
   assert.equal(h, 'Your $5 coffee costs $1,825 a year.'); // outline hook is candidate 1; the numeric line wins the blend
   assert.ok(lastHookPick!.score >= 75 && calls === 2, `score ${lastHookPick!.score}, calls ${calls}`);
 });
+test('pickTitle: judged candidates, invented numbers and long titles lose', async () => {
+  const {pickTitle} = await import('./story.js');
+  const client = {messages: {create: async (r: {system: string; messages: {content: string}[]}) => ({content: [{type: 'text', text: /Score each/.test(r.system)
+    ? JSON.stringify({scores: r.messages[0].content.split('\n').map(l => /1,825/.test(l) ? 90 : 40)})
+    : JSON.stringify({titles: ['Your coffee costs $1,825 a year', 'Coffee costs $9,999 a year', 'Why this tiny daily habit quietly drains far more money than you think']})}]})}} as any;
+  const ep = {title: 'Coffee money', scenes: [{narration: 'A $5 coffee is $1,825 a year.'}]} as any;
+  const r = await pickTitle(client, ep);
+  assert.equal(r.title, 'Your coffee costs $1,825 a year'); // the $9,999 title is dropped, the 70-char one is over the length cap
+});

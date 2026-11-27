@@ -4,7 +4,7 @@ import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
 import {splitBeats} from './beats.js';
-import {closeLoop, concreteGaps, fillConcrete, lastHookPick} from './story.js';
+import {closeLoop, concreteGaps, fillConcrete, judgeStory, lastHookPick, pickTitle} from './story.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
@@ -75,6 +75,10 @@ try {
   for (let round = 0; round < 2 && !values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW; round++) { const next = await rewriteWeak(client, ep, {model, lang, log}); if (next === ep) break; ep = next; } // up to 2 rounds while under 75
   if (storyOn && !values['no-rewrite'] && concreteGaps(ep.scenes.map(s => s.narration)).length) ep = await fillConcrete(client, ep, {model, log, maxWords: values.short ? 12 : 20, name: ep.scenes.map(s => s.narration.match(/\b(Anna|Alex|Ben|Clara|David|Emma|Jack|Kate|Leo|Mia|Noah|Sam|Sarah|Tom|Maria|Lisa|John|Mike|Jane)\b/)?.[1]).find(Boolean)});
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  const titled = storyOn ? await pickTitle(client, ep, {model, log}) : {title: ep.title, score: 0};
+  ep = {...ep, title: titled.title};
+  const story = storyOn ? await judgeStory(client, ep, model) : {score: 0};
+  if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
   const sc = scoreScript(ep);
   console.log(`DRAFT_NOTE script score ${sc.total}/100 (${sc.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`);
   if (fit.dropped) console.log(`DRAFT_NOTE ${fit.dropped} beats dropped to fit a 52 s Short`);
@@ -83,7 +87,7 @@ try {
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);
   const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted, ...(lastHookPick?.overlay ? {hookOverlay: lastHookPick.overlay} : {})} as typeof ep); // 5-7 word on-screen line for muted viewers (renderer: beat 1)
-  fs.writeFileSync(path.join(path.dirname(file), 'script-score.json'), JSON.stringify({...sc, hook: lastHookPick, concreteGaps: concreteGaps(ep.scenes.map(s => s.narration))}, null, 2));
+  fs.writeFileSync(path.join(path.dirname(file), 'script-score.json'), JSON.stringify({...sc, hook: lastHookPick, story, title: titled, concreteGaps: concreteGaps(ep.scenes.map(s => s.narration))}, null, 2));
   if (Object.keys(flags.notes).length) fs.writeFileSync(path.join(path.dirname(file), 'notes.json'), JSON.stringify({notes: flags.notes}, null, 2));
   for (const n of Object.values(flags.notes).flat()) console.log(`DRAFT_WARN ${n}`);
   console.log(`DRAFT_OK ${file}`);
