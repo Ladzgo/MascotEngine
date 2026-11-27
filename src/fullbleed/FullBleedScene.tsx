@@ -1,12 +1,13 @@
 import React from 'react';
-import {Img, OffthreadVideo, getInputProps, staticFile} from 'remotion';
+import {Img, OffthreadVideo, continueRender, delayRender, getInputProps, staticFile} from 'remotion';
+import {Lottie, type LottieAnimationData} from '@remotion/lottie';
 import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
 import {GradDefs, IsoBox, Txt, fitText, pop, seg} from './kit';
 import {isFunctionWord} from '../fx/captions';
 import {objectOf} from './assetObj';
-import {assetFile} from './assetPick';
+import {animatedTwin, assetFile} from './assetPick';
 import {planShots} from './shots';
 import {actionCopies, ActionOverlay} from './actions';
 import {planEpisode, type ScenePlan} from './episodePlan';
@@ -249,13 +250,38 @@ const ChartBars: React.FC<{labels: string[]; values: number[]; t: number}> = ({l
 };
 
 /** A library character (Fluent 3D person or reacting face) stands at the side of the hero: pops in after the hero, sways, a small hop on landing. */
+/** Fetches a public file once per render (assets/lib is local-only: CI and fresh clones lack it, so a miss must fall back, never fail the render). */
+function useStatic<T>(file: string | undefined, read: (r: Response) => Promise<T>): T | null | undefined {
+  const [v, setV] = React.useState<T | null | undefined>(file ? undefined : null);
+  const [handle] = React.useState(() => (file ? delayRender(`asset ${file}`) : null));
+  React.useEffect(() => {
+    if (!file || handle === null) return;
+    fetch(staticFile(file), (read as unknown) === headOk ? {method: 'HEAD'} : undefined).then(r => (r.ok ? read(r) : null)).catch(() => null).then(x => { setV(x as T | null); continueRender(handle); });
+  }, [file, handle, read]);
+  return v;
+}
+const headOk = async () => true, json = (r: Response) => r.json() as Promise<LottieAnimationData>;
+
+/** Real-footage loop (catalog background) as a drawn beat's backdrop: blurred by the wrapper, graded, darkened toward the floor so the hero and captions read. */
+const LoopBackdrop: React.FC<{file: string; w: number; h: number; pal: [string, string, string, string]; grade: string; fallback: React.ReactNode}> = ({file, w, h, pal, grade, fallback}) => {
+  const ok = useStatic(file, headOk);
+  if (!ok) return <>{fallback}</>;
+  return (
+    <div style={{position: 'absolute', inset: 0, background: pal[2]}}>
+      <OffthreadVideo src={staticFile(file)} muted style={{position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', filter: `${grade} brightness(0.78)`}} />
+      <div style={{position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0) 30%, rgba(0,0,0,0.25) 62%, ${pal[2]}ee 100%)`}} />
+    </div>
+  );
+};
+
 const Character: React.FC<{id: string; t: number; w: number; feet: number; left: boolean}> = ({id, t, w, feet, left}) => {
-  const [failed, setFailed] = React.useState(false), file = assetFile(id);
+  const [failed, setFailed] = React.useState(false), file = assetFile(id), anim = useStatic(animatedTwin(id), json); // the Noto animated twin when fetched, else the still
   if (!file || failed) return null;
   const size = Math.min(w * 0.3, feet * 0.42), e = pop(t, 0.45, 0.5), hop = Math.abs(Math.sin(Math.max(0, t - 0.45) * 2.2)) * size * 0.04 * Math.exp(-Math.max(0, t - 0.45) * 0.6);
   return (
     <div style={{position: 'absolute', left: left ? w * 0.05 : w * 0.95 - size, top: feet - size * 0.92 - hop, width: size, height: size, transform: `scale(${Math.max(0.01, e)}) rotate(${Math.sin(t * 1.4) * 3}deg)`, transformOrigin: '50% 100%', filter: 'drop-shadow(0 18px 18px rgba(0,0,0,0.35))'}}>
-      <Img src={staticFile(file)} maxRetries={0} onError={() => setFailed(true)} style={{width: '100%', height: '100%', objectFit: 'contain', transform: left ? undefined : 'scaleX(-1)'}} />
+      {anim ? <Lottie animationData={anim} loop style={{width: '100%', height: '100%', transform: left ? undefined : 'scaleX(-1)'}} />
+        : anim === null && <Img src={staticFile(file)} maxRetries={0} onError={() => setFailed(true)} style={{width: '100%', height: '100%', objectFit: 'contain', transform: left ? undefined : 'scaleX(-1)'}} />}
     </div>
   );
 };
@@ -316,7 +342,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       {qaMarks() && <style>{'html,body{background:#000!important}body *{visibility:hidden!important}.qamk,.qamk *{visibility:visible!important}'}</style>}
       {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: /\.mp4$/i.test(scene.stockFile) ? undefined : `scale(${1.05 * Math.max(1, subZ)}) translate(${subX * w * 0.4}px, 0px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} grade={grade.filter} /></div> : (
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.12 * Math.max(1, subZ)}) translateX(${panX * 0.4 + subX * w * 0.3}px)`, transformOrigin: '50% 60%', filter: `blur(${tall ? 3 : 2}px)`}}>
-        <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
+        {plan.bgLoop ? <LoopBackdrop file={plan.bgLoop} w={w} h={h} pal={pal} grade={grade.filter} fallback={<Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />} /> : <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />}
         {qaMarks() && <QaMarks c="backdrop" w={w} h={h} />}
       </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>

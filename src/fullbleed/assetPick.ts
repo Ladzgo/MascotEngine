@@ -1,6 +1,6 @@
 // Picks library assets (src/assets catalog: Fluent Emoji 3D, MIT) for a beat: a 3D object for a word the drawn set has no picture for,
 // and a character (a person doing the thing, or a face reacting) beside the hero. Browser-safe (the catalog is JSON).
-import {byId, search, type Asset} from '../assets/catalog';
+import {CATALOG, byId, search, type Asset} from '../assets/catalog';
 
 const STOP = new Set('about after again because before being could does doesn every going little makes making might never other really should since still their there these thing think those through until where which while would years your yours actually most much more what when that this with from have just they them then than into over only even also each next first last same such very will want like keep take make made know need feel feels says said here every eight seven three seventy hundred thousand million twenty thirty forty fifty sixty ninety eleven twelve zero four five nine score scores beats double doubles slows drop drops down'.split(' '));
 export const contentWords = (t: string) => t.toLowerCase().replace(/[^a-z' -]/g, ' ').split(/[\s-]+/).map(w => w.replace(/'s$/, '')).filter(w => w.length >= 4 && !STOP.has(w));
@@ -38,3 +38,27 @@ export function characterAsset(text: string, emotion = 'neutral', used: Set<stri
 }
 
 export const assetFile = (id: string) => byId(id)?.file;
+
+/** Noto animated (Lottie) twin of a library emoji (same glyph): a reacting face moves instead of standing still (QUALITY-PLAN 7). */
+export function animatedTwin(id: string): string | undefined {
+  const g = byId(id)?.glyph;
+  return g ? CATALOG.find(a => a.kind === 'animated' && a.format === 'lottie' && a.glyph === g)?.file : undefined;
+}
+
+// real-footage loops (Pixabay, catalog kind 'background') behind a drawn beat when the sentence (or the title) names their world; first tag = category
+const LOOP_WORDS: Record<string, RegExp> = {
+  snow: /^(snow\w*|cold|colder|freez\w*|winter\w*|frost\w*|ice|icy|degrees?)$/, money: /^(money|cash|dollars?|bills?|savings?|spend\w*|paid|pay\w*|salary|wealth|rich)$/,
+  stock: /^(stocks?|market|invest\w*|shares?|index|funds?|portfolio|trading)$/, office: /^(office|work\w*|jobs?|boss|desk|career|meeting|employ\w*)$/,
+  technology: /^(tech\w*|data|internet|network|wifi|computer|laptop|servers?|apps?|software|online|digital|chips?)$/, fire: /^(fire|heat|hot|warm\w*|burn\w*|calories?|flames?)$/,
+  starry: /^(sleep\w*|night\w*|asleep|dreams?|bed|bedtime|stars?|insomnia|melatonin)$/, kitchen: /^(coffee|cook\w*|kitchen|food|meals?|eat\w*|latte|tea|breakfast|groceries)$/,
+  rain: /^(rain\w*|storm\w*|wet|weather)$/, ocean: /^(ocean|sea|beach|waves?|water|swim\w*)$/, city: /^(city|cities|urban|commut\w*|traffic|rent|downtown)$/,
+  forest: /^(forest|trees?|nature|hik\w*|walk\w*|outdoors?|park)$/, clouds: /^(sky|clouds?|air|breath\w*|oxygen)$/,
+};
+const loopsOf = (cat: string) => CATALOG.filter(a => a.kind === 'background' && a.format === 'video' && a.tags[0] === cat && !a.tags.includes('waterfall') && (cat !== 'money' || a.tags.includes('cash')));
+/** Loop categories a text names, in spoken order. */
+export const loopCats = (text: string) => [...new Set(contentWords(text).flatMap(w => Object.entries(LOOP_WORDS).filter(([, re]) => re.test(w)).map(([c]) => c)))];
+/** A loop file of the first category not in `avoid` with a file not in `used`. */
+export function loopAsset(cats: string[], avoid: Set<string>, used: Set<string>): {cat: string; file: string} | undefined {
+  for (const cat of cats) { if (avoid.has(cat)) continue; const a = loopsOf(cat).find(x => !used.has(x.file)); if (a) return {cat, file: a.file}; }
+  return undefined;
+}

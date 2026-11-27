@@ -1,11 +1,11 @@
 import {planShots, objectFor, candidatesFor} from './shots';
 import {OBJECTS} from './objects';
-import {objectAsset, characterAsset} from './assetPick';
+import {objectAsset, characterAsset, loopAsset, loopCats} from './assetPick';
 import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} from './catalog';
 
 type W = {w: string; start: number; end: number};
 export type PlannedShot = {kind: string; at: number; why?: string; action: string};
-export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string};
+export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string};
 
 /** Where each kind of subject likes to live; the engine rotates through these so neighbouring scenes never share a setting. */
 const ENV_BY_GROUP: Record<string, Setting[]> = {
@@ -49,6 +49,11 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
   const envHist: Setting[] = []; // backdrops of drawn beats only (stock beats show footage)
   const usedAssets = new Set<string>();
   let prevEnv: Setting | undefined, prevLayout: Layout | undefined, prevCam = -1, talkN = 0;
+  // real-footage loops behind drawn beats: the sentence's world, else the episode's most named one on every other drawn beat; never the same look within 3 beats
+  const catCount = new Map<string, number>();
+  for (const sc of scenes) for (const c of loopCats(sc.narration ?? '')) catCount.set(c, (catCount.get(c) ?? 0) + 1);
+  const topCat = [...catCount].sort((a, b) => b[1] - a[1])[0]?.[0], looks: string[] = [], usedLoops = new Set<string>();
+  let prevLoop = false;
   scenes.forEach((s, i) => {
     const sh = s.shot ?? {}, words = wordsPer[i] ?? [], dur = durs[i] ?? 4;
     const billOk = BILL_TEXT.test(s.narration ?? ''), visuals = s.visuals?.filter((v: {kind: string}) => (money || !MONEY_ONLY.has(objectFor(v.kind))) && (billOk || !BILLS.has(objectFor(v.kind))));
@@ -107,7 +112,11 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       if (layout === prevLayout) layout = layout === 'hero' ? 'kinetic' : 'hero';
     }
     if ((layout === 'pip' || layout === 'broll') && !s.stockFile) layout = 'hero';
-    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character});
+    const own = loopCats(s.narration ?? ''), loop = !s.stockFile && layout !== 'dataviz' && s.type !== 'chart' && (own.length || !prevLoop) ? loopAsset([...own, ...(topCat ? [topCat] : [])], new Set(looks.slice(-2).filter(l => l.startsWith('loop:')).map(l => l.slice(5))), usedLoops) : undefined;
+    if (loop) usedLoops.add(loop.file);
+    if (!s.stockFile) prevLoop = !!loop;
+    looks.push(s.stockFile ? `stock:${s.stockFile}` : loop ? `loop:${loop.cat}` : env);
+    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character, bgLoop: loop?.file});
     prevEnv = env; prevLayout = layout; prevCam = camera;
   });
   // palettes: never the same index twice in a row
