@@ -71,13 +71,13 @@ test('talk-run merge, closing reversal, simile cap, chart grounding', async () =
   assert.equal(groundCharts({...ep, sources: ['https://blog.example.com'], scenes: [chart('From three to five.')]}).scenes[0].type, 'talk');
 });
 
-test('spoken length: numerals count as said; a long Short data scene is flagged, a long talk scene is left to the beat splitter', async () => {
+test('spoken length: numerals count as said; a long Short data scene is no lint error (tightenLong shortens it)', async () => {
   const {spokenWords, lintEpisode} = await import('./lint.js');
   assert.equal(spokenWords('Save $1,825 a year.'), 10); // save one thousand eight hundred twenty five dollars a year
   const base: any = {format: 'short', disclaimer: true, sources: [], scenes: [{type: 'title', narration: 'Coffee costs more than you think.'}, {type: 'talk', narration: 'Five dollars a day adds up.'}]};
   assert.ok(!lintEpisode(base).some(e => /Short beats/.test(e)));
   base.scenes.push({type: 'list', narration: 'Daily coffee $5, yearly $1,825, beats the national average of $1,100.', items: ['a', 'b']});
-  assert.ok(lintEpisode(base).some(e => /Short beats must stay under 5 s/.test(e)));
+  assert.ok(!lintEpisode(base).some(e => /Short beats must stay under 5 s/.test(e)));
 });
 
 test('numeralize: spelled-out amounts become numerals for captions; small bare counts and other languages stay', async () => {

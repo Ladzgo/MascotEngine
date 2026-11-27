@@ -22,7 +22,7 @@ export function lintEpisode(ep: Episode): string[] {
   const spokenN = spokenWords(hook);
   if (spokenN > 13) errs.push(`Hook takes about ${(spokenN * 60 / 165).toFixed(1)} s to say once numbers are spelled out; keep it under 4.3 s (about 12 spoken words).`);
   // Shorts: every beat stays under ~5 s on screen; data scenes are never split later, so their narration must already be short
-  if (ep.format === 'short') ep.scenes.forEach((s, i) => { const n = spokenWords(s.narration); if (i > 0 && s.type !== 'talk' && n > 14) errs.push(`Scene ${i + 1} (${s.type}) takes about ${(n * 60 / 165).toFixed(1)} s to say once numbers are spelled out; Short beats must stay under 5 s (14 spoken words): shorten it.`); });
+  // Shorts beats over ~5 s are no lint error any more: as an error it threw away whole outline drafts (the one-shot fallback then came out 16:9, ep014); the CLI's tightenLong + splitBeats shorten them
   const hasNumbers = ep.scenes.some(s => s.type === 'big_number' || s.type === 'chart');
   if (hasNumbers && ep.sources.length === 0) errs.push('big_number/chart scenes need at least one URL in "sources".');
   ep.scenes.forEach((s, i) => {
