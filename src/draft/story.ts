@@ -111,7 +111,7 @@ export const HOOK_FORMULAS = {
   transformation: 'a result with a number and a timeframe: "X became Y in Z"',
   controversy: 'a genuinely contested take, said flatly',
   list_tease: '"Three things ..." with the count',
-  visual_first: 'names a result the picture already shows, e.g. "This $5 cup costs $1,825."',
+  visual_first: 'names a result the picture already shows ("This [thing] costs [number].")',
 } as const;
 export type HookPick = {hook: string; score: number; formula?: string; overlay?: string; tried: number};
 // shortcut: the outline (other agent's lane) only takes the hook string; the CLI reads the score from here. Pass a callback if this goes concurrent.
@@ -167,7 +167,7 @@ export const overlayOk = (t: string) => {
 export async function makeOverlay(client: Client, hook: string, own: string | undefined, model?: string): Promise<string | undefined> {
   let cands = own ? [own] : [];
   try {
-    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'You write the on-screen text for the first second of a vertical Short. Each is a complete, grammatical phrase of 4 to 7 words that says the same promise as the spoken line in different words, e.g. "Your coffee costs $1,825 a year". No filler like "explained" or "today", no question marks. Output ONLY JSON: {"overlays": [3 strings]}', messages: [{role: 'user', content: `Spoken line: ${hook}`}]}))) as {overlays?: unknown};
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'You write the on-screen text for the first second of a vertical Short. Each is a complete, grammatical phrase of 4 to 7 words that says the same promise as the spoken line in different words, e.g. "Your [thing] costs [number] a year". No filler like "explained" or "today", no question marks. Output ONLY JSON: {"overlays": [3 strings]}', messages: [{role: 'user', content: `Spoken line: ${hook}`}]}))) as {overlays?: unknown};
     cands.push(...(Array.isArray(j.overlays) ? j.overlays.map(x => String(x).trim()) : []));
   } catch { /* own only */ }
   cands = [...new Set(cands.map(c => c.replace(/[.!]+$/, '')))].filter(overlayOk);
