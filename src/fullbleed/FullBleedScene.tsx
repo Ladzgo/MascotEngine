@@ -227,6 +227,40 @@ const Counter: React.FC<{s: Extract<Scene, {type: 'big_number'}>; t: number; w: 
   );
 };
 
+/** Split screen behind a compare/before_after: the frame is cut in two worlds (cool vs warm) along a slanted seam that wipes in, like an editor's split. */
+const SplitScreen: React.FC<{t: number; w: number; h: number; tall: boolean; accent: string}> = ({t, w, h, tall, accent}) => {
+  const e = easeOut(clamp((t - 0.15) / 0.45)), k = tall ? h * 0.06 : w * 0.06;
+  const u = tall ? (k / h) * 50 : (k / w) * 50;
+  const a = tall ? `polygon(0 0, 100% 0, 100% ${50 - u}%, 0 ${50 + u}%)` : `polygon(0 0, ${50 + u}% 0, ${50 - u}% 100%, 0 100%)`;
+  const b = tall ? `polygon(0 ${50 + u}%, 100% ${50 - u}%, 100% 100%, 0 100%)` : `polygon(${50 + u}% 0, 100% 0, 100% 100%, ${50 - u}% 100%)`;
+  const slide = (d: number) => (tall ? `translateY(${(e - 1) * h * 0.5 * d}px)` : `translateX(${(e - 1) * w * 0.5 * d}px)`);
+  return (
+    <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', opacity: e}}>
+      <div style={{position: 'absolute', inset: 0, background: 'rgba(30,70,170,0.5)', clipPath: a, transform: slide(1)}} />
+      <div style={{position: 'absolute', inset: 0, background: `${accent}80`, clipPath: b, transform: slide(-1)}} />
+    </div>
+  );
+};
+
+/** Tech beats: a phone notification slides down in the safe top zone (the UI a viewer knows from their own lock screen), app name + the beat's label. */
+export const TECH = /\b(phones?|smartphones?|batter(y|ies)|apps?|screens?|charg\w*|wifi|notifications?|laptops?|computers?|chips?|data|internet|online)\b/i;
+const Notification: React.FC<{app: string; text: string; t: number; w: number; h: number}> = ({app, text, t, w, h}) => {
+  const e = easeOut(clamp((t - 0.35) / 0.35)), size = Math.min(w * 0.042, 46);
+  return (
+    <div style={{position: 'absolute', left: w * 0.08, width: w * 0.84, top: h * 0.115, transform: `translateY(${(e - 1) * h * 0.12}px)`, opacity: e, background: 'rgba(245,245,250,0.92)', borderRadius: size * 0.9, padding: `${size * 0.55}px ${size * 0.7}px`, boxShadow: '0 18px 50px rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: size * 0.6, fontFamily: SANS, color: '#16182a'}}>
+      <div style={{width: size * 2, height: size * 2, borderRadius: size * 0.5, background: 'linear-gradient(160deg, #5ad66f, #1e9e3e)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: size}}>{app[0]}</div>
+      <div style={{flex: 1, minWidth: 0}}>
+        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: size * 0.72, fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: 1}}><span>{app}</span><span>now</span></div>
+        <div style={{fontSize: size, fontWeight: 800, lineHeight: 1.15, marginTop: size * 0.15}}>{text}</div>
+      </div>
+    </div>
+  );
+};
+/** Whether the top text zone of a beat is taken by the scene itself (then no punch word over it). */
+export const topBusy = (scene: Scene, plan: ScenePlan | undefined, index: number, hook?: string) => ['big_number', 'title', 'compare', 'before_after', 'list', 'checklist', 'stats', 'table', 'timeline'].includes(scene.type)
+  || plan?.layout === 'kinetic' || (index === 0 && !!hook) || techBanner(scene, plan);
+const techBanner = (scene: Scene, plan: ScenePlan | undefined) => scene.type === 'talk' && (plan?.layout === 'hero' || plan?.layout === 'pip') && TECH.test(scene.narration) && !!scene.shot?.label;
+
 const Versus: React.FC<{a: {title: string; value: string}; b: {title: string; value: string}; t: number; w: number; h: number; y: number; accent: string}> = ({a, b, t, w, h, y, accent}) => {
   const tall = h > w, cw = tall ? w * 0.78 : w * 0.34, ch = tall ? 190 : 170;
   const card = (c: {title: string; value: string}, i: number) => {
@@ -325,7 +359,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const stage = fixedStage ? `translate(${panX}px, ${tiltY}px) rotate(${rot}deg) scale(${sc})` : `translate(${panX + subX * w}px, ${tiltY + subY * h}px) rotate(${rot}deg) scale(${sc * subZ})`;
   // hero stands on the ground plane (y = 70% of a tall frame, so it ends above the captions at 72-80%; 74% of a wide one, above its captions at 78%+); its feet are at 82.5% of the 400 box
   const base = tall ? w * 1.15 : h * 0.86; // wider objects (scale, bars, calendar) span the whole 400 box: bigger and they get cut at the frame edge
-  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
+  const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' || (lay === 'hero' && techBanner(scene, plan)) ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
   const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
@@ -345,6 +379,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
         {plan.bgLoop ? <LoopBackdrop file={plan.bgLoop} w={w} h={h} pal={pal} grade={grade.filter} fallback={<Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />} /> : <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />}
         {qaMarks() && <QaMarks c="backdrop" w={w} h={h} />}
       </div>)}
+      {versus && <SplitScreen t={t} w={w} h={h} tall={tall} accent={accent} />}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
         {qaMarks() && <QaMarks c="stage" w={w} h={h} />}
         {shots.map((s, i) => {
@@ -412,7 +447,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
       })()}
       {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
         return <div style={{position: 'absolute', left: w * 0.06, width: w * 0.42, top: h * 0.2, fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.02, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 16px 36px rgba(0,0,0,0.5)`, opacity: e2, transform: `translateX(${(1 - e2) * -40}px)`}}>{kw}<div style={{marginTop: fs * 0.25, height: fs * 0.12, width: `${60 * easeOut((t - 0.35) / 0.4)}%`, background: accent, borderRadius: fs * 0.06}} /></div>; })()}
-      {plan.character && !sideTitle && <Character id={plan.character} t={t} w={w} feet={groundY} left={index % 2 === 0} />}
+      {techBanner(scene, plan) && !showHook && <Notification app={(scene.narration.match(TECH)?.[0] ?? 'Phone').replace(/^\w/, c => c.toUpperCase())} text={scene.shot!.label!} t={t} w={w} h={h} />}
+      {/* reaction after the detail: in a beat with sub-shots the character enters on the last one (wide -> close -> reaction) */}
+      {plan.character && !sideTitle && <Character id={plan.character} t={t - (nSub >= 2 ? (nSub - 1) * dur / nSub - 0.45 : 0)} w={w} feet={groundY} left={index % 2 === 0} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: grade.tint, mixBlendMode: 'soft-light', opacity: 0.28}} />
       {active < 0 && null}

@@ -11,7 +11,7 @@ import {TRANSITION_FRAMES, TransitionLayer} from './fx/transitions';
 import {SceneView} from './scenes/SceneView';
 import {ChapterTag, SourceCard} from './fx/overlays';
 import {Camera, Living, ProgressBar, Vignette} from './fx/life';
-import {FullBleedScene} from './fullbleed/FullBleedScene';
+import {FullBleedScene, topBusy} from './fullbleed/FullBleedScene';
 import {planEpisode} from './fullbleed/episodePlan';
 import {PunchCaptions, buildPunchPhrases} from './fx/punch';
 import {DISPLAY, INK, SANS, loadFonts, easeOut, spring, clamp} from './theme';
@@ -105,7 +105,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
       ))}
       {!fullbleed && <Vignette />}
       {!fullbleed && g < endStart && <ProgressBar index={sceneAt(L, g)} count={totalScenes} p={(g - base) / Math.max(1, L.ends[sceneAt(L, g)] - L.froms[sceneAt(L, g)])} accent={accent} />}
-      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={!['big_number', 'title', 'compare', 'before_after', 'list', 'checklist', 'stats', 'table', 'timeline'].includes(episode.scenes[sceneAt(L, g)].type) && fbPlan[sceneAt(L, g)]?.layout !== 'kinetic' && !(sceneAt(L, g) === 0 && episode.hookOverlay)} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
+      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={!topBusy(episode.scenes[sceneAt(L, g)], fbPlan[sceneAt(L, g)], sceneAt(L, g), episode.format === 'short' ? episode.hookOverlay : undefined)} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
       {episode.disclaimer && episode.format !== 'short' && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
           <EndCard episode={episode} accent={accent} />
