@@ -273,6 +273,7 @@ export async function chat(o: {system: string; messages: ChatMsg[]; json?: boole
     }
     if (env.LLM_FALLBACK === '0') throw first!;
     // the fallback is a stopgap for a spent free quota: the smallest installed text model answers 2-3x faster than the 7B default (storyboard batches timed out at 240 s)
+    console.warn(`LLM_FALLBACK ${p} failed (${first!.message.slice(0, 160)}); trying local Ollama`); // a silent fallback hid a 15 min wait on the shared Ollama lock
     const fast = env.LLM_FALLBACK_MODEL || await fastestOllama(env);
     try { return await viaOllama(o.system, o.messages, !!o.json, fast ? {...env, OLLAMA_MODEL: fast} : env); }
     catch (e) { throw new Error(`${first!.message} (local Ollama fallback: ${(e as Error).message})`); }

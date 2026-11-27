@@ -205,6 +205,13 @@ export function concrete(t: string): boolean {
   return false;
 }
 /** Beat pairs (i, i+1) from beat 1 on where neither beat carries a number or a name: "a number or a name in every 2nd beat". Returns i. */
+/** Indexes of lines that belong to another topic or state something false: the story judge scored a retell with "Mia bets $10 on red" in a banana Short at 95 (sd-banana). Fails open. */
+export async function strayLines(client: Client, topic: string, lines: string[], model?: string): Promise<number[]> {
+  try {
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'You fact-check a short video script. List the numbers of the lines that belong to a different topic than the video, or state something false or physically impossible. Questions and figures of speech ("felt like a zombie") are fine. Output ONLY JSON: {"bad": [line numbers]}', messages: [{role: 'user', content: `Video: ${topic}\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`}]}))) as {bad?: unknown};
+    return (Array.isArray(j.bad) ? j.bad : []).map(x => Number(x) - 1).filter(i => Number.isInteger(i) && i >= 0 && i < lines.length);
+  } catch { return []; }
+}
 /** The line names an everyday first-name person ("Alex visits a casino..."). */
 export const namesPerson = (t: string) => [...t.matchAll(/\b[A-Z][a-z]{2,}\b/g)].some(m => FIRST_NAMES.has(m[0].toLowerCase()));
 export function concreteGaps(narr: string[]): number[] {
@@ -273,7 +280,7 @@ export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, mo
 async function judgeOnce(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
   const lines = ep.scenes.map(s => s.narration).filter(l => !/\b(follow|subscribe)\b/i.test(l)); // the CTA is required, not story: it kept being quoted as the weakest line
   try {
-    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. Quote the weakest line of THIS script exactly. The anchors only calibrate the scale: never quote them or reuse their people, numbers or topic in your fix; the fix must be about this script's topic. Give points per criterion first, then the total. Output ONLY JSON: {"points": {"surprise": 0-25, "person": 0-20, "turn": 0-20, "payoff": 0-20, "retell": 0-15}, "weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown; points?: Record<string, unknown>};
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. A line that belongs to another topic, a line said twice, a story that does not follow from line to line, or a claim that is false caps the whole script at 40 (give the points accordingly).Quote the weakest line of THIS script exactly. The anchors only calibrate the scale: never quote them or reuse their people, numbers or topic in your fix; the fix must be about this script's topic. Give points per criterion first, then the total. Output ONLY JSON: {"points": {"surprise": 0-25, "person": 0-20, "turn": 0-20, "payoff": 0-20, "retell": 0-15}, "weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown; points?: Record<string, unknown>};
     // a bare total sat on the OK anchor ("about 62") for every script; the per-criterion sum moves with the content and names what is missing
     const MAXP: Record<string, number> = {surprise: 25, person: 20, turn: 20, payoff: 20, retell: 15}, pts = Object.entries(MAXP).map(([k, m]) => [k, Math.max(0, Math.min(m, Number(j.points?.[k])))] as const);
     const summed = pts.every(([, v]) => Number.isFinite(v)), low = summed ? [...pts].sort((a, b) => a[1] / MAXP[a[0]] - b[1] / MAXP[b[0]])[0] : undefined;
@@ -337,13 +344,15 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
       // talk lines may hand their number to a neighbour (the person needs a line of setup; sd-roulette retell died on "lost its number"); data beats keep theirs, and no number may vanish
       const said = new Set(lines.flatMap(spokenNumbers)), gone = narr.slice(1, -1).flatMap(spokenNumbers).filter(x => !said.has(x));
       const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : gone.length ? `dropped ${gone.slice(0, 3).join(', ')}` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
-      const ok = !why;
-      if (ok) {
+      const stray = why ? [] : (await strayLines(client, `${cur.title}\n${narr[0]}`, lines, o.model)).filter(i => !narr.includes(lines[i])); // only lines the retell wrote
+      const ok = !why && !stray.length;
+      if (!why && stray.length) o.log?.(`story retell rejected (off-topic or false: ${stray.slice(0, 2).map(i => `"${lines[i]}"`).join(', ')})`);
+      else if (ok) {
         const next = {...cur, scenes: cur.scenes.map((s, i) => i > 0 && i < narr.length - 1 ? {...s, narration: lines[i - 1]} : s) as Episode['scenes']}, nj = await judgeStory(client, next, o.model);
         history.push(nj.score);
         o.log?.(`story retell: judge ${j.score} -> ${nj.score}`);
         if (nj.score > j.score) { cur = next; j = nj; }
-      } else o.log?.(`story retell rejected (${why})`);
+      } else if (why) o.log?.(`story retell rejected (${why})`);
     } catch (e) { o.log?.(`story retell skipped (${(e as Error).message.slice(0, 60)})`); }
   }
   for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75); r++) {
