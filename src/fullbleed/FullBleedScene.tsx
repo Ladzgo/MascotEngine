@@ -128,10 +128,11 @@ export const GRADES = [
 ] as const;
 export const gradeFor = (title: string) => GRADES[[...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % GRADES.length];
 /** Kinetic headline: the keyword, but never a bare small number with no unit ("2" said nothing on ep016 beat 5): then the longest content word. */
+const NO_HEADLINE = /^(because|although|however|therefore|actually|really|without|through|whether|instead|another|anything|something|everything|nothing|remember|follow)$/i; // connectives say nothing alone ('BECAUSE', ep016)
 export const kineticWord = (narration: string, emphasis: string[], label?: string) => {
-  if (label && /\d/.test(label) && label.split(/\s+/).length <= 3) return label; // the storyboard's number label ('7.4 psi') beats a spelled-out number the keyword picker can't see ('seven point four')
-  const k = pickKeyword(narration, emphasis), content = () => narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(w => !isFunctionWord(w) && !/^\d+$/.test(w) && !isBareVerb(w)).sort((a, b) => b.length - a.length)[0];
-  if (/^\d{1,2}$/.test(k) || (!k.includes(' ') && isBareVerb(k))) return content() ?? k; // a bare small number or a bare verb ("CREATES", ep017) says nothing
+  if (label && /\d/.test(label) && label.split(/\s+/).length <= 3) return label.replace(/(\d[\d,.]*)\s*dollars?\b/i, '$$$1'); // the storyboard's number label ('7.4 psi') beats a spelled-out number the keyword picker can't see ('seven point four')
+  const k = pickKeyword(narration, emphasis), content = () => narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(w => !isFunctionWord(w) && !NO_HEADLINE.test(w) && !/^\d+$/.test(w) && !isBareVerb(w)).sort((a, b) => b.length - a.length)[0];
+  if (/^\d{1,2}$/.test(k) || (!k.includes(' ') && (isBareVerb(k) || NO_HEADLINE.test(k)))) return content() ?? k; // a bare small number or a bare verb ("CREATES", ep017) says nothing
   return k.split(' ').map(w => (/\d/.test(w) ? screenNumber(w) : w)).join(' '); // en-US or short: pickKeyword strips commas ('$10000000' -> '$10M', ep017)
 };
 /** QA zoom probe (scripts/qa/zoomFrames.ts renders with inputProps.qaMarks): four squares ride inside each camera layer and everything else is hidden,
@@ -439,7 +440,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
                     </svg>
                   );
                 })}
-                {sl.main && ac.overlay && <div style={{position: 'absolute', left: sx0 - size / 2, top: sy0 - size / 2, width: size, height: size, opacity: 1 - out}}><ActionOverlay kind={ac.overlay} u={lt} size={size} /></div>}
+                {sl.main && ac.overlay && (() => { const os = Math.min(size, w * 0.9); return <div style={{position: 'absolute', left: sx0 - os / 2, top: sy0 - os / 2, width: os, height: os, opacity: 1 - out}}><ActionOverlay kind={ac.overlay} u={lt} size={os} /></div>; })()} {/* the overlay box stays inside the frame: on a full-size hero (1242 px box) the check badge sat off the right edge (ep016) */}
                 <svg viewBox="0 0 400 400" width={size} height={size} style={{position: 'absolute', left: sx0 - size / 2, top: sy0 - size / 2 + bob + 0.65 * size, overflow: 'visible', opacity: (1 - easeInOut(out)) * clamp(inE * 1.5) * 0.22, transform: `scaleY(-1) scale(${over})`, WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', maskImage: 'linear-gradient(to top, #000 0%, transparent 52%)', filter: 'blur(2px)', pointerEvents: 'none'}}>
                   {isChart && scene.type === 'chart' && sl.main ? <ChartBars labels={scene.chart.labels} values={scene.chart.values} t={lt} /> : <O t={lt} accent={accent} value={undefined} />}
                 </svg>

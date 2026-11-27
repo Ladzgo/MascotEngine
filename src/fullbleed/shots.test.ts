@@ -177,3 +177,9 @@ test('kinetic headline: a number label beats a spelled-out number', async () => 
   const {kineticWord} = await import('./FullBleedScene');
   assert.equal(kineticWord('It creates a seven point four psi gap to manage.', [], '7.4 psi'), '7.4 psi');
 });
+
+test('kinetic headline: no connectives, dollar labels as $', async () => {
+  const {kineticWord} = await import('./FullBleedScene');
+  assert.notEqual(kineticWord('Follow Money Myths, because the reason you lose money isn’t what you think.', []).toLowerCase(), 'because');
+  assert.equal(kineticWord('A 2 dollars surcharge per basket.', [], '2 dollars'), '$2');
+});
