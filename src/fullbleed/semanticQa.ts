@@ -53,21 +53,26 @@ async function ask(png: string, sentence: string): Promise<{score: number; shown
   return {score: Math.max(0, Math.min(10, Number(j.score) || 0)), shown: String(j.shown ?? '').slice(0, 80), reason: String(j.reason ?? '').slice(0, 140)};
 }
 
-const items: Item[] = [];
+const items: Item[] = [], missing: number[] = [];
 for (const [i, d] of dec.scenes.entries()) {
   const t = d.startSec + d.durSec * 0.5, png = path.join(tmp, `s${i}.png`);
   const r = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', t.toFixed(2), '-i', file, '-frames:v', '1', '-vf', 'scale=540:-1', png]);
   if (r.status !== 0) continue;
-  try { items.push({scene: i + 1, sentence: ep.scenes[i].narration, ...(await ask(png, ep.scenes[i].narration))}); }
-  catch (e) { console.error(`beat ${i + 1}: ${(e as Error).message}`); }
+  // one retry (the model is shared: another agent's model swap times a call out); a beat that still fails makes the run invalid
+  for (let k = 0; k < 2; k++) {
+    try { items.push({scene: i + 1, sentence: ep.scenes[i].narration, ...(await ask(png, ep.scenes[i].narration))}); break; }
+    catch (e) { console.error(`beat ${i + 1}${k ? ' (retry)' : ''}: ${(e as Error).message}`); if (k) missing.push(i + 1); }
+  }
   const it = items[items.length - 1];
   if (it?.scene === i + 1) console.log(`#${String(i + 1).padStart(2)} ${String(it.score).padStart(2)}/10  ${it.shown.padEnd(40)} | ${it.sentence.slice(0, 60)}`);
 }
 fs.rmSync(tmp, {recursive: true, force: true});
 const mean = items.length ? items.reduce((a, x) => a + x.score, 0) / items.length : 0;
 const med = median(items.map(x => x.score));
-fs.writeFileSync(`${b}semantic.json`, JSON.stringify({model, file: path.basename(file), mean: +mean.toFixed(2), median: med, items}, null, 2));
-if (process.argv.includes('--fix')) { // beats below the threshold get another stock query/subject; render again afterwards
+const valid = !missing.length;
+fs.writeFileSync(`${b}semantic.json`, JSON.stringify({model, file: path.basename(file), valid, missing, mean: +mean.toFixed(2), median: med, items}, null, 2));
+if (process.argv.includes('--fix') && !valid) console.log(`\n--fix skipped: beats ${missing.join(', ')} were not scored`);
+else if (process.argv.includes('--fix')) { // beats below the threshold get another stock query/subject; render again afterwards
   const f = `${dir}episode.json`, before = JSON.parse(fs.readFileSync(f, 'utf8')), r = reselect(before, items, Number(arg('below') ?? 6));
   const swapped = changedBeats(before, r.ep);
   if (swapped.length) {
@@ -78,4 +83,4 @@ if (process.argv.includes('--fix')) { // beats below the threshold get another s
     if (k.kept.length) { fs.writeFileSync(f, JSON.stringify(k.ep, null, 2)); console.log(`now: npm run direct -- ${ep.id} && npm run render -- ${ep.id}`); }
   }
 }
-console.log(`\nsemantic QA ${ep.id}: median ${med}/10, mean ${mean.toFixed(1)}/10 over ${items.length} beats; weakest: ${[...items].sort((a, b) => a.score - b.score).slice(0, 3).map(x => `#${x.scene} (${x.score})`).join(', ')}  (build/semantic.json)`);
+console.log(`\nsemantic QA ${ep.id}${valid ? '' : ` INVALID (beats ${missing.join(', ')} timed out twice; re-run when \`ollama ps\` shows no other model)`}: median ${med}/10, mean ${mean.toFixed(1)}/10 over ${items.length} beats; weakest: ${[...items].sort((a, b) => a.score - b.score).slice(0, 3).map(x => `#${x.scene} (${x.score})`).join(', ')}  (build/semantic.json)`);
