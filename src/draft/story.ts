@@ -324,7 +324,11 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
     const narr = cur.scenes.map(s => s.narration), heard = [...new Set([...narr.flatMap(spokenNumbers), ...(o.facts ?? [])])], max = o.maxWords ?? 14;
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}${factBlock}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
-      const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim());
+      const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim().replace(/^\d+\s*[:.]\s*/, ''));
+      // the model often hands back the hook or the last line too (89/88 lines on lf-inflation): those two stay anyway, so drop the echo
+      const same = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) === b.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
+      if (lines.length > narr.length - 2 && same(lines[0], narr[0])) lines.shift();
+      if (lines.length > narr.length - 2 && same(lines.at(-1)!, narr.at(-1)!)) lines.pop();
       const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : !nameOk(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
       const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
       const ok = !why;
