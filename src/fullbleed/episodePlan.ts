@@ -109,7 +109,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     if (camera === prevCam) camera = (camera + 1) % 4;
     // layout: content decides first, talk beats rotate through the composed layouts
     let layout: Layout;
-    const companion = GROUPS[g]?.find(k => OBJECTS[k] && (money || !MONEY_ONLY.has(k)) && !shots.some(x => x.kind === k) && !lastSix().includes(k));
+    const companion = GROUPS[g]?.find(k => OBJECTS[k] && !METAPHOR.has(k) && (money || !MONEY_ONLY.has(k)) && !shots.some(x => x.kind === k) && !lastSix().includes(k));
     if (typeof sh.layout === 'string' && (LAYOUTS as readonly string[]).includes(sh.layout)) layout = sh.layout as Layout;
     else if (s.type === 'chart') layout = 'dataviz';
     else if (s.stockFile) layout = shots[0]?.why?.startsWith('shot.') ? 'pip' : 'broll'; // footage + the named object as an accent reads as "exactly this" (semantic QA: bare snow footage for "zero degrees" scored 5)
@@ -191,3 +191,6 @@ export function conceptHero(text: string, avoid: Set<string>, money = true): {ki
   }
   return undefined;
 }
+
+/** Pictures that are a statement (a prize, a weight, a pit): never an unasked companion (a #1 trophy beside 'winter months can cost you', fbw-ep014). */
+const METAPHOR = new Set(['trophy', 'anchor', 'hole', 'rocket', 'ladder', 'dice', 'snowball', 'debt_counter', 'medal', 'person_celebrate']);

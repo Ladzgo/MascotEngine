@@ -481,7 +481,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
         const perm = tall ? rows.map((_, i) => i) : uncross(rows.map(r => [r.x + r.wp, r.yy + size * 0.8]), rows.map(r => [r.tx, r.ty]));
         return rows.map((r, i) => <Callout key={i} text={r.txt} t={t} at={r.at} x={r.x} y={r.yy} tx={rows[perm[i]].tx} ty={rows[perm[i]].ty} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} hp={tall && i === rows.length - 1 ? hOf(r.txt) - size * 0.5 : undefined} />);
       })()}
-      {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
+      {sideTitle && (() => { const kw = kineticWord(scene.narration, scene.emphasis, scene.shot?.label).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
         return <div style={{position: 'absolute', left: w * 0.06, width: w * 0.42, top: h * 0.2, fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.02, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 16px 36px rgba(0,0,0,0.5)`, opacity: e2, transform: `translateX(${(1 - e2) * -40}px)`}}>{kw}<div style={{marginTop: fs * 0.25, height: fs * 0.12, width: `${60 * easeOut((t - 0.35) / 0.4)}%`, background: accent, borderRadius: fs * 0.06}} /></div>; })()}
       {techBanner(scene, plan) && !showHook && !sideTitle && <Notification {...notice(scene.narration)} t={t} w={w} h={h} />}
       {/* reaction after the detail: in a beat with sub-shots the character enters on the last one (wide -> close -> reaction) */}
