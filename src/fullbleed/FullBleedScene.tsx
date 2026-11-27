@@ -329,7 +329,7 @@ const HookOverlay: React.FC<{text: string; t: number; w: number; h: number; top:
   return (
     <div style={{position: 'absolute', left: w * 0.08, width: w * 0.84, top, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.04, color: '#fff'}}>
       {lines.map((ln, li) => <div key={li}>{ln.split(' ').map((wd, wi) => {
-        const e = easeOut(clamp((t - 0.08 - 0.09 * k++) / 0.22)), isKey = wd === key;
+        const e = easeOut(clamp((t + 0.12 - 0.06 * k++) / 0.18)), isKey = wd === key; // the first words are up on frame 0 (cover frame / first second), all in by ~0.4 s
         return <span key={wi} style={{display: 'inline-block', margin: `0 ${fs * 0.12}px`, opacity: e, transform: `translateY(${(1 - e) * fs * 0.35}px) ${isKey ? `rotate(${-2 * e}deg)` : ''}`, ...(isKey ? {background: '#ffe033', color: '#16182a', padding: `0 ${fs * 0.14}px`, borderRadius: fs * 0.1, boxShadow: '0 10px 30px rgba(0,0,0,0.45)'} : {textShadow: `0 ${fs * 0.05}px 0 rgba(0,0,0,0.55), 0 ${fs * 0.1}px ${fs * 0.3}px rgba(0,0,0,0.5)`}), WebkitTextStroke: `${fs * 0.025}px rgba(0,0,0,0.35)`}}>{wd}</span>;
       })}</div>)}
     </div>

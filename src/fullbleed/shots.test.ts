@@ -85,9 +85,11 @@ test('reselect: weak stock beat loses its stock, weak drawn beat gets another su
 test('shot.at: the subject lands on its spoken word, later shots stay ordered', () => {
   const w = (t: string) => t.split(' ').map((x, i) => ({w: x, start: i * 0.4, end: i * 0.4 + 0.3}));
   const n = 'Every morning your heart pumps more blood';
-  const p = planEpisode([{narration: n, emphasis: [], emotion: 'neutral', type: 'talk', shot: {subject: 'heart', action: 'pulse', at: 'heart'}}], [w(n)], [5]);
+  const sc = {narration: n, emphasis: [], emotion: 'neutral', type: 'talk', shot: {subject: 'heart', action: 'pulse', at: 'heart'}}, title = {narration: 'Hook line.', emphasis: [], emotion: 'neutral', type: 'talk'};
+  const q = planEpisode([title, sc], [w('Hook line.'), w(n)], [3, 5]), p = [q[1]];
   assert.equal(p[0].shots[0].kind, 'heart'); assert.ok(Math.abs(p[0].shots[0].at - 1.2) < 1e-6);
   p[0].shots.forEach((s, i) => { if (i) assert.ok(s.at > p[0].shots[i - 1].at); });
+  assert.equal(planEpisode([sc], [w(n)], [5])[0].shots[0].at, 0); // the hook beat shows its picture on frame 0
 });
 
 import {planStats} from './episodePlan.js';
