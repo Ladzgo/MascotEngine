@@ -112,3 +112,10 @@ test('tightenLong: long Short beats become two sentences only when every number 
   assert.equal(out.scenes[1].narration, 'A 3000 mAh phone. It loses 600 at zero.');
   assert.equal(out.scenes[2].narration, ep.scenes[2].narration); // 99 is a new number: rejected
 });
+test('tightenLong joins two rewrite entries with the same index', async () => {
+  const {tightenLong} = await import('./draft.js');
+  const client = {messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({rewrites: [{i: 1, narration: 'A quick nap helps.'}, {i: 1, narration: 'You find it faster.'}]})}]})}} as any;
+  const mk = (n: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration: n});
+  const ep = {id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'short', scenes: [mk('Hook.'), mk('A quick nap could help you find it faster provided you stop grogginess.'), mk('End.')]} as any;
+  assert.equal((await tightenLong(client, ep, {est: s => s.narration.split(' ').length / 2})).scenes[1].narration, 'A quick nap helps. You find it faster.');
+});

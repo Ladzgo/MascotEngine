@@ -260,10 +260,14 @@ export async function tightenLong(client: Client, ep: Episode, o: {model?: strin
     const j = extractJson(res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('')) as {rewrites?: {i: number; narration: string}[]};
     const scenes = [...ep.scenes];
     let n = 0;
-    for (const w of j.rewrites ?? []) {
-      const s = scenes[w.i]; if (!s || !long.some(l => l.i === w.i) || typeof w.narration !== 'string') continue;
+    // models often return the two sentences as two entries with the same i: join them
+    const byI = new Map<number, string>();
+    for (const w of j.rewrites ?? []) if (typeof w.narration === 'string') byI.set(w.i, `${byI.get(w.i) ?? ''} ${w.narration.trim()}`.trim());
+    for (const [wi, joined] of byI) {
+      const w = {i: wi, narration: joined}, s = scenes[w.i]; if (!s || !long.some(l => l.i === w.i)) continue;
       const t = w.narration.trim(), same = spokenNumbers(t).sort().join() === spokenNumbers(s.narration).sort().join();
       if (same && (t.match(/[.!?](\s|$)/g) ?? []).length >= 2) { scenes[w.i] = {...s, narration: t} as Episode['scenes'][number]; n++; }
+      else o.log?.(`tighten: beat ${w.i + 1} rejected (${same ? 'not two sentences' : `numbers ${spokenNumbers(t).join('/')} vs ${spokenNumbers(s.narration).join('/')}`}): ${t}`);
     }
     o.log?.(`${long.length} beats over ${max} s, ${n} tightened`);
     return {...ep, scenes: scenes as Episode['scenes']};
