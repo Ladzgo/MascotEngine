@@ -145,3 +145,8 @@ test('match cut: same silhouette in a row cuts hard and keeps the framing', asyn
   markMatchCuts(plans, [{}, {}, {}]);
   assert.equal(plans[1].matchCut, true); assert.equal(plans[1].zoom, 'wide'); assert.equal(plans[2].matchCut, undefined);
 });
+
+test('uncross: leader lines from a left column never cross', async () => {
+  const {uncross} = await import('./FullBleedScene');
+  assert.deepEqual(uncross([[0, 0], [0, 10]], [[10, 10], [10, 0]]), [1, 0]);
+});

@@ -175,6 +175,18 @@ const Particles: React.FC<{t: number; w: number; h: number; cx: number; cy: numb
 };
 const MONEY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'card', 'bars3d', 'percent', 'bank', 'receipts']);
 
+/** Assignment of anchors to line starts (<= 4: all permutations) with the fewest crossing segments, then the shortest total length. */
+export function uncross(from: number[][], to: number[][]): number[] {
+  const cross = (a: number[], b: number[], c: number[], d: number[]) => { const o = (p: number[], q: number[], r: number[]) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])); return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; };
+  const perms = (n: number[]): number[][] => (n.length <= 1 ? [n] : n.flatMap((x, i) => perms([...n.slice(0, i), ...n.slice(i + 1)]).map(r => [x, ...r])));
+  let best = from.map((_, i) => i), score = Infinity;
+  for (const p of from.length <= 4 ? perms(best) : [best]) {
+    let c = 0, len = 0;
+    p.forEach((j, i) => { len += Math.hypot(to[j][0] - from[i][0], to[j][1] - from[i][1]); p.forEach((k, m) => { if (m > i && cross(from[i], to[j], from[m], to[k])) c++; }); });
+    if (c * 1e6 + len < score) { score = c * 1e6 + len; best = p; }
+  }
+  return best;
+}
 /** Callout label: pill with a leader line that draws to the hero. */
 const calloutWidth = (text: string, size: number, maxW: number) => Math.min(size * 0.6 * text.length + size * 1.8, maxW);
 const Callout: React.FC<{text: string; t: number; at: number; x: number; y: number; tx: number; ty: number; size: number; accent: string; align: 'left' | 'right' | 'down'; maxW: number; hp?: number}> = ({text, t, at, x, y, tx, ty, size, accent, align, maxW, hp}) => {
@@ -445,14 +457,16 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
         // ties the data to the thing (reference) - a line per pill crossed the other pills and read as debug pins
         const total = ctxText.reduce((a, r) => a + hOf(cut(r)), 0), objTop = h * 0.62 + (cy - 0.41 * hs - h * 0.62) * sc;
         let y = tall ? Math.max(h * 0.075, objTop - total - size * 0.4) : h * 0.14;
-        return ctxText.map((raw, i) => {
+        const rows = ctxText.map((raw, i) => {
           const txt = cut(raw), wp = calloutWidth(txt, size, maxW), yy = y;
           y += hOf(txt);
-          const x = tall ? (w - wp) / 2 : w * 0.04;
           const at = 0.5 + i * Math.max(0.8, (dur - 1) / ctxText.length), [ax, ay] = anchorOf(kindAt(at), i);
           const px = hx - hs / 2 + (ax * hs) / 400, py = cy - hs / 2 + (ay * hs) / 400; // anchor on the real part of the object, carried through the camera move
-          return <Callout key={i} text={txt} t={t} at={at} x={x} y={yy} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.62 + (py - h * 0.62) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} hp={tall && i === ctxText.length - 1 ? hOf(txt) - size * 0.5 : undefined} />;
+          return {txt, wp, yy, at, x: tall ? (w - wp) / 2 : w * 0.04, tx: w / 2 + (px - w / 2) * sc + panX, ty: h * 0.62 + (py - h * 0.62) * sc + tiltY};
         });
+        // 16:9 leader lines: the anchors go to the pills in the order with no crossing lines (fb-wide beat 4 had three crossing)
+        const perm = tall ? rows.map((_, i) => i) : uncross(rows.map(r => [r.x + r.wp, r.yy + size * 0.8]), rows.map(r => [r.tx, r.ty]));
+        return rows.map((r, i) => <Callout key={i} text={r.txt} t={t} at={r.at} x={r.x} y={r.yy} tx={rows[perm[i]].tx} ty={rows[perm[i]].ty} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} hp={tall && i === rows.length - 1 ? hOf(r.txt) - size * 0.5 : undefined} />);
       })()}
       {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
         return <div style={{position: 'absolute', left: w * 0.06, width: w * 0.42, top: h * 0.2, fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.02, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 16px 36px rgba(0,0,0,0.5)`, opacity: e2, transform: `translateX(${(1 - e2) * -40}px)`}}>{kw}<div style={{marginTop: fs * 0.25, height: fs * 0.12, width: `${60 * easeOut((t - 0.35) / 0.4)}%`, background: accent, borderRadius: fs * 0.06}} /></div>; })()}
