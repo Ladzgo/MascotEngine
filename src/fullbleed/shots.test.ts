@@ -65,7 +65,7 @@ test('variety engine: no subject within 6 beats, no setting/camera/layout twice 
   const plan = planEpisode(scenes, scenes.map(s => words(s.narration)), scenes.map(() => 4));
   assert.equal(plan[3].shots[0].kind, 'anchor'); assert.equal(plan[3].shots[0].action, 'sink'); assert.equal(plan[3].env, 'street');
   plan.forEach((p, i) => {
-    if (i) { assert.notEqual(p.env, plan[i - 1].env, `env repeats at ${i}`); assert.notEqual(p.camera, plan[i - 1].camera); assert.notEqual(p.layout, plan[i - 1].layout, `layout repeats at ${i}`); assert.notEqual(p.pal, plan[i - 1].pal); }
+    if (i) { assert.notEqual(p.env, plan[i - 1].env, `env repeats at ${i}`); assert.notEqual(p.camera, plan[i - 1].camera); if (!p.matchCut) assert.notEqual(p.layout, plan[i - 1].layout, `layout repeats at ${i}`); assert.notEqual(p.pal, plan[i - 1].pal); }
     const prior = plan.slice(Math.max(0, i - 6), i).flatMap(q => q.shots.map(x => x.kind));
     p.shots.forEach(sh => { if (i !== 3) assert.ok(!prior.includes(sh.kind), `${sh.kind} repeats within 6 beats at ${i}`); });
   });

@@ -115,15 +115,15 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     else if (s.stockFile) layout = shots[0]?.why?.startsWith('shot.') ? 'pip' : 'broll'; // footage + the named object as an accent reads as "exactly this" (semantic QA: bare snow footage for "zero degrees" scored 5)
     else if (s.type !== 'talk') layout = 'hero';
     else {
-      const order: Layout[] = ['hero', 'kinetic', 'split', 'grid', 'hero', 'kinetic'];
+      const order: Layout[] = ['hero', 'kinetic', 'split', 'hero', 'kinetic', 'split']; // no grid: one picture six times read as clip art (fbw-ep014: six phones)
       layout = order[talkN % order.length]; talkN++;
-      if (layout === 'split' && !companion) layout = 'grid';
+      if (layout === 'split' && !companion) layout = 'hero';
       if (layout === prevLayout) layout = layout === 'hero' ? 'kinetic' : 'hero';
     }
     if ((layout === 'pip' || layout === 'broll') && !s.stockFile) layout = 'hero';
     // a drawn beat of 4 s+ that still has one picture gets its group companion half-way (QA change rate: a new picture every <= 3 s; ep017 failed at 3.3 s)
     if (shots.length === 1 && dur >= 4 && companion && !s.stockFile && s.type === 'talk' && !['split', 'grid', 'dataviz'].includes(layout)) shots.push({kind: companion, at: Math.min(dur - 1.5, Math.max(shots[0].at + 1.5, dur / 2)), why: 'companion (change rate)', action: 'pop_in'});
-    if (layout === 'grid' && WEAK.has(shots[0]?.kind ?? '')) layout = 'kinetic'; // six shields for 'the real reason' read as clip art (ep016); a full-size lone symbol was clipped, so the headline carries it
+    if (layout === 'grid') layout = WEAK.has(shots[0]?.kind ?? '') ? 'kinetic' : 'hero'; // an explicit shot.layout grid too // six shields for 'the real reason' read as clip art (ep016); a full-size lone symbol was clipped, so the headline carries it
     const own = loopCats(s.narration ?? ''), loop = !s.stockFile && layout !== 'dataviz' && s.type !== 'chart' && (own.length || !prevLoop) ? loopAsset([...own, ...(topCat ? [topCat] : [])], new Set(looks.slice(-2).filter(l => l.startsWith('loop:')).map(l => l.slice(5))), usedLoops) : undefined;
     if (loop) usedLoops.add(loop.file);
     if (!s.stockFile) prevLoop = !!loop;
