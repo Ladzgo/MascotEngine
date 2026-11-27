@@ -57,11 +57,27 @@ export function recentDevices(epsRoot: string, n = 3): string[] {
   } catch { return []; }
 }
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-/** One device not used in the last N episodes; the topic picks among the rest deterministically (same topic, same device). */
-export function pickDevice(topic: string, recent: string[], force?: string): Device {
+/** Retention loop: mean audience retention (%) per story device from data/retention.json (YouTube curves imported by `npm run analytics`); {} below 3 videos. */
+export function deviceRetention(root = new URL('../../', import.meta.url).pathname): Record<string, number> {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(root, 'data/retention.json'), 'utf8')) as {videos?: Record<string, {curve?: number[]; episode?: string}>};
+    const acc: Record<string, number[]> = {};
+    for (const v of Object.values(data.videos ?? {})) {
+      if (!v.curve?.length || !v.episode) continue;
+      const dev = (JSON.parse(fs.readFileSync(path.join(root, 'episodes', v.episode, 'episode.json'), 'utf8')) as {device?: string}).device;
+      if (dev) (acc[dev] ??= []).push(v.curve.reduce((a, b) => a + b, 0) / v.curve.length);
+    }
+    if (Object.values(acc).flat().length < 3) return {};
+    return Object.fromEntries(Object.entries(acc).map(([k, xs]) => [k, xs.reduce((a, b) => a + b, 0) / xs.length]));
+  } catch { return {}; }
+}
+/** One device not used in the last N episodes; the topic picks among the rest deterministically (same topic, same device). Devices whose measured retention is more than 5 points under the median sit out. */
+export function pickDevice(topic: string, recent: string[], force?: string, retention: Record<string, number> = deviceRetention()): Device {
   const f = deviceById(force); if (f) return f;
   const free = DEVICES.filter(d => !recent.includes(d.id));
-  const pool = free.length ? free : DEVICES.filter(d => d.id !== recent[0]);
+  let pool = free.length ? free : DEVICES.filter(d => d.id !== recent[0]);
+  const known = Object.values(retention).sort((a, b) => a - b);
+  if (known.length >= 2) { const med = known[Math.floor(known.length / 2)], kept = pool.filter(d => !(d.id in retention) || retention[d.id] >= med - 5); if (kept.length) pool = kept; }
   return pool[hash(topic) % pool.length];
 }
 

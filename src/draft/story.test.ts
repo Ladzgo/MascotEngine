@@ -82,3 +82,9 @@ test('pickTitle: judged candidates, invented numbers and long titles lose', asyn
   const r = await pickTitle(client, ep);
   assert.equal(r.title, 'Your coffee costs $1,825 a year'); // the $9,999 title is dropped, the 70-char one is over the length cap
 });
+test('retention loop: a device viewers leave sits out of the rotation', () => {
+  const all = DEVICES.map(d => d.id), weak = all[0];
+  const ret = Object.fromEntries(all.map(id => [id, id === weak ? 20 : 50]));
+  for (const t of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) assert.notEqual(pickDevice(t, [], undefined, ret).id, weak);
+  assert.equal(pickDevice('x', [], undefined, {}).id, pickDevice('x', [], undefined, {}).id);
+});
