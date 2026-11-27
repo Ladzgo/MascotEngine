@@ -5,7 +5,7 @@ import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} 
 
 type W = {w: string; start: number; end: number};
 export type PlannedShot = {kind: string; at: number; why?: string; action: string};
-export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string};
+export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string; matchCut?: boolean};
 
 /** Where each kind of subject likes to live; the engine rotates through these so neighbouring scenes never share a setting. */
 const ENV_BY_GROUP: Record<string, Setting[]> = {
@@ -121,6 +121,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
   });
   // palettes: never the same index twice in a row
   out.forEach((p, i) => { if (i && p.pal === out[i - 1].pal) p.pal = (p.pal + 1) % 4; });
+  markMatchCuts(out, scenes);
   return out;
 }
 const SUBJECT_SET = new Set(Object.keys(OBJECTS));
@@ -138,4 +139,20 @@ export function planStats(plans: ScenePlan[], scenes: {type: string; stockFile?:
     beats: n, layouts, plainShare: n ? plans.filter((p, i) => p.layout === 'hero' && scenes[i].type === 'talk' && !scenes[i].stock).length / n : 0,
     distinct: n ? new Set(first).size / n : 0, minRepeatGap: gap === Infinity ? null : gap, stockShare: n ? scenes.filter(s => s.stock || s.stockFile).length / n : 0,
   };
+}
+
+/** Silhouette classes for match cuts: two beats in a row whose heroes share a silhouette cut hard on the shape (an editor's match cut), no camera transition. */
+const SHAPES: Record<string, string[]> = {
+  round: ['clock', 'coin_stacks', 'coin_spin', 'gauge', 'pie', 'donut', 'globe', 'sun', 'moon', 'apple', 'stopwatch', 'snowball', 'percent', 'atom', 'medal', 'burger', 'brain'],
+  tall: ['battery', 'thermometer', 'phone', 'flask', 'hourglass', 'pill', 'drop', 'bulb', 'gas_pump', 'rocket', 'ladder', 'jar_fill', 'flame', 'trophy', 'coffee'],
+  box: ['laptop', 'doc', 'card', 'card_swipe', 'calendar', 'calculator', 'clipboard', 'tax_form', 'receipts', 'bills', 'paycheck', 'book', 'safe', 'vault', 'atm', 'chip', 'subscriptions'],
+};
+export const shapeOf = (kind: string) => Object.entries(SHAPES).find(([, v]) => v.includes(kind))?.[0];
+/** Marks beat i as a match cut when it and beat i-1 are drawn heroes of the same silhouette; it also takes the previous framing so the shapes line up. */
+export function markMatchCuts(plans: ScenePlan[], scenes: {stockFile?: string}[]): void {
+  plans.forEach((p, i) => {
+    const q = plans[i - 1], a = q?.shots.at(-1)?.kind, b = p.shots[0]?.kind;
+    if (!q || !a || !b || scenes[i].stockFile || scenes[i - 1].stockFile || ![p.layout, q.layout].every(l => l === 'hero' || l === 'kinetic') || !shapeOf(a) || shapeOf(a) !== shapeOf(b)) return;
+    p.matchCut = true; p.zoom = q.zoom;
+  });
 }

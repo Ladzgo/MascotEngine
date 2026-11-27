@@ -137,3 +137,11 @@ test('tech notification: system app name and a short first-clause line', async (
   assert.deepEqual(notice('So stop charging your phone in the freezing cold.'), {app: 'Battery', text: 'Stop charging your phone in the freezing cold.'});
   assert.deepEqual(notice('Cold screens lag, forcing you to tap twice.'), {app: 'Settings', text: 'Cold screens lag.'});
 });
+
+test('match cut: same silhouette in a row cuts hard and keeps the framing', async () => {
+  const {markMatchCuts} = await import('./episodePlan.js');
+  const p = (kind: string, zoom: 'wide' | 'close') => ({env: 'room', pal: 0, camera: 0, zoom, layout: 'hero', shots: [{kind, at: 0, action: 'pop_in'}]}) as any;
+  const plans = [p('battery', 'wide'), p('thermometer', 'close'), p('clock', 'wide')];
+  markMatchCuts(plans, [{}, {}, {}]);
+  assert.equal(plans[1].matchCut, true); assert.equal(plans[1].zoom, 'wide'); assert.equal(plans[2].matchCut, undefined);
+});
