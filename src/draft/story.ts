@@ -145,7 +145,13 @@ export async function pickHook(o: {client: Client; topic: string; outlineHook: s
     if (round === 0) cands.unshift({h: o.outlineHook});
     cands = cands.filter((c, i, a) => wcount(c.h) <= 14 && !/[=+→<>|]/.test(c.h) && !badHookShape(c.h) && o.allowedOk(c.h) && !fullName(c.h) && !pool.some(p => p.h === c.h) && a.findIndex(x => x.h === c.h) === i);
     tried += cands.length;
-    if (cands.length) { const s = await judgeHooks(o.client, cands.map(c => c.h), o.model); pool.push(...cands.map((c, i) => ({...c, s: s[i]}))); }
+    // grammar first ("A cracked window became 10 million loss in seconds." passed the judge at 85), judged in parallel
+    if (cands.length) {
+      const [g, s] = await Promise.all([grammarScores(o.client, cands.map(c => c.h), o.model), judgeHooks(o.client, cands.map(c => c.h), o.model)]);
+      const ok = cands.map((c, i) => ({...c, s: s[i], g: g[i]})).filter(c => c.g >= 7 || c.h === o.outlineHook && cands.length === 1);
+      if (ok.length < cands.length) o.log?.(`hooks: ${cands.length - ok.length} dropped for grammar`);
+      pool.push(...ok.map(({g: _g, ...c}) => c));
+    }
     pool.sort((a, b) => b.s - a.s);
     if (pool[0] && pool[0].s >= HOOK_TARGET) break;
     if (pool[0]) bar = `\nThe best line so far scored ${pool[0].s}/100: "${pool[0].h}". Write 5 sharper lines that beat it: more specific, shorter, a clearer open question.`;
@@ -164,6 +170,15 @@ export const overlayOk = (t: string) => {
   const w = wcount(t);
   return w >= 4 && w <= 7 && !/\b(explained|today|revealed|here'?s why|must see|shocking)\b/i.test(t) && !/\b(one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|hundred|thousand)\s+(loss|gain|cost|fee|drop|rise)\b/i.test(t) && !badHookShape(t) && !/\?$/.test(t);
 };
+/** 0-10 per line: grammatical English a native speaker would write (5) + makes sense on its own (5). Shared by hooks and overlays; 7 when the call fails. */
+export async function grammarScores(client: Client, lines: string[], model?: string): Promise<number[]> {
+  if (!lines.length) return [];
+  try {
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'Score each line 0-10: grammatical English a native speaker would write (5), and it makes sense on its own without context (5). "A cracked window became 10 million loss" scores 3. Output ONLY JSON: {"scores": [numbers, same order]}', messages: [{role: 'user', content: lines.map((c, i) => `${i + 1}. ${c}`).join('\n')}]}))) as {scores?: unknown};
+    return Array.isArray(j.scores) && j.scores.length === lines.length ? j.scores.map(x => Number(x) || 0) : lines.map(() => 7);
+  } catch { return lines.map(() => 7); }
+}
+
 /** 5-7 word on-screen line for muted viewers: the hook candidate's own overlay plus 3 fresh ones, rule-checked, then judged for grammar and sense (>= 7/10). */
 export async function makeOverlay(client: Client, hook: string, own: string | undefined, model?: string): Promise<string | undefined> {
   let cands = own ? [own] : [];
@@ -173,12 +188,9 @@ export async function makeOverlay(client: Client, hook: string, own: string | un
   } catch { /* own only */ }
   cands = [...new Set(cands.map(c => c.replace(/[.!]+$/, '')))].filter(overlayOk);
   if (!cands.length) return undefined;
-  try {
-    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 200, system: 'Score each on-screen phrase 0-10: grammatical English a native speaker would write (5), and it makes sense on its own without the audio (5). Output ONLY JSON: {"scores": [numbers, same order]}', messages: [{role: 'user', content: cands.map((c, i) => `${i + 1}. ${c}`).join('\n')}]}))) as {scores?: unknown};
-    const sc = Array.isArray(j.scores) && j.scores.length === cands.length ? j.scores.map(Number) : cands.map(() => 7);
-    const best = cands.map((c, i) => ({c, s: sc[i] || 0})).sort((a, b) => b.s - a.s)[0];
-    return best.s >= 7 ? best.c : undefined;
-  } catch { return cands[0]; }
+  const sc = await grammarScores(client, cands, model);
+  const best = cands.map((c, i) => ({c, s: sc[i] || 0})).sort((a, b) => b.s - a.s)[0];
+  return best.s >= 7 ? best.c : undefined;
 }
 
 // first names the concreteness check accepts at a sentence start (elsewhere any capitalised word counts as a name)
@@ -249,7 +261,9 @@ ANCHOR STRONG (about 88): a named everyday person at one concrete moment; one su
 /** "Would a friend repeat this?" judge, 0-100, calibrated with weak/ok/strong anchors; it must quote the weakest line. */
 /** Mean of two judge calls: one call moved +-15 on a one-line change (zzb-u3 62 -> 45), too noisy to keep or drop a rewrite on. */
 export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
-  const [a, b] = await Promise.all([judgeOnce(client, ep, model), judgeOnce(client, ep, model)]);
+  const a = await judgeOnce(client, ep, model);
+  if (a.score >= 80 || a.score <= 40) return a; // clear verdicts need no second opinion (saves a call per judge on most drafts)
+  const b = await judgeOnce(client, ep, model);
   return {...(a.score <= b.score ? a : b), score: Math.round((a.score + b.score) / 2)}; // the harsher call's weakest line and fix
 }
 async function judgeOnce(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {

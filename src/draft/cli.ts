@@ -87,9 +87,9 @@ try {
   if (values.short && concreteGaps(ep.scenes.map(s => s.narration)).length) { const d = dropFlat(ep, estSec); if (d.dropped) { log(`concrete: ${d.dropped} flat beats dropped`); ep = d.ep; } }
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   ep = fixCta(ep, chanName, fits); // never "Follow Money Myths" on a battery video
-  const titled = storyOn ? await pickTitle(client, ep, {model, log}) : {title: ep.title, score: 0};
+  // title and the first story verdict do not depend on each other: run them together
+  const [titled, story0] = storyOn ? await Promise.all([pickTitle(client, ep, {model, log}), judgeStory(client, ep, model)]) : [{title: ep.title, score: 0}, {score: 0}];
   ep = {...ep, title: titled.title};
-  const story0 = storyOn ? await judgeStory(client, ep, model) : {score: 0};
   // the judge quotes its weakest line: rewrite that line by its note, re-judge, keep only a gain (2 rounds)
   const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: [...facts.flatMap(f => f.numbers), ...lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)], factLines: facts.map(f => f.text), ...(values.short ? {est: estSec, maxSec: 4.4} : {})}) : {ep, score: story0.score, history: [story0.score]};
   ep = improved.ep;
