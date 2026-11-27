@@ -272,7 +272,8 @@ ANCHOR STRONG (about 88): a named everyday person at one concrete moment; one su
 /** "Would a friend repeat this?" judge, 0-100, calibrated with weak/ok/strong anchors; it must quote the weakest line. */
 /** Mean of two judge calls: one call moved +-15 on a one-line change (zzb-u3 62 -> 45), too noisy to keep or drop a rewrite on. */
 export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
-  const a = await judgeOnce(client, ep, model);
+  let a = await judgeOnce(client, ep, model);
+  if (!a.score && !a.weakest) a = await judgeOnce(client, ep, model); // a failed call reads as 0 (sd-fees started its rewrites from "0")
   if (a.score >= 80 || a.score <= 40) return a; // clear verdicts need no second opinion (saves a call per judge on most drafts)
   const b = await judgeOnce(client, ep, model);
   return {...(a.score <= b.score ? a : b), score: Math.round((a.score + b.score) / 2)}; // the harsher call's weakest line and fix
@@ -335,7 +336,9 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
     const narr = cur.scenes.map(s => s.narration), heard = [...new Set([...narr.flatMap(spokenNumbers), ...(o.facts ?? [])])], max = o.maxWords ?? 14;
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}${factBlock}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
-      const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim().replace(/^\d+\s*[:.]\s*/, ''));
+      const raw = (extractJson(out) as {lines?: unknown}).lines, arr = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : [];
+      // sometimes all lines come back as one newline-joined string (sd-fees: "1/9 lines")
+      const lines = (arr.length === 1 ? String(arr[0]).split(/\n+/) : arr).map(x => String(x).trim().replace(/^\d+\s*[:.]\s*/, '')).filter(Boolean);
       // the model often hands back the hook or the last line too (89/88 lines on lf-inflation): those two stay anyway, so drop the echo
       const same = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30) === b.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
       if (lines.length > narr.length - 2 && same(lines[0], narr[0])) lines.shift();

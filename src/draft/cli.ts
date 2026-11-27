@@ -5,7 +5,7 @@ import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channe
 import {requireClient} from '../llm/llm.js';
 import {splitBeats} from './beats.js';
 import {researchFacts, type Fact} from './facts.js';
-import {closeLoop, concreteGaps, dropFlat, fillConcrete, improveStory, judgeStory, lastHookPick, namesPerson, pickTitle} from './story.js';
+import {closeLoop, concreteGaps, dropFlat, fillConcrete, improveStory, judgeStory, lastHookPick, namesPerson, pickTitle, strayLines} from './story.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
 import {isHu} from './lang.js';
@@ -95,6 +95,13 @@ try {
   const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: [...facts.flatMap(f => f.numbers), ...lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)], factLines: facts.map(f => f.text), ...(values.short ? {est: estSec, maxSec: 6.5} : {})}) : {ep, score: story0.score, history: [story0.score]};
   ep = improved.ep;
   const story = {...story0, score: improved.score, history: improved.history};
+  // last truth pass: middle talk lines a fact-check calls off-topic or false go while the Short stays over 36 s (sd-airplane ended "So airplane mode can actually speed up charging" after saying the opposite)
+  if (storyOn && values.short) {
+    const narr = ep.scenes.map(s => s.narration), bad = new Set((await strayLines(client, `${ep.title}\n${narr[0]}`, narr, model)).filter(i => i > 0 && i < narr.length - 1 && ep.scenes[i].type === 'talk'));
+    const kept = ep.scenes.filter((_, i) => !bad.has(i));
+    if (bad.size && kept.reduce((a, s) => a + estSec(s) + SCENE_PAD, 0) >= 36) { log(`truth: ${bad.size} off-topic/false lines dropped (${[...bad].map(i => `"${narr[i]}"`).join(', ').slice(0, 200)})`); ep = {...ep, scenes: kept as typeof ep.scenes}; }
+    else if (bad.size) log(`truth: ${bad.size} flagged lines kept (dropping them would cut the Short under 36 s)`);
+  }
   // story rewrites may run long; Shorts re-tighten and re-split before the storyboard sees the final text
   if (values.short && improved.history.length > 1) ep = splitBeats(await tightenLong(client, ep, {model, est: estSec, maxSec: 4.4, log}), {max: 11, clauses: true});
   const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
