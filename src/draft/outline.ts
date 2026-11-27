@@ -139,7 +139,8 @@ export const keyWords = (t: string) => [...new Set(t.toLowerCase().replace(/[^\p
 /** Section-level check: what the model must fix before the beats are accepted. */
 export function checkPart(beats: Sc[], p: Part, allowed: number[]): string[] {
   const errs: string[] = [];
-  if (beats.length < p.min || beats.length > p.max) errs.push(`write ${p.min} to ${p.max} beats, you wrote ${beats.length}.`);
+  // long-form parts (minWords set) may run 3 beats over: lf-inflation retried 9-of-8 and 11-of-8 chapters, threw the words away and came out at 553 of 950
+  if (beats.length < p.min || beats.length > p.max + (p.minWords ? 3 : 0)) errs.push(`write ${p.min} to ${p.max} beats, you wrote ${beats.length}.`);
   beats.forEach((b, i) => {
     const n = wc(b.narration);
     if (n > (p.maxBeat ?? 40)) errs.push(`beat ${i + 1} has ${n} words; split it, ${p.maxBeat ? '6 to 14' : '12 to 28'} words per beat.`);
