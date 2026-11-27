@@ -257,7 +257,7 @@ const Notification: React.FC<{app: string; text: string; t: number; w: number; h
   );
 };
 /** Whether the top text zone of a beat is taken by the scene itself (then no punch word over it). */
-export const topBusy = (scene: Scene, plan: ScenePlan | undefined, index: number, hook?: string) => ['big_number', 'title', 'compare', 'before_after', 'list', 'checklist', 'stats', 'table', 'timeline'].includes(scene.type)
+export const topBusy = (scene: Scene, plan: ScenePlan | undefined, index: number, hook?: string) => ['big_number', 'title', 'chart', 'compare', 'before_after', 'list', 'checklist', 'stats', 'table', 'timeline'].includes(scene.type)
   || plan?.layout === 'kinetic' || (index === 0 && !!hook) || techBanner(scene, plan);
 const techBanner = (scene: Scene, plan: ScenePlan | undefined) => scene.type === 'talk' && (plan?.layout === 'hero' || plan?.layout === 'pip') && TECH.test(scene.narration) && !!scene.shot?.label;
 
@@ -362,7 +362,8 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   const lay = plan.layout, scale = hasCallouts ? (tall ? 0.5 : 0.72) : versus ? 0.58 : scene.type === 'title' ? 0.62 : scene.type === 'big_number' ? 0.64 : lay === 'kinetic' || (lay === 'hero' && techBanner(scene, plan)) ? 0.66 : lay === 'pip' || lay === 'broll' ? 0.46 : 1; // over real footage the drawn subject is an accent, not the picture
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
-  const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
+  // 16:9: a chart drawn at full size lost its top labels, and the right-third hero ran under the side title (golden fbw-03/05)
+  const hs = base * scale * (tall ? 1 : charty ? 0.78 : plan.layout === 'hero' && scene.type === 'talk' && !scene.stockFile ? 0.82 : 1), groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
   // top of the hero box after the close framing (feet at 82.5% of the 400 box, push <= 1.12 about 62% height): text above it never overlaps the art
   const heroTop = h * 0.62 + (groundY - 0.825 * hs - h * 0.62) * 1.12;
   const showHook = !!hook && tall && !hasCallouts && !versus && scene.type !== 'big_number';

@@ -17,9 +17,9 @@ const GOLD = path.join(root, 'scripts/qa/golden'), ID = 'zz-golden', SCALE = 0.2
 const update = process.argv.includes('--update');
 const epDir = path.join(root, 'episodes', ID);
 
-// two fixtures from the same script: the paper look (16:9) and the full-bleed Short (9:16, references named fb-*.jpg)
+// three fixtures from the same script: the paper look (16:9), the full-bleed Short (9:16, fb-*.jpg) and full-bleed long form (16:9, fbw-*.jpg)
 let bad = 0;
-for (const [prefix, patch] of [['', {}], ['fb-', {look: 'fullbleed', format: 'short'}]] as const) {
+for (const [prefix, patch] of [['', {}], ['fb-', {look: 'fullbleed', format: 'short'}], ['fbw-', {look: 'fullbleed', format: 'wide'}]] as const) {
 fs.rmSync(epDir, {recursive: true, force: true});
 fs.mkdirSync(epDir, {recursive: true});
 fs.writeFileSync(path.join(epDir, 'episode.json'), JSON.stringify({...JSON.parse(fs.readFileSync(path.join(GOLD, 'episode.json'), 'utf8')), ...patch}));
