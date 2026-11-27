@@ -49,11 +49,11 @@ export const Txt: React.FC<{x: number; y: number; size?: number; fill?: string; 
   <text x={x} y={y} fontFamily='"Archivo Black", sans-serif' fontSize={size} fill={fill} textAnchor={anchor} stroke={stroke} strokeWidth={stroke ? size * 0.12 : 0} paintOrder="stroke" strokeLinejoin="round">{children}</text>
 );
 
-/** Font size and line breaks so `text` (caps, Archivo Black ~0.68 em per glyph) fits maxW x maxH: greedy word wrap, whole words only (a char cut showed "FAS", ep015). */
+/** Font size and line breaks so `text` (caps, Archivo Black ~0.8 em per glyph: 0.68 let SCREENS run off the frame, ep015) fits maxW x maxH: greedy word wrap, whole words only (a char cut showed "FAS", ep015). */
 export function fitText(text: string, maxW: number, maxH: number, maxFs: number, lh = 1.04): {fs: number; lines: string[]} {
   const words = text.split(/\s+/).filter(Boolean);
   for (let fs = maxFs; ; fs -= 4) {
-    const per = maxW / (fs * 0.68), lines: string[] = [];
+    const per = maxW / (fs * 0.8), lines: string[] = [];
     for (const w of words) { const last = lines[lines.length - 1]; if (last !== undefined && (last + ' ' + w).length <= per) lines[lines.length - 1] = last + ' ' + w; else lines.push(w); }
     if (fs <= 40 || (lines.length * fs * lh <= maxH && Math.max(...lines.map(l => l.length)) <= per)) return {fs, lines};
   }

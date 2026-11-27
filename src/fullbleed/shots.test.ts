@@ -110,7 +110,7 @@ test('fitText: whole words only, fits the box, hook key is the number or longest
   const {hookKey} = await import('./FullBleedScene');
   const r = fitText('COLD DRAINS YOUR BATTERY FAST', 900, 460, 194, 1);
   assert.equal(r.lines.join(' '), 'COLD DRAINS YOUR BATTERY FAST');
-  assert.ok(r.lines.length * r.fs <= 460 && Math.max(...r.lines.map(l => l.length)) * r.fs * 0.68 <= 900);
+  assert.ok(r.lines.length * r.fs <= 460 && Math.max(...r.lines.map(l => l.length)) * r.fs * 0.8 <= 900);
   assert.equal(hookKey('Stop charging in freezing temps'), 'charging');
   assert.equal(hookKey('Why 600 mAh loss? Not just cold'), '600');
 });
