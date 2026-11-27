@@ -24,3 +24,16 @@ export function reselect<T extends Raw>(ep: T, items: {scene: number; score: num
   }
   return {ep: {...ep, scenes}, log};
 }
+
+/** Beats whose scene changed between two versions (0-based). */
+export const changedBeats = (a: Raw, b: Raw) => a.scenes.flatMap((s, i) => (JSON.stringify(s) === JSON.stringify(b.scenes[i]) ? [] : [i]));
+/** A re-choice is kept only when the re-scored picture beats the old score; everything else goes back to the old scene (a bus stop for "stop charging" scored lower). */
+export function keepImproved<T extends Raw>(before: T, after: T, oldScore: Map<number, number>, newScore: Map<number, number>): {ep: T; kept: number[]; reverted: number[]} {
+  const kept: number[] = [], reverted: number[] = [];
+  const scenes = after.scenes.map((s, i) => {
+    if (JSON.stringify(s) === JSON.stringify(before.scenes[i])) return s;
+    if ((newScore.get(i) ?? -1) > (oldScore.get(i) ?? 10)) { kept.push(i); return s; }
+    reverted.push(i); return before.scenes[i];
+  });
+  return {ep: {...after, scenes}, kept, reverted};
+}

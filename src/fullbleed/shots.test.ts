@@ -121,3 +121,13 @@ test('punch cadence: at most one punch word per 6.5 s', async () => {
   const s = [...punchSchedule(ph)].map(i => ph[i].start);
   assert.ok(s.length >= 3 && s.every((t, k) => !k || t - s[k - 1] >= PUNCH_GAP));
 });
+
+test('reselect: a swap is kept only when its re-score rises', async () => {
+  const {keepImproved, changedBeats} = await import('./reselect.js');
+  const before = {scenes: [{narration: 'a', shot: {subject: 'lock'}}, {narration: 'b', shot: {subject: 'clock'}}, {narration: 'c'}]};
+  const after = {scenes: [{narration: 'a', shot: {subject: 'bus'}}, {narration: 'b', shot: {subject: 'battery'}}, {narration: 'c'}]};
+  assert.deepEqual(changedBeats(before, after), [0, 1]);
+  const r = keepImproved(before, after, new Map([[0, 5], [1, 5]]), new Map([[0, 3], [1, 7]]));
+  assert.deepEqual(r.kept, [1]); assert.deepEqual(r.reverted, [0]);
+  assert.equal(r.ep.scenes[0].shot?.subject, 'lock'); assert.equal(r.ep.scenes[1].shot?.subject, 'battery');
+});

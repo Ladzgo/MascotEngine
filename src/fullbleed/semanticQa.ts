@@ -6,7 +6,32 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {episodeDir, loadEpisode} from '../schema.js';
-import {median, reselect} from './reselect.js';
+import {changedBeats, keepImproved, median, reselect} from './reselect.js';
+import {bundle} from '@remotion/bundler';
+import {renderStill, selectComposition} from '@remotion/renderer';
+import {Episode, parseDecisions} from '../schema.js';
+import {loadCharacterAssets, withArt, withStock} from '../pipeline/render.js';
+import {chromiumTuning} from '../pipeline/renderOpts.js';
+
+/** Scores of re-chosen beats, rendered from the changed episode with the current timings/decisions (a dropped stock clip stays off). */
+async function rescore(raw: unknown, beats: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>(), e0 = Episode.parse(raw), st = withStock(e0, dir);
+  const e1 = {...st, scenes: st.scenes.map((x, i) => (beats.includes(i) && !(e0.scenes[i] as {stock?: unknown}).stock ? {...x, stockFile: undefined} : x))} as typeof st;
+  const {episode, publicDir, cleanup} = withArt(e1, dir), root = new URL('../../', import.meta.url).pathname;
+  let served: string;
+  try { served = await bundle({entryPoint: `${root}src/index.ts`, publicDir}); } finally { cleanup(); }
+  const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'semfix-'));
+  try {
+    const timings = JSON.parse(fs.readFileSync(`${b}timings.json`, 'utf8')), decisions = parseDecisions(fs.readFileSync(`${b}decisions.json`, 'utf8'));
+    const inputProps = {episode, timings, decisions, assets: loadCharacterAssets()}, comp = await selectComposition({serveUrl: served, id: 'Episode', inputProps});
+    for (const i of beats) {
+      const d = decisions.scenes[i], png = path.join(tmp2, `r${i}.png`);
+      await renderStill({composition: comp, serveUrl: served, output: png, frame: Math.round((d.startSec + d.durSec * 0.5) * comp.fps), inputProps, scale: 540 / comp.width, chromiumOptions: chromiumTuning()});
+      try { out.set(i, (await ask(png, episode.scenes[i].narration)).score); } catch (e) { console.error(`re-score beat ${i + 1}: ${(e as Error).message}`); }
+    }
+  } finally { fs.rmSync(served, {recursive: true, force: true}); fs.rmSync(tmp2, {recursive: true, force: true}); }
+  return out;
+}
 
 const arg = (n: string) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : undefined; };
 const id = process.argv[2];
@@ -43,7 +68,14 @@ const mean = items.length ? items.reduce((a, x) => a + x.score, 0) / items.lengt
 const med = median(items.map(x => x.score));
 fs.writeFileSync(`${b}semantic.json`, JSON.stringify({model, file: path.basename(file), mean: +mean.toFixed(2), median: med, items}, null, 2));
 if (process.argv.includes('--fix')) { // beats below the threshold get another stock query/subject; render again afterwards
-  const f = `${dir}episode.json`, r = reselect(JSON.parse(fs.readFileSync(f, 'utf8')), items, Number(arg('below') ?? 6));
-  if (r.log.length) { fs.writeFileSync(f, JSON.stringify(r.ep, null, 2)); console.log(`\nre-chosen:\n${r.log.join('\n')}\nnow: npm run direct -- ${ep.id} && npm run render -- ${ep.id}`); }
+  const f = `${dir}episode.json`, before = JSON.parse(fs.readFileSync(f, 'utf8')), r = reselect(before, items, Number(arg('below') ?? 6));
+  const swapped = changedBeats(before, r.ep);
+  if (swapped.length) {
+    // never worse: render each re-chosen beat (same frame as above), score it, keep the swap only if the score rises
+    const scores = await rescore(r.ep, swapped), old = new Map(items.map(x => [x.scene - 1, x.score]));
+    const k = keepImproved(before, r.ep, old, scores);
+    console.log(`\nre-chosen:\n${r.log.join('\n')}\nre-scored: ${swapped.map(i => `#${i + 1} ${old.get(i)} -> ${scores.get(i) ?? '?'}`).join(', ')}; kept ${k.kept.map(i => `#${i + 1}`).join(' ') || 'none'}, reverted ${k.reverted.map(i => `#${i + 1}`).join(' ') || 'none'}`);
+    if (k.kept.length) { fs.writeFileSync(f, JSON.stringify(k.ep, null, 2)); console.log(`now: npm run direct -- ${ep.id} && npm run render -- ${ep.id}`); }
+  }
 }
 console.log(`\nsemantic QA ${ep.id}: median ${med}/10, mean ${mean.toFixed(1)}/10 over ${items.length} beats; weakest: ${[...items].sort((a, b) => a.score - b.score).slice(0, 3).map(x => `#${x.scene} (${x.score})`).join(', ')}  (build/semantic.json)`);
