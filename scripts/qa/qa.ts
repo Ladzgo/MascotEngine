@@ -3,11 +3,10 @@ import {spawnSync} from 'node:child_process';
 import {episodeDir, loadEpisode} from '../../src/schema.js';
 import {checkShots} from '../../src/draft/storyboard.js';
 import {SCORE_FAIL_BELOW, scoreScript} from '../../src/draft/score.js';
-import {planShots} from '../../src/fullbleed/shots.js';
 import {buildPhrases} from '../../src/fx/captions.js';
 import {activeRmsDb} from '../../src/pipeline/audio.js';
 import {spoken} from '../../src/pipeline/speech.js';
-import {zoomRows} from './zoom.js';
+import {visualChanges, zoomRows} from './zoom.js';
 import {frameZoomRows} from './zoomFrames.js';
 
 /** Thresholds (documented in docs/QA.md). */
@@ -139,9 +138,7 @@ export function qa(id: string, fileArg?: string) {
   const [wLo, wHi] = short ? LIMITS.shortWpm : [140, 180];
   add('speaking pace', wpm >= wLo && wpm <= wHi, `${wpm.toFixed(0)} wpm`, `${wLo}..${wHi} wpm`);
   // a visual change = every shot the renderer plans inside a scene (src/fullbleed/shots.ts), or one per scene for the paper look
-  const changes = ep.look === 'fullbleed'
-    ? ep.scenes.reduce((a, sc, i) => { const d = dec.scenes[i], t0 = tim.scenes[i].start; return a + planShots(sc as any, tim.scenes[i].words.map((w: any) => ({w: w.w, start: w.start - t0 + d.speechStart, end: w.end - t0 + d.speechStart})), d.durSec, {seed: i}).length; }, 0)
-    : ep.scenes.length;
+  const changes = ep.look === 'fullbleed' ? visualChanges(ep.id).reduce((a, n) => a + n, 0) : ep.scenes.length; // what the renderer shows: planned shots and sub-shot cuts
   const perChange = dur / Math.max(1, changes), cap = short ? LIMITS.shortChange : LIMITS.wideChange;
   add('visual change rate', perChange <= cap, `a new visual every ${perChange.toFixed(1)} s (${changes} changes)`, `<= ${cap} s`);
   const longest = Math.max(...dec.scenes.map((d: any) => d.durSec)), longCap = short ? 5 : 12;
