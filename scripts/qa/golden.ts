@@ -17,9 +17,12 @@ const GOLD = path.join(root, 'scripts/qa/golden'), ID = 'zz-golden', SCALE = 0.2
 const update = process.argv.includes('--update');
 const epDir = path.join(root, 'episodes', ID);
 
+// two fixtures from the same script: the paper look (16:9) and the full-bleed Short (9:16, references named fb-*.jpg)
+let bad = 0;
+for (const [prefix, patch] of [['', {}], ['fb-', {look: 'fullbleed', format: 'short'}]] as const) {
 fs.rmSync(epDir, {recursive: true, force: true});
 fs.mkdirSync(epDir, {recursive: true});
-fs.copyFileSync(path.join(GOLD, 'episode.json'), path.join(epDir, 'episode.json'));
+fs.writeFileSync(path.join(epDir, 'episode.json'), JSON.stringify({...JSON.parse(fs.readFileSync(path.join(GOLD, 'episode.json'), 'utf8')), ...patch}));
 try {
   const ep = loadEpisode(ID), dir = episodeDir(ID);
   writeTimings(dir, await new SilentTTS().synthesize(ep, dir));
@@ -34,9 +37,8 @@ try {
   const inputProps = {episode: ep, timings, decisions, assets: loadCharacterAssets()};
   const comp = await selectComposition({serveUrl: bundled, id: 'Episode', inputProps});
   const tmp = fs.mkdtempSync(path.join(root, 'out-golden-'));
-  let bad = 0;
   for (const [i, s] of decisions.scenes.entries()) {
-    const name = `${String(i + 1).padStart(2, '0')}-${s.type}${ep.scenes[i].type === 'talk' && (ep.scenes[i] as {quote?: unknown}).quote ? '-quote' : ''}.jpg`;
+    const name = `${prefix}${String(i + 1).padStart(2, '0')}-${s.type}${ep.scenes[i].type === 'talk' && (ep.scenes[i] as {quote?: unknown}).quote ? '-quote' : ''}.jpg`;
     const frame = Math.round((s.startSec + s.durSec * 0.8) * 30);
     const png = path.join(tmp, name.replace('.jpg', '.png')), out = path.join(tmp, name);
     await renderStill({composition: comp, serveUrl: bundled, output: png, frame, inputProps, scale: SCALE, chromiumOptions: chromiumTuning()});
@@ -50,5 +52,7 @@ try {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ssim ${ssim.toFixed(4)}  [>= ${MIN_SSIM}]`);
   }
   fs.rmSync(tmp, {recursive: true, force: true});
-  if (bad) { console.error(`${bad} golden frame(s) changed; see scripts/qa/golden/FAIL-*.jpg. If the change is intended: npm run qa:golden -- --update`); process.exitCode = 1; }
+  fs.rmSync(bundled, {recursive: true, force: true}); // a bundle holds a full copy of assets/ (~1 GB)
 } finally { fs.rmSync(epDir, {recursive: true, force: true}); }
+}
+if (bad) { console.error(`${bad} golden frame(s) changed; see scripts/qa/golden/FAIL-*.jpg. If the change is intended: npm run qa:golden -- --update`); process.exitCode = 1; }

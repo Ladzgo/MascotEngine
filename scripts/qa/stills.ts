@@ -27,6 +27,7 @@ for (const [i, s] of decisions.scenes.entries()) {
   await renderStill({composition: comp, serveUrl: bundled, output: f, frame: Math.round((s.startSec + s.durSec * 0.6) * 30), inputProps, scale: 0.5, chromiumOptions: chromiumTuning()});
   files.push(f);
 }
+fs.rmSync(bundled, {recursive: true, force: true}); // a bundle holds a full copy of assets/ (~1 GB); 200 leftovers filled the disk
 const cols = Math.min(8, files.length), rows = Math.ceil(files.length / cols);
 spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-reinit_filter', '0', '-i', path.join(out, '%02d.png'), '-vf', `scale=240:-1,tile=${cols}x${rows}`, '-frames:v', '1', path.join(out, 'sheet.png')]);
 console.log(`stills: ${files.length} beats -> ${out}/ (sheet.png, ${cols}x${rows})`);

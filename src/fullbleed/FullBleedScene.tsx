@@ -276,7 +276,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
   const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
-  const hx = hasCallouts && !tall ? w * 0.7 : w / 2;
+  // 16:9 talk beat: rule of thirds, the hero on the right third and the key phrase as a side title on the left (a centred object left both sides empty)
+  const sideTitle = !tall && plan.layout === 'hero' && scene.type === 'talk' && !scene.stockFile;
+  const hx = hasCallouts && !tall ? w * 0.7 : sideTitle ? w * 0.66 : w / 2;
   const sweepX = (((t * 0.32) % 1.7) - 0.35) * w;
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
@@ -348,7 +350,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           return <Callout key={i} text={txt} t={t} at={at} x={x} y={yy} tx={w / 2 + (px - w / 2) * sc + panX} ty={h * 0.62 + (py - h * 0.62) * sc + tiltY} size={size} accent={accent} align={tall ? 'down' : 'left'} maxW={maxW} />;
         });
       })()}
-      {plan.character && <Character id={plan.character} t={t} w={w} feet={groundY} left={index % 2 === 0} />}
+      {sideTitle && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.15) / 0.35), fs = Math.min(h * 0.13, (w * 0.4) / (Math.max(4, ...kw.split(/\s+/).map(x => x.length)) * 0.62));
+        return <div style={{position: 'absolute', left: w * 0.06, width: w * 0.42, top: h * 0.2, fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.02, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 16px 36px rgba(0,0,0,0.5)`, opacity: e2, transform: `translateX(${(1 - e2) * -40}px)`}}>{kw}<div style={{marginTop: fs * 0.25, height: fs * 0.12, width: `${60 * easeOut((t - 0.35) / 0.4)}%`, background: accent, borderRadius: fs * 0.06}} /></div>; })()}
+      {plan.character && !sideTitle && <Character id={plan.character} t={t} w={w} feet={groundY} left={index % 2 === 0} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%)'}} />
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: grade.tint, mixBlendMode: 'soft-light', opacity: 0.28}} />
       {active < 0 && null}
