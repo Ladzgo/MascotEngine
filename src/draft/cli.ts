@@ -4,6 +4,7 @@ import {parseArgs} from 'node:util';
 import {loadChannel, channelContext, DEFAULT_CHANNEL_ID} from '../channel/channel.js';
 import {requireClient} from '../llm/llm.js';
 import {splitBeats} from './beats.js';
+import {researchFacts, type Fact} from './facts.js';
 import {closeLoop, concreteGaps, dropFlat, fillConcrete, improveStory, judgeStory, lastHookPick, pickTitle} from './story.js';
 import {criticNotes, criticPass, ensurePayoff} from './critic.js';
 import {editPass, fixEpisode} from './editor.js';
@@ -18,7 +19,7 @@ import {addScenes, fixCta, topicFitsChannel, tightenLong, expandThin, punchUpHoo
 const root = path.resolve(new URL('../../', import.meta.url).pathname);
 const {values, positionals} = parseArgs({
   allowPositionals: true,
-  options: {id: {type: 'string'}, angle: {type: 'string'}, dry: {type: 'boolean'}, channel: {type: 'string'}, 'no-punchup': {type: 'boolean'}, 'no-expand': {type: 'boolean'}, 'no-edit': {type: 'boolean'}, legacy: {type: 'boolean'}, short: {type: 'boolean'}, device: {type: 'string'}, 'no-storyboard': {type: 'boolean'}, 'no-rewrite': {type: 'boolean'}},
+  options: {id: {type: 'string'}, angle: {type: 'string'}, dry: {type: 'boolean'}, channel: {type: 'string'}, 'no-punchup': {type: 'boolean'}, 'no-expand': {type: 'boolean'}, 'no-edit': {type: 'boolean'}, legacy: {type: 'boolean'}, short: {type: 'boolean'}, device: {type: 'string'}, 'no-storyboard': {type: 'boolean'}, 'no-rewrite': {type: 'boolean'}, 'no-facts': {type: 'boolean'}},
 });
 const topic = positionals.join(' ').trim();
 const id = values.id;
@@ -45,7 +46,10 @@ try {
   const model = process.env.DRAFT_MODEL ?? MODEL, log = (m: string) => console.log(`DRAFT_NOTE ${m}`);
   const legacy = () => draftEpisode({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model});
   // outline first, then one call per section (progress lines feed the Studio); the one-shot storyboard prompt is the fallback
-  const ep0 = values.legacy && !values.short ? await legacy() : await draftByOutline({client, topic, id, angle: values.angle, voice, channel: channelId, channelContext: ctx, lang, model, log, short: values.short, device: values.device, epsRoot: path.join(root, 'episodes'), progress: (d, n, label) => console.log(`DRAFT_PROGRESS ${d}/${n} ${label}`)}).catch(e => { log(`outline draft failed (${(e as Error).message.replace(/\s*\n- /g, ' | ').slice(0, 300)}); using the one-shot prompt`); return legacy(); });
+  // free fact research (Wikipedia) first: the outline and the story rewrites may use these sourced numbers
+  const facts: Fact[] = !values.legacy && !values['no-facts'] ? await researchFacts(client, topic, {model, log}) : [];
+  const angle = [values.angle, facts.length ? `Sourced facts (use their exact numbers; at least one should be the surprising fact of the video): ${facts.map(f => f.text).join(' ')}` : ''].filter(Boolean).join('\n') || undefined;
+  const ep0 = values.legacy && !values.short ? await legacy() : await draftByOutline({client, topic, id, angle, voice, channel: channelId, channelContext: ctx, lang, model, log, short: values.short, device: values.device, epsRoot: path.join(root, 'episodes'), progress: (d, n, label) => console.log(`DRAFT_PROGRESS ${d}/${n} ${label}`)}).catch(e => { log(`outline draft failed (${(e as Error).message.replace(/\s*\n- /g, ' | ').slice(0, 300)}); using the one-shot prompt`); return legacy(); });
   log(`first draft: ${ep0.scenes.length} beats, ${ep0.scenes.reduce((n, s) => n + s.narration.split(/\s+/).length, 0)} words`);
   // the one-shot fallback knows nothing about Shorts: a --short draft is a 9:16 full-bleed episode whichever path wrote it (ep014 came out 16:9)
   if (values.short) Object.assign(ep0, {format: 'short', look: 'fullbleed'});
@@ -87,7 +91,7 @@ try {
   ep = {...ep, title: titled.title};
   const story0 = storyOn ? await judgeStory(client, ep, model) : {score: 0};
   // the judge quotes its weakest line: rewrite that line by its note, re-judge, keep only a gain (2 rounds)
-  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40), ...(values.short ? {est: estSec, maxSec: 4.4} : {})}) : {ep, score: story0.score, history: [story0.score]};
+  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: [...facts.flatMap(f => f.numbers), ...lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)], factLines: facts.map(f => f.text), ...(values.short ? {est: estSec, maxSec: 4.4} : {})}) : {ep, score: story0.score, history: [story0.score]};
   ep = improved.ep;
   const story = {...story0, score: improved.score, history: improved.history};
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
@@ -99,6 +103,7 @@ try {
   if (ep2 !== ep1b) console.log(`DRAFT_NOTE hook sharpened: ${ep.scenes[0].narration}`);
   const flags = sourceFlags(ep);
   const file = writeDraft(path.join(root, 'episodes'), {...ep, sources: flags.vetted, ...(lastHookPick?.overlay ? {hookOverlay: lastHookPick.overlay} : {})}); // 5-7 word on-screen line for muted viewers (renderer: beat 1)
+  if (facts.length) fs.writeFileSync(path.join(path.dirname(file), 'facts.json'), JSON.stringify({topic, facts}, null, 2));
   fs.writeFileSync(path.join(path.dirname(file), 'script-score.json'), JSON.stringify({...sc, hook: lastHookPick, story, title: titled, concreteGaps: concreteGaps(ep.scenes.map(s => s.narration))}, null, 2));
   if (Object.keys(flags.notes).length) fs.writeFileSync(path.join(path.dirname(file), 'notes.json'), JSON.stringify({notes: flags.notes}, null, 2));
   for (const n of Object.values(flags.notes).flat()) console.log(`DRAFT_WARN ${n}`);
