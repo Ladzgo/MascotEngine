@@ -21,6 +21,9 @@ const VOICES: Record<NeuralName, Record<string, string>> = {
   piper: {en: 'en_US-ryan-high', hu: 'hu_HU-anna-medium'},
   edge: {en: 'en-US-AvaMultilingualNeural', hu: 'hu-HU-NoemiNeural', de: 'de-DE-ConradNeural', es: 'es-ES-ElviraNeural'},
 };
+/** Speed factor per voice so every voice lands near af_heart's pace at the same clause speeds (measured on 3 Short scripts at speed 0.89:
+ *  af_heart 148 wpm, am_fenrir 170, am_puck 175, bm_george 145, am_michael 135, bf_emma 164, piper ryan 174; kokoro's rate is not linear in speed, so these are rounded). */
+export const VOICE_RATE: Record<string, number> = {am_fenrir: 0.94, am_puck: 0.92, bf_emma: 0.95, am_michael: 1.06, 'en_US-ryan-high': 0.9};
 export const neuralVoice = (e: NeuralName, lang: string, env: NodeJS.ProcessEnv = process.env) => env[`TTS_VOICE_${e.toUpperCase()}`] || env.TTS_VOICE_ALL || VOICES[e][lang] || VOICES[e].en;
 
 /** Why an engine can or cannot run for a language, and the one command that fixes it (shown by doctor and the Studio). */
@@ -63,7 +66,7 @@ export function renderSpeech(engine: NeuralName, text: string, lang: string, out
   const tmp = `${outWav}.parts`;
   fs.mkdirSync(tmp, {recursive: true});
   const ext = engine === 'edge' ? 'mp3' : 'wav';
-  const job = {engine, voice: neuralVoice(engine, lang), lang, models: modelsDir(), segments: segs.map((s, i) => ({text: s.text, speed: s.speed, out: `${tmp}/${i}.${ext}`}))};
+  const job = {engine, voice: neuralVoice(engine, lang), lang, models: modelsDir(), segments: segs.map((s, i) => ({text: s.text, speed: Math.round(s.speed * (VOICE_RATE[neuralVoice(engine, lang)] ?? 1) * 1000) / 1000, out: `${tmp}/${i}.${ext}`}))};
   const run = () => spawnSync(py(), [path.join(ROOT, 'scripts/tts/bridge.py')], {input: JSON.stringify(job), encoding: 'utf8', timeout: 600000, maxBuffer: 1 << 24});
   let r = run();
   if (r.status !== 0 && /LibsndfileError|System error/.test(r.stderr ?? '')) { fs.mkdirSync(tmp, {recursive: true}); r = run(); } // a transient write error seen once on ep011; a second try passes
@@ -101,7 +104,7 @@ export class NeuralTTS implements TTSAdapter {
     const scenes: SceneTiming[] = [];
     for (const [index, s] of ep.scenes.entries()) {
       const file = `${outDir}audio/scene-${index + 1}.mp3`, wav = `${outDir}audio/scene-${index + 1}.wav`;
-      const segs = segmentize(spoken(s.narration, L), {lang: L, seed: index + 1, emphasis: 'emphasis' in s ? s.emphasis : []}).map(x => `${x.text}@${x.speed}/${x.pauseMs}`).join('|'); // speed/pause changes re-voice on their own
+      const segs = segmentize(spoken(s.narration, L), {lang: L, seed: index + 1, emphasis: 'emphasis' in s ? s.emphasis : []}).map(x => `${x.text}@${x.speed}/${x.pauseMs}`).join('|') + `@${VOICE_RATE[voice] ?? 1}`; // speed/pause changes re-voice on their own
       const key = audioKey(this.name, voice, 'neural5', neuralPost(), lang ?? '', aligner ?? '', s.narration, segs), cached = cacheGet(file, key);
       let dur: number, rel: RelWord[];
       if (cached) { dur = cached.dur; rel = cached.rel; console.log(`scene ${index + 1}: audio cached`); } else {
