@@ -74,7 +74,7 @@ export function autoFixEpisode(ep: Episode): Episode {
     }
     return {...s, narration: n};
   }) as Episode['scenes'];
-  return mergeTalkRuns(groundCharts(groundNumbers(limitSimiles(fixClosing({...ep, scenes, disclaimer: true}))))); // merge last: grounding demotes big_number/chart scenes to talk and can build a new run of 7 (killed zzb-long2)
+  return fixClosing(mergeTalkRuns(groundCharts(groundNumbers(limitSimiles(fixClosing({...ep, scenes, disclaimer: true})))))); // merge last: grounding demotes big_number/chart scenes to talk and can build a new run of 7 (killed zzb-long2); closing fixed again because a merge can pull a "But..." sentence into it (zzb-s1)
 }
 
 const SHORT_TALK = 30, RUN = 7; // beat-split scripts have many short talk scenes (each with its own illustration), so only a run of 7 is a problem
