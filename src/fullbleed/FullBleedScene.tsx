@@ -1,5 +1,5 @@
 import React from 'react';
-import {Img, OffthreadVideo, staticFile} from 'remotion';
+import {Img, OffthreadVideo, getInputProps, staticFile} from 'remotion';
 import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
@@ -125,12 +125,22 @@ export const GRADES = [
   {name: 'gold', tint: '#ffd78a', filter: 'saturate(1.08) contrast(1.05) sepia(0.05)'},
 ] as const;
 export const gradeFor = (title: string) => GRADES[[...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % GRADES.length];
+/** QA zoom probe (scripts/qa/zoomFrames.ts renders with inputProps.qaMarks): four squares ride inside each camera layer and everything else is hidden,
+ *  so the rendered frame shows exactly how much each layer scales, ancestors (transitions, wrappers) included. Stage squares sit apart from the others (overlap hid pixels). */
+export const QA_MARK_COLORS = {stock: '#00ff00', backdrop: '#ff0000', stage: '#0000ff'} as const;
+const qaMarks = () => !!(getInputProps() as {qaMarks?: boolean}).qaMarks;
+const QaMarks: React.FC<{c: keyof typeof QA_MARK_COLORS; w: number; h: number; style?: React.CSSProperties}> = ({c, w, h, style}) => (
+  <div className="qamk" style={{position: 'absolute', left: 0, top: 0, width: w, height: h, ...style}}>
+    {(c === 'stage' ? [[0.38, 0.33], [0.62, 0.33], [0.38, 0.62], [0.62, 0.62]] : [[0.18, 0.18], [0.82, 0.18], [0.18, 0.5], [0.82, 0.5]]).map(([fx, fy], i) => <div key={i} style={{position: 'absolute', left: fx * w - w * 0.025, top: fy * h - w * 0.025, width: w * 0.05, height: w * 0.05, background: QA_MARK_COLORS[c]}} />)}
+  </div>
+);
 const StockLayer: React.FC<{file: string; p: number; mv: number; w: number; h: number; pal: [string, string, string, string]; grade: string}> = ({file, p, mv, w, h, pal, grade}) => {
     const video = /\.mp4$/i.test(file), {sc, tx} = stockMove(video, mv, p, w);
   const style: React.CSSProperties = {position: 'absolute', inset: 0, width: w, height: h, objectFit: 'cover', transform: `translateX(${tx}px) scale(${sc})`, filter: grade};
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden', background: pal[2]}}>
       {video ? <OffthreadVideo src={staticFile(file)} muted style={style} /> : <Img src={staticFile(file)} style={style} />}
+      {qaMarks() && <QaMarks c="stock" w={w} h={h} style={{transform: style.transform}} />}
       <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0) 35%, rgba(0,0,0,0.3))'}} />
       <div style={{position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6))'}} />
     </div>
@@ -303,11 +313,14 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <svg width={0} height={0} style={{position: 'absolute'}}><GradDefs accent={accent} /></svg>
+      {qaMarks() && <style>{'html,body{background:#000!important}body *{visibility:hidden!important}.qamk,.qamk *{visibility:visible!important}'}</style>}
       {scene.stockFile ? <div style={{position: 'absolute', inset: 0, transform: /\.mp4$/i.test(scene.stockFile) ? undefined : `scale(${1.05 * Math.max(1, subZ)}) translate(${subX * w * 0.4}px, 0px)`}}><StockLayer file={scene.stockFile} p={p} mv={mv} w={w} h={h} pal={pal} grade={grade.filter} /></div> : (
       <div style={{position: 'absolute', inset: 0, transform: `scale(${1.12 * Math.max(1, subZ)}) translateX(${panX * 0.4 + subX * w * 0.3}px)`, transformOrigin: '50% 60%', filter: `blur(${tall ? 3 : 2}px)`}}>
         <Backdrop w={w} h={h} env={env} pal={pal} cx={panX} t={t} seed={index} />
+        {qaMarks() && <QaMarks c="backdrop" w={w} h={h} />}
       </div>)}
       <div style={{position: 'absolute', inset: 0, transform: stage, transformOrigin: '50% 62%'}}>
+        {qaMarks() && <QaMarks c="stage" w={w} h={h} />}
         {shots.map((s, i) => {
           const Obj = objectOf(s.kind), local = t - s.at, end = shots[i + 1]?.at ?? 1e9, out = clamp((t - end) / 0.3);
           if (local < 0 || out >= 1 || !Obj) return null;

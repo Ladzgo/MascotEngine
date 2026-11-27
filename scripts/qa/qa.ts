@@ -8,6 +8,7 @@ import {buildPhrases} from '../../src/fx/captions.js';
 import {activeRmsDb} from '../../src/pipeline/audio.js';
 import {spoken} from '../../src/pipeline/speech.js';
 import {zoomRows} from './zoom.js';
+import {frameZoomRows} from './zoomFrames.js';
 
 /** Thresholds (documented in docs/QA.md). */
 export const LIMITS = {
@@ -193,6 +194,12 @@ if (process.argv[1]?.endsWith('qa.ts')) {
   const fi = process.argv.indexOf('--file');
   try {
     const r = qa(id, fi > 0 ? process.argv[fi + 1] : undefined);
+    if (r.checks.some(c => c.name === 'camera zoom') && !process.argv.includes('--no-frames')) { // the same bar measured on rendered frames (~30 s: one bundle + 2 stills per sub-shot)
+      const z = await frameZoomRows(id), over = z.filter(x => x.over.length);
+      r.checks.push({name: 'camera zoom (frames)', ok: !over.length, value: over.length ? over.slice(0, 3).map(x => `beat ${x.beat} ${x.kind}: ${x.over.join(', ')}`).join('; ') : `max move ${(Math.max(...z.map(x => x.move)) * 100).toFixed(1)}%, max cut ${(Math.max(...z.map(x => x.cut)) * 100).toFixed(1)}%, one layer at a time`, limit: 'clip 0%, photo <= 4.5%, push <= 6%, cut <= 5%'});
+      r.ok = r.checks.every(c => c.ok);
+      fs.writeFileSync(`${episodeDir(id)}build/qa.json`, JSON.stringify(r, null, 2));
+    }
     for (const c of r.checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name.padEnd(24)} ${c.value}${c.limit ? `  [${c.limit}]` : ''}`);
     console.log(`\nQA ${r.ok ? 'OK' : 'FAILED'}: ${r.checks.filter(c => !c.ok).length} failing of ${r.checks.length} (build/qa.json)`);
     process.exit(r.ok ? 0 : 1);

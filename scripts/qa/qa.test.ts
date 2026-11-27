@@ -49,3 +49,15 @@ test('camera: stock clips never zoom, photos <= 4.5%, drawn push <= 6%, cuts <= 
     assert.ok(p.move <= 0.046 && d.move <= 0.062 && p.cut <= 0.05 && d.cut <= 0.05 && p.layers <= 1 && d.layers <= 1, JSON.stringify({mv, index, p, d}));
   }
 });
+
+test('zoom probe: marker spread scales with the layer, colours stay apart', async () => {
+  const {spreads} = await import('./zoomFrames.js');
+  const w = 100, h = 100, img = (s: number) => {
+    const rgb = new Uint8Array(w * h * 3);
+    for (const [fx, fy] of [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]]) for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) { const px = Math.round(50 + (fx - 0.5) * 100 * s) + x, py = Math.round(50 + (fy - 0.5) * 100 * s) + y; rgb[(py * w + px) * 3 + 2] = 255; }
+    return rgb;
+  };
+  const a = spreads(img(1), w, h).stage!, b = spreads(img(1.1), w, h).stage!;
+  assert.ok(Math.abs(Math.log(b / a) - Math.log(1.1)) < 0.02, `${a} -> ${b}`);
+  assert.equal(spreads(img(1), w, h).backdrop, undefined);
+});

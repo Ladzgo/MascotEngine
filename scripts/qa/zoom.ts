@@ -1,7 +1,7 @@
 // Camera zoom per beat (QA "motion" bar: one visible move at a time, stock clips still-framed, photo move <= 4.5%, drawn push <= 6%, small sub-shot cuts).
 //   npx tsx scripts/qa/zoom.ts <episode-id>
 // Computed from the renderer's own camera functions (stageCamera/stockMove/SUB_FRAMES via beatZoom), so a code change that stacks zooms again fails QA.
-// Measuring it from frames was tried and rejected: captions, titles and moving footage swamp a 4% Ken Burns (ep011: a 17% stock zoom read as 0%).
+// A plain frame diff of the video was rejected (captions, titles and moving footage swamp a 4% Ken Burns); zoomFrames.ts measures the rendered layers with marker squares.
 import fs from 'node:fs';
 import {episodeDir, loadEpisode} from '../../src/schema.js';
 import {beatZoom} from '../../src/fullbleed/FullBleedScene.js';
