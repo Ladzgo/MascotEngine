@@ -29,7 +29,9 @@ async function stockStep(id: string) {
   if (!ep.scenes.some(s => s.stock) || process.env.STOCK === '0') return;
   try {
     const {stockForEpisode} = await import('../stock/index.js');
-    const items = await stockForEpisode(episodeDir(id), ep.scenes, ep.format, {log: m => console.warn(m), progress: (d, n, q) => console.log(`STOCK_PROGRESS ${d}/${n} ${q}`)});
+    const {withOllamaLock} = await import('../llm/ollamaLock.js');
+    // stock candidates are scored by the local vision model: hold data/ollama.lock so semantic QA and drafts wait their turn instead of evicting it
+    const items = await withOllamaLock(`stock ${id}`, () => stockForEpisode(episodeDir(id), ep.scenes, ep.format, {log: m => console.warn(m), progress: (d, n, q) => console.log(`STOCK_PROGRESS ${d}/${n} ${q}`)}));
     console.log(`stock: ${items.length} of ${ep.scenes.filter(s => s.stock).length} beats have licensed footage`);
   } catch (e) { console.warn(`stock skipped: ${(e as Error).message.split('\n')[0]}`); }
 }

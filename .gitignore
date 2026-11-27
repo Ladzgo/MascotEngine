@@ -22,3 +22,4 @@ data/logs
 .venv-tts
 data/voice-preview
 assets/stock-cache/
+data/ollama.lock

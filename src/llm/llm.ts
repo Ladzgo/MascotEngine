@@ -1,4 +1,5 @@
 import {spawn} from 'node:child_process';
+import {withOllamaLock} from './ollamaLock.js';
 import {extractJson} from './json.js';
 export {extractJson};
 
@@ -199,6 +200,9 @@ async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages
 
 // keep_alive 30 s: a text model that stays loaded for Ollama's default 5 min locks out the vision model other QA steps need
 async function viaOllama(system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
+  return withOllamaLock('llm-text', () => viaOllamaUnlocked(system, messages, json, env));
+}
+async function viaOllamaUnlocked(system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
   const host = ollamaHost(env), model = await ensureOllama(env);
   let res: Response;
   try {

@@ -124,3 +124,13 @@ test('free fallback: groq quota out -> cerebras (keyed) -> local ollama; never a
     assert.ok(hosts.includes('api.cerebras.ai') && hosts.includes('127.0.0.1') && !hosts.some(h => /anthropic/.test(h)), hosts.join(','));
   } finally { restore(); }
 });
+
+test('ollama lock: a live holder makes others wait (then time out), a dead or stale holder is taken over, re-entrant in-process', async () => {
+  const {withOllamaLock} = await import('./ollamaLock.js');
+  const file = `${(await import('node:os')).tmpdir()}/ollama-lock-test-${process.pid}.lock`, fs = await import('node:fs');
+  fs.writeFileSync(file, JSON.stringify({pid: process.ppid, who: 'other', at: Date.now()}));
+  await assert.rejects(withOllamaLock('t', async () => 1, {file, maxWaitMs: 600}), /busy/);
+  fs.writeFileSync(file, JSON.stringify({pid: 2 ** 22 + 12345, who: 'dead', at: Date.now()}));
+  assert.equal(await withOllamaLock('t', async () => withOllamaLock('inner', async () => 7, {file}), {file}), 7);
+  assert.ok(!fs.existsSync(file), 'released');
+});
