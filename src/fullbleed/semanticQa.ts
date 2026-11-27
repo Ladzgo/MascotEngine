@@ -12,7 +12,7 @@ const arg = (n: string) => { const i = process.argv.indexOf(`--${n}`); return i 
 const id = process.argv[2];
 if (!id || id.startsWith('-')) { console.error('Usage: npm run qa:semantic -- <episode-id> [--file video.mp4] [--model qwen2.5vl:7b]'); process.exit(2); }
 const ep = loadEpisode(id), dir = episodeDir(ep.id), b = `${dir}build/`;
-const file = arg('file') ?? [`${b}${ep.id}-final.mp4`, `${b}${ep.id}-preview.mp4`].find(f => fs.existsSync(f));
+const file = arg('file') ?? [`${b}${ep.id}-final.mp4`, `${b}${ep.id}-preview.mp4`].filter(f => fs.existsSync(f)).sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs)[0]; // the newest render: a stale final hid every preview change
 if (!file) { console.error(`no rendered video in ${b}`); process.exit(2); }
 const dec = JSON.parse(fs.readFileSync(`${b}decisions.json`, 'utf8'));
 const model = arg('model') ?? process.env.VLM_MODEL ?? 'qwen2.5vl:7b', host = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/+$/, '');

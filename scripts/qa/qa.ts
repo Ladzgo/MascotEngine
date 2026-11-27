@@ -104,7 +104,7 @@ function gray(file: string, t: number, w: number, h: number): Uint8Array {
 
 export function qa(id: string, fileArg?: string) {
   const ep = loadEpisode(id), dir = episodeDir(ep.id), b = `${dir}build/`;
-  const file = fileArg ?? [`${b}${ep.id}-final.mp4`, `${b}${ep.id}-preview.mp4`].find(f => fs.existsSync(f));
+  const file = fileArg ?? [`${b}${ep.id}-final.mp4`, `${b}${ep.id}-preview.mp4`].filter(f => fs.existsSync(f)).sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs)[0]; // the newest render: a stale final hid every preview change
   if (!file) throw new Error(`no rendered video in ${b} (run render first)`);
   const checks: Check[] = [];
   const add = (name: string, ok: boolean, value: string, limit?: string) => checks.push({name, ok, value, limit});
