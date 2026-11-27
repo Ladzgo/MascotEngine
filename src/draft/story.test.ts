@@ -103,7 +103,7 @@ test('improveStory rewrites the quoted weakest line and keeps it only when the r
   const ep = mk(['Hook $5.', 'It is a problem.', 'Then $40 a month.', 'So next time, $5.']);
   let judged = 0;
   const client = {messages: {create: async (r: {system: string}) => ({content: [{type: 'text', text: /tough YouTube/.test(r.system)
-    ? JSON.stringify({score: [80, 70][judged++] ?? 70, weakest: 'Then $40 a month.'})
+    ? JSON.stringify({score: [80, 80][judged++] ?? 70, weakest: 'Then $40 a month.'})
     : JSON.stringify({rewrites: [{i: 1, line: 'Anna pays $40 a month for it.'}]})}]})}} as any;
   const r = await improveStory(client, ep, {score: 50, weakest: 'It is a problem.', fix: 'add a person'});
   assert.equal(r.ep.scenes[1].narration, 'Anna pays $40 a month for it.');

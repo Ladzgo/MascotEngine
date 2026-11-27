@@ -247,7 +247,12 @@ const STORY_ANCHORS = `ANCHOR WEAK (about 35): general statements ("X is importa
 ANCHOR OK (about 62): one real fact with its number and the mechanism behind it, but no person, no turn, and an ending that only repeats the advice.
 ANCHOR STRONG (about 88): a named everyday person at one concrete moment; one surprising fact with its number; a turn where the obvious explanation is wrong; the last line answers the opening line; a viewer could retell it in one sentence.`;
 /** "Would a friend repeat this?" judge, 0-100, calibrated with weak/ok/strong anchors; it must quote the weakest line. */
+/** Mean of two judge calls: one call moved +-15 on a one-line change (zzb-u3 62 -> 45), too noisy to keep or drop a rewrite on. */
 export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
+  const [a, b] = await Promise.all([judgeOnce(client, ep, model), judgeOnce(client, ep, model)]);
+  return {...(a.score <= b.score ? a : b), score: Math.round((a.score + b.score) / 2)}; // the harsher call's weakest line and fix
+}
+async function judgeOnce(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
   const lines = ep.scenes.map(s => s.narration);
   try {
     const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. Quote the weakest line of THIS script exactly. The anchors only calibrate the scale: never quote them or reuse their people, numbers or topic in your fix; the fix must be about this script's topic. Output ONLY JSON: {"weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown};
