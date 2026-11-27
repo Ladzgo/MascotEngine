@@ -54,8 +54,8 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     const billOk = BILL_TEXT.test(s.narration ?? ''), visuals = s.visuals?.filter((v: {kind: string}) => (money || !MONEY_ONLY.has(objectFor(v.kind))) && (billOk || !BILLS.has(objectFor(v.kind))));
     const raw = planShots({...s, visuals: visuals?.length ? visuals : undefined}, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
     // a topic word said in the sentence ("battery", "sleep", "coffee") beats a storyboard subject the sentence never names (after-tech: pie for "sluggish chemistry")
-    const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor), topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-2).flat().includes(k));
-    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || said.includes(sh.subject))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor), topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-1).flat().includes(k));
+    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || (said.includes(sh.subject) && !WEAK.has(sh.subject)))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
     else if (topical) raw[0] = {kind: topical, at: 0, why: `shot.topic word -> ${topical}`};
     // the drawn subject lands when the voice says its word (max 1.2 s in; before that the backdrop/footage carries the beat)
     if (typeof sh.at === 'string' && raw[0]?.why?.startsWith('shot.')) {
@@ -69,6 +69,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home, money);
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
+    if (s.type === 'chart') shots.splice(1); // the chart IS the picture: a later object replaced the plot with a clock (fb-wide)
     // library assets (Fluent 3D, src/assets): a fallback/variety picture becomes the object the sentence names; a long one-picture beat gets it as its second shot
     if (!s.stockFile && !['big_number', 'chart', 'title'].includes(s.type)) {
       for (const x of shots) if (/fallback|variety|mid-scene/.test(x.why ?? '')) { const a = objectAsset(s.narration ?? '', usedAssets); if (a) { usedAssets.add(a.id); x.why = `${x.why} -> asset "${a.word}"`; x.kind = `asset:${a.id}`; } }
@@ -114,7 +115,9 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
   return out;
 }
 const SUBJECT_SET = new Set(Object.keys(OBJECTS));
-const TOPICAL = new Set(['sport', 'health', 'travel', 'tech', 'food', 'science', 'sleep'].flatMap(g => GROUPS[g]).filter(k => !['gears', 'bulb', 'person_walking', 'globe', 'sun'].includes(k)));
+// symbols any sentence could carry: a topic object the sentence names beats them (en-sleep title: a clock for "memory after missing eight hours of sleep" scored 5)
+const WEAK = new Set(['clock', 'calendar', 'hourglass', 'gears', 'bulb', 'people', 'magnifier', 'shield', 'lock', 'scale', 'pie', 'percent', 'arrow_up', 'arrow_down', 'doc', 'clipboard']);
+const TOPICAL = new Set(['sport', 'health', 'travel', 'tech', 'food', 'science', 'sleep'].flatMap(g => GROUPS[g]).filter(k => !WEAK.has(k) && !['person_walking', 'globe', 'sun'].includes(k)));
 
 /** Variety numbers of a plan: share of plain beats (one centred object on a talk beat), distinct pictures, closest repeat, stock share, layout mix. Targets: plain <= 25%, distinct >= 60%, repeat gap >= 8. */
 export function planStats(plans: ScenePlan[], scenes: {type: string; stockFile?: string; stock?: unknown}[]) {
