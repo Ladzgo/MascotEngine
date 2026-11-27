@@ -197,13 +197,14 @@ async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages
   return text;
 }
 
+// keep_alive 30 s: a text model that stays loaded for Ollama's default 5 min locks out the vision model other QA steps need
 async function viaOllama(system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
   const host = ollamaHost(env), model = await ensureOllama(env);
   let res: Response;
   try {
     res = await fetch(`${host}/api/chat`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(ollamaTimeoutMs(model, env)),
-      body: JSON.stringify({model, stream: true, ...(json ? {format: 'json'} : {}), options: {temperature: 0.6, num_ctx: 8192}, messages: [{role: 'system', content: system}, ...messages]}),
+      body: JSON.stringify({model, stream: true, keep_alive: env.OLLAMA_KEEP_ALIVE || '30s', ...(json ? {format: 'json'} : {}), options: {temperature: 0.6, num_ctx: 8192}, messages: [{role: 'system', content: system}, ...messages]}),
     });
   } catch (e) {
     if ((e as Error).name === 'TimeoutError') throw new Error(`Ollama model "${model}" took longer than ${ollamaTimeoutMs(model, env) / 1000}s for one answer (set LLM_TIMEOUT_MS to allow more).`);
