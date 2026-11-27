@@ -1,6 +1,7 @@
 import React from 'react';
 import {DISPLAY, clamp, easeOut, spring} from '../theme';
 import {isFunctionWord, type CaptionWord, type Phrase} from './captions';
+import {numeralize} from '../pipeline/speech';
 
 /** 'punch' caption preset: 2-3 words at a time, centred in the lower third, heavy white type with a black outline, current keyword yellow. */
 const NUM = /^(\d[\d,.]*%?|\$\d[\d,.]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|twenty-\w+)$/i;
@@ -15,9 +16,33 @@ const STARTERS = new Set('the a an your my our their his her this these those to
  * greedily taking 3 words: never between a number and its unit, never ending on a dangling function word, not before "of",
  * preferably right before a starter word, and single words or long chunks only when nothing better fits.
  */
+const NUMV = /^(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|point)$/;
+/** Spoken number words (the aligner returns what TTS said) back to numerals for the captions: 'one thousand eight hundred twenty five dollars' -> one '$1,825' token
+ *  spanning the same time (ep011: 'TWENTY FIVE DOLLARS' read as $25). Small counts stay words, as in the narration (numeralize decides). */
+export function numeralWords(ws: CaptionWord[]): CaptionWord[] {
+  const out: CaptionWord[] = [], low = (w: CaptionWord) => w.w.toLowerCase().replace(/[^a-z-]/g, '');
+  for (let i = 0; i < ws.length; i++) {
+    let j = i;
+    const isNum = (x: CaptionWord | undefined) => !!x && low(x).split('-').every(y => NUMV.test(y));
+    while (j < ws.length) {
+      const ok = isNum(ws[j]) || (j > i && low(ws[j]) === 'and' && isNum(ws[j + 1])) || (j === i && low(ws[j]) === 'a' && isNum(ws[j + 1]));
+      if (!ok) break;
+      j++;
+      if (/[.,;:!?]$/.test(ws[j - 1].w)) break; // a clause end closes the number
+    }
+    if (j > i && j < ws.length && /^(dollars?|percent)$/.test(low(ws[j])) && !/[.,;:!?]$/.test(ws[j - 1].w)) j++;
+    if (j - i < 2) { out.push(ws[i]); continue; }
+    const run = ws.slice(i, j), tail = /[.,;:!?]+$/.exec(run[run.length - 1].w)?.[0] ?? '', n = numeralize(run.map(w => w.w.replace(/[.,;:!?]+$/, '')).join(' '));
+    if (!/\d/.test(n) || /[a-z]{3,}/i.test(n.replace(/\b(million|billion|thousand)\b/gi, ''))) { out.push(ws[i]); continue; } // only a clean number replaces the words
+    out.push({...run[0], w: n + tail, end: run[run.length - 1].end});
+    i = j - 1;
+  }
+  return out;
+}
 export function buildPunchPhrases(sceneWords: CaptionWord[][]): Phrase[] {
   const out: Phrase[] = [];
-  for (const ws of sceneWords) {
+  for (const ws0 of sceneWords) {
+    const ws = numeralWords(ws0);
     let a = 0;
     ws.forEach((w, k) => {
       if (!/[.!?,;:]$/.test(w.w) && k < ws.length - 1) return;

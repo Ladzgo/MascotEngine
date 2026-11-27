@@ -37,7 +37,7 @@ test('punch chunks: number+unit stay together, no chunk ends on a function word'
   const ph = buildPunchPhrases([words('It takes eighteen years to pay off two thousand dollars at the typical rate.')]).map(p => p.words.map(w => w.w).join(' '));
   assert.ok(ph.some(p => /eighteen years/.test(p)), ph.join(' | '));
   assert.ok(!ph.some(p => /\b(to|the|at)$/.test(p)), ph.join(' | '));
-  assert.ok(ph.some(p => /two thousand dollars/.test(p)), ph.join(' | '));
+  assert.ok(ph.some(p => /\$2,000/.test(p)), ph.join(' | ')); // spoken number words come back as one numeral token
 });
 test('debt object only for debt narration; generic objects need literal words', () => {
   const n = 'Prices rise every year, so plan ahead.', s = planShots(sc(n), words(n), 5);
@@ -189,4 +189,13 @@ test('reselect: dropping stock is kept on a tie', async () => {
   const before = {scenes: [{narration: 'a', stock: {query: 'x'}}]}, after = {scenes: [{narration: 'a'}]};
   assert.deepEqual(keepImproved(before as any, after as any, new Map([[0, 5]]), new Map([[0, 5]])).kept, [0]);
   assert.deepEqual(keepImproved(before as any, after as any, new Map([[0, 5]]), new Map([[0, 3]])).kept, []);
+});
+
+test('captions: spoken number words become one numeral token', async () => {
+  const {numeralWords} = await import('../fx/punch.js');
+  const w = (t: string) => t.split(' ').map((x, i) => ({w: x, start: i, end: i + 0.5}));
+  const r = numeralWords(w('You could spend one thousand eight hundred twenty five dollars a year.'));
+  assert.equal(r.map(x => x.w).join(' '), 'You could spend $1,825 a year.');
+  assert.equal(r[3].start, 3); assert.equal(r[3].end, 9.5);
+  assert.equal(numeralWords(w('It lasts ten days.')).map(x => x.w).join(' '), 'It lasts ten days.');
 });
