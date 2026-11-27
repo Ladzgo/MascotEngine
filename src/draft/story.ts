@@ -297,9 +297,17 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
     if (idx < 0) break;
     const heard = narr.flatMap(spokenNumbers), max = o.maxWords ?? 14;
     try {
-      const res = extractJson(text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 400, system: `You fix one line of a spoken vertical Short so the story gets better. Follow the editor's note. One or two short spoken sentences, ${max} words or fewer, plain words, it must fit between the line before and the line after. Use only numbers already in the script (${[...new Set(heard)].join(', ') || 'none'}); no new figures, no real person's full name. Output ONLY JSON: {"line": string}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? 'make this line concrete and surprising'}\nBefore: ${narr[idx - 1] ?? ''}\nLINE TO REWRITE: ${narr[idx]}\nAfter: ${narr[idx + 1] ?? ''}`}]}))) as {line?: unknown};
-      const line = String(res.line ?? '').trim();
-      if (!line || wcount(line) > max || !spokenNumbers(line).every(n => heard.includes(n)) || slopHits(line).length || fullName(line)) { o.log?.(`story: rewrite of beat ${idx + 1} rejected: ${line}`); break; }
+      const sys = `You fix one line of a spoken vertical Short so the story gets better. Follow the editor's note. One or two short spoken sentences, ${max} words or fewer, plain words, it must fit between the line before and the line after. Use only numbers already in the script (${[...new Set(heard)].join(', ') || 'none'}); no new figures, no real person's full name. Output ONLY JSON: {"line": string}`;
+      const msgs: {role: 'user' | 'assistant'; content: string}[] = [{role: 'user', content: `Editor's note: ${j.fix ?? 'make this line concrete and surprising'}\nBefore: ${narr[idx - 1] ?? ''}\nLINE TO REWRITE: ${narr[idx]}\nAfter: ${narr[idx + 1] ?? ''}`}];
+      let line = '', why = '';
+      for (let t = 0; t < 2; t++) { // one retry with the reason (the first answers ran 20 words for a 14-word slot)
+        const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 400, system: sys, messages: msgs}));
+        line = String((extractJson(out) as {line?: unknown}).line ?? '').trim();
+        why = !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words, the limit is ${max}` : !spokenNumbers(line).every(n => heard.includes(n)) ? 'it adds a number that is not in the script' : slopHits(line).length ? 'it uses a stock phrase' : fullName(line) ? 'it names a real person' : '';
+        if (!why) break;
+        msgs.push({role: 'assistant', content: out.slice(0, 600)}, {role: 'user', content: `Rejected: ${why}. Output the fixed {"line"} again.`});
+      }
+      if (why) { o.log?.(`story: rewrite of beat ${idx + 1} rejected (${why}): ${line}`); break; }
       const next = {...cur, scenes: cur.scenes.map((s, i) => i === idx ? {...s, narration: line} : s) as Episode['scenes']};
       const nj = await judgeStory(client, next, o.model);
       history.push(nj.score);
