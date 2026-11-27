@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {chat, resolveProvider, extractJson, pickModel, pickGemini, testProvider} from './llm.js';
 
 const realFetch = globalThis.fetch;
+process.env.OLLAMA_LOCK_FILE ??= `${(await import('node:os')).tmpdir()}/ollama-llm-test-${process.pid}.lock`; // a real draft holding data/ollama.lock made the mocked chat tests wait 15 min
 const mockFetch = (fn: (url: string, init?: any) => Response | Promise<Response>) => { globalThis.fetch = ((u: any, i: any) => Promise.resolve(fn(String(u), i))) as any; };
 const restore = () => { globalThis.fetch = realFetch; };
 const j = (o: unknown, status = 200) => new Response(JSON.stringify(o), {status});

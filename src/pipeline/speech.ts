@@ -46,9 +46,9 @@ export function spoken(text: string, lang = 'en'): string {
   for (const [re, w] of hu ? ABBR_HU : ABBR_EN) t = t.replace(re, w);
   const NUM = hu ? '\\d{1,3}(?:[ \\u00a0]\\d{3})+(?:,\\d+)?|\\d+(?:,\\d+)?' : '\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?';
   // currency symbol before: $1,000  $1.5 million  $2k
-  t = t.replace(new RegExp(`([$€£])\\s?(${NUM})(?:\\s?(k|m|mm|bn|b|thousand|million|billion)\\b)?`, 'gi'), (_, c: string, n: string, sc?: string) => {
+  t = t.replace(new RegExp(`([$€£])\\s?(${NUM})(?:\\s?(k|m|mm|bn|b|thousand|million|billion)\\b)?`, 'gi'), (_, c: string, n: string, sc: string | undefined, off: number, all: string) => {
     const words = readNumber(n, lang), scale = sc ? (SCALE_EN[sc.toLowerCase()] ?? sc.toLowerCase()) : '';
-    const one = !sc && Number(n.replace(/,/g, '')) === 1;
+    const one = !sc && Number(n.replace(/,/g, '')) === 1 || /\ban?\s$/i.test(all.slice(Math.max(0, off - 3), off)); // "a $5 coffee": the amount is an adjective, "five dollar"
     return hu ? `${words}${scale ? ` ${scale}` : ''} ${CUR[c].hu}` : `${words}${scale ? ` ${scale}` : ''} ${one ? CUR[c].en[0] : CUR[c].en[1]}`;
   });
   t = t.replace(new RegExp(`(${NUM})\\s?%`, 'g'), (_, n: string) => `${readNumber(n, lang)} ${hu ? 'százalék' : 'percent'}`);
@@ -86,6 +86,7 @@ export function numeralize(text: string): string {
 }
 
 export type Segment = {text: string; speed: number; pauseMs: number};
+const NUM_WORD = /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b/i;
 const PAUSE: Record<string, number> = {'.': 280, '?': 340, '!': 280, ';': 200, ':': 200, ',': 120, '—': 220, '…': 400};
 /** Tiny deterministic jitter so repeated runs sound the same but sentences differ from each other. */
 const jit = (seed: number, i: number) => { const x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); };
@@ -94,18 +95,26 @@ const jit = (seed: number, i: number) => { const x = Math.sin(seed * 12.9898 + i
 export function segmentize(text: string, o: {lang?: string; seed?: number; emphasis?: string[]} = {}): Segment[] {
   const seed = o.seed ?? 1, out: Segment[] = [];
   const sents = text.replace(/\s+/g, ' ').trim().match(/[^.!?…]+(?:\.{3}|[.!?…])?["')]*|[^.!?…]+$/g)?.map(s => s.trim()).filter(Boolean) ?? [];
+  const lang = o.lang ?? 'en', em = (o.emphasis ?? []).filter(Boolean).map(e => spoken(e, lang).toLowerCase()); // "$1,825" in emphasis must match the spelled-out text
   sents.forEach((s, si) => {
-    const parts = s.split(/(?<=[,;:])\s+|\s+(?:—|–|-)\s+/).reduce<string[]>((a, p) => { if (a.length && a[a.length - 1].split(' ').length < 4) a[a.length - 1] += ` ${p}`; else a.push(p); return a; }, []);
+    const clauses = s.split(/(?<=[,;:])\s+|\s+(?:—|–|-)\s+/).reduce<string[]>((a, p) => { if (a.length && a[a.length - 1].split(' ').length < 4) a[a.length - 1] += ` ${p}`; else a.push(p); return a; }, []);
+    // a narrator leaves a tiny beat before the key amount ("That's over | eighteen hundred dollars"): the lead and the number become two segments
+    const beats = new Set<number>(), parts: string[] = [];
+    for (const c of clauses) {
+      const ws = c.split(' '), at = ws.findIndex((w, k) => k >= 3 && NUM_WORD.test(w) && (NUM_WORD.test(ws[k + 1] ?? '') || /^(dollars?|percent|euros?|pounds?)\b/i.test(ws[k + 1] ?? '')));
+      if (lang === 'en' && at > 0) { beats.add(parts.length); parts.push(ws.slice(0, at).join(' '), ws.slice(at).join(' ')); } else parts.push(c);
+    }
+    const sw = s.split(' ').length, sentShift = (jit(seed, si + 99) * 2 - 1) * 0.02 + (sw <= 5 ? -0.03 : sw >= 16 ? 0.02 : 0); // whole sentences differ in pace: short punch lines slower, long run-ons a touch quicker
     parts.forEach((p, pi) => {
       const last = pi === parts.length - 1, end = p.trim().slice(-1);
-      let speed = 0.83 + 0.08 * jit(seed, si * 7 + pi); // kokoro at 1.0 talks ~176 wpm; 0.89-0.98 read Short beats at 173 wpm (zzb-h3), 0.85-0.93 still hit 177 on ep018; the references sit at 150-170
-      if (o.emphasis?.some(e => e && p.toLowerCase().includes(e.toLowerCase()))) speed -= 0.03; // linger on the stressed phrase
+      let speed = 0.84 + 0.06 * jit(seed, si * 7 + pi) + sentShift; // kokoro at 1.0 talks ~176 wpm; 0.89-0.98 read Short beats at 173 wpm (zzb-h3), 0.85-0.93 still hit 177 on ep018; the references sit at 150-170
+      if (em.some(e => p.toLowerCase().includes(e))) speed -= 0.03; // linger on the stressed phrase
       if (last && end === '?') speed += 0.02;
       // spelled-out amounts are many short words that the voice rushes ("one thousand eight hundred twenty five"): a narrator slows down on numbers
-      const numeric = (p.match(/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|percent)\b/gi) ?? []).length >= 3;
+      const numeric = (p.match(new RegExp(NUM_WORD.source, 'gi')) ?? []).length >= 3 || (beats.has(pi - 1) && NUM_WORD.test(p.split(' ')[0]));
       if (numeric) speed = Math.min(speed, 0.87) - 0.07;
-      const base = last ? (si === sents.length - 1 ? 0 : (PAUSE[end] ?? 280)) : (PAUSE[end] ?? 120);
-      const pauseMs = base ? Math.max(40, Math.round(base + (jit(seed, si * 13 + pi + 50) * 2 - 1) * 60)) : 0;
+      const base = beats.has(pi) ? 90 : last ? (si === sents.length - 1 ? 0 : (PAUSE[end] ?? 280)) : (PAUSE[end] ?? 120);
+      const pauseMs = beats.has(pi) ? base : base ? Math.max(40, Math.round(base + (jit(seed, si * 13 + pi + 50) * 2 - 1) * 60)) : 0;
       out.push({text: p.replace(/[—–]/g, ',').trim(), speed: Math.round(Math.min(0.92, Math.max(numeric ? 0.78 : 0.81, speed)) * 1000) / 1000, pauseMs});
     });
   });
