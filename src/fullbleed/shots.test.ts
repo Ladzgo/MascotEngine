@@ -150,3 +150,10 @@ test('uncross: leader lines from a left column never cross', async () => {
   const {uncross} = await import('./FullBleedScene');
   assert.deepEqual(uncross([[0, 0], [0, 10]], [[10, 10], [10, 0]]), [1, 0]);
 });
+
+test('concept hero: charge -> plug, freezing -> snowflake, repeats avoided', async () => {
+  const {conceptHero} = await import('./episodePlan.js');
+  assert.equal(conceptHero("Don't charge in cold.", new Set())?.kind, 'asset:fluent-electric-plug');
+  assert.equal(conceptHero('So stop charging your phone in the freezing cold.', new Set(['asset:fluent-electric-plug']))?.kind, 'asset:fluent-snowflake');
+  assert.equal(conceptHero('Prices went up.', new Set()), undefined);
+});

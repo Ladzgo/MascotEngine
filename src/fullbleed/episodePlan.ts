@@ -1,6 +1,7 @@
 import {planShots, objectFor, candidatesFor} from './shots';
 import {OBJECTS} from './objects';
 import {objectAsset, characterAsset, loopAsset, loopCats} from './assetPick';
+import {byId} from '../assets/catalog';
 import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} from './catalog';
 
 type W = {w: string; start: number; end: number};
@@ -75,6 +76,12 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
     if (s.type === 'chart') shots.splice(1); // the chart IS the picture: a later object replaced the plot with a clock (fb-wide)
+    // an action/condition the sentence names ("charge", "freezing", "heat", "save") is a concrete picture: it beats a device symbol, a variety pick or a repeat (ep015: a laptop for "Don't charge in cold")
+    if (!s.stockFile && !['big_number', 'chart', 'title'].includes(s.type)) shots.forEach((x, k) => {
+      if (!(DEVICE.has(x.kind) || WEAK.has(x.kind) || /variety|fallback|mid-scene/.test(x.why ?? '') || perScene.at(-1)?.includes(x.kind))) return;
+      const c = conceptHero(s.narration ?? '', new Set([...(perScene.at(-1) ?? []), ...shots.map(y => y.kind), ...[...usedAssets].map(a => `asset:${a}`)]), money);
+      if (c) { shots[k] = {...x, kind: c.kind, why: `${x.why} -> concept "${c.word}"`}; if (c.kind.startsWith('asset:')) usedAssets.add(c.kind.slice(6)); }
+    });
     // a symbol any sentence could carry (shield, lock, magnifier...) loses the hero spot to a library object the sentence names (reference gap 2: a shield grid for 'the real reason')
     if (!s.stockFile && !['big_number', 'chart', 'title'].includes(s.type) && WEAK.has(shots[0]?.kind ?? '')) { const a = objectAsset(s.narration ?? '', usedAssets); if (a) { usedAssets.add(a.id); shots[0] = {...shots[0], kind: `asset:${a.id}`, why: `${shots[0].why} -> asset "${a.word}" (weak symbol)`}; } }
     // library assets (Fluent 3D, src/assets): a fallback/variety picture becomes the object the sentence names; a long one-picture beat gets it as its second shot
@@ -157,4 +164,23 @@ export function markMatchCuts(plans: ScenePlan[], scenes: {stockFile?: string}[]
     if (!q || !a || !b || scenes[i].stockFile || scenes[i - 1].stockFile || ![p.layout, q.layout].every(l => l === 'hero' || l === 'kinetic') || !shapeOf(a) || shapeOf(a) !== shapeOf(b)) return;
     p.matchCut = true; p.zoom = q.zoom;
   });
+}
+
+/** Verbs/conditions with a concrete picture, in the order tried (procedural object or library asset). */
+const CONCEPTS: [RegExp, string[]][] = [
+  [/^(charg(e|es|ed|ing|er)|plug(s|ged)?|recharg\w*)$/, ['asset:fluent-electric-plug']],
+  [/^(cold|colder|freez\w*|frozen|winter\w*|icy|frost\w*)$/, ['asset:fluent-snowflake', 'thermometer']],
+  [/^(heat|hot|warm(s|er|ing|ed)?|burn\w*)$/, ['flame', 'asset:fluent-fire']],
+  [/^(sav(e|es|ed|ing|ings))$/, ['piggy', 'jar_fill']],
+  [/^(sleep\w*|asleep|nap\w*)$/, ['bed', 'moon']],
+  [/^(run|runs|running|walk\w*|steps?)$/, ['shoe', 'person_walking']],
+];
+const DEVICE = new Set(['phone', 'laptop', 'chip', 'gears', 'asset:fluent-mobile-phone', 'asset:fluent-laptop']);
+export function conceptHero(text: string, avoid: Set<string>, money = true): {kind: string; word: string} | undefined {
+  for (const w of text.toLowerCase().replace(/[^a-z' ]/g, ' ').split(/\s+/)) for (const [re, kinds] of CONCEPTS) {
+    if (!re.test(w)) continue;
+    const k = kinds.find(x => !avoid.has(x) && !avoid.has(x.slice(6)) && (x.startsWith('asset:') ? !!byId(x.slice(6)) : !!OBJECTS[x]) && (money || !MONEY_ONLY.has(x)));
+    if (k) return {kind: k, word: w};
+  }
+  return undefined;
 }
