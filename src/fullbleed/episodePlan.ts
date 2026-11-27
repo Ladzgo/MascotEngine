@@ -174,6 +174,8 @@ const CONCEPTS: [RegExp, string[]][] = [
   [/^(heat|hot|warm(s|er|ing|ed)?|burn\w*)$/, ['flame', 'asset:fluent-fire']],
   [/^(sav(e|es|ed|ing|ings))$/, ['piggy', 'jar_fill']],
   [/^(sleep\w*|asleep|nap\w*)$/, ['bed', 'moon']],
+  [/^(fees?|surcharges?|charges)$/, ['receipts', 'bills']],
+  [/^(lose|loses|losing|lost|wast(e|es|ed|ing))$/, ['asset:fluent-money-with-wings']],
   [/^(run|runs|running|walk\w*|steps?)$/, ['shoe', 'person_walking']],
 ];
 const DEVICE = new Set(['phone', 'laptop', 'chip', 'gears', 'asset:fluent-mobile-phone', 'asset:fluent-laptop']);
