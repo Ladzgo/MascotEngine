@@ -174,8 +174,10 @@ export const overlayOk = (t: string) => {
 export async function grammarScores(client: Client, lines: string[], model?: string): Promise<number[]> {
   if (!lines.length) return [];
   try {
-    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'Score each line 0-10: grammatical English a native speaker would write (5), and it makes sense on its own without context (5). "A cracked window became 10 million loss" scores 3. Output ONLY JSON: {"scores": [numbers, same order]}', messages: [{role: 'user', content: lines.map((c, i) => `${i + 1}. ${c}`).join('\n')}]}))) as {scores?: unknown};
-    return Array.isArray(j.scores) && j.scores.length === lines.length ? j.scores.map(x => Number(x) || 0) : lines.map(() => 7);
+    const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 300, system: 'For each line give two scores: "grammar" 0-5 (grammatical English a native speaker would write) and "sense" 0-5 (it makes sense on its own without context). "A cracked window became 10 million loss" gets grammar 1, sense 2. Output ONLY JSON: {"scores": [{"grammar": number, "sense": number}, one per line, same order]}', messages: [{role: 'user', content: lines.map((c, i) => `${i + 1}. ${c}`).join('\n')}]}))) as {scores?: unknown};
+    // one 0-10 number per line came back as 5 for every clean line (the model read "(5)" as the scale) and dropped every hook (sd-roulette hook 0/100)
+    const one = (x: unknown) => x && typeof x === 'object' ? (Number((x as {grammar?: unknown}).grammar) || 0) + (Number((x as {sense?: unknown}).sense) || 0) : Number(x) || 0;
+    return Array.isArray(j.scores) && j.scores.length === lines.length ? j.scores.map(one) : lines.map(() => 7);
   } catch { return lines.map(() => 7); }
 }
 
