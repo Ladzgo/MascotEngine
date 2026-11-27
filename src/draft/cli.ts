@@ -85,15 +85,17 @@ try {
   for (let round = 0; round < 2 && !values['no-rewrite'] && scoreScript(ep).total < SCORE_REWRITE_BELOW; round++) { const next = await rewriteWeak(client, ep, {model, lang, log}); if (next === ep) break; ep = next; } // up to 2 rounds while under 75
   if (storyOn && !values['no-rewrite'] && concreteGaps(ep.scenes.map(s => s.narration)).length) ep = await fillConcrete(client, ep, {model, log, maxWords: values.short ? 12 : 20});
   if (values.short && concreteGaps(ep.scenes.map(s => s.narration)).length) { const d = dropFlat(ep, estSec); if (d.dropped) { log(`concrete: ${d.dropped} flat beats dropped`); ep = d.ep; } }
-  if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   ep = fixCta(ep, chanName, fits); // never "Follow Money Myths" on a battery video
   // title and the first story verdict do not depend on each other: run them together
   const [titled, story0] = storyOn ? await Promise.all([pickTitle(client, ep, {model, log}), judgeStory(client, ep, model)]) : [{title: ep.title, score: 0}, {score: 0}];
   ep = {...ep, title: titled.title};
   // the judge quotes its weakest line: rewrite that line by its note, re-judge, keep only a gain (2 rounds)
-  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: [...facts.flatMap(f => f.numbers), ...lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)], factLines: facts.map(f => f.text), ...(values.short ? {est: estSec, maxSec: 4.4} : {})}) : {ep, score: story0.score, history: [story0.score]};
+  const improved = storyOn && !values['no-rewrite'] ? await improveStory(client, ep, story0, {model, log, maxWords: values.short ? 14 : 28, facts: [...facts.flatMap(f => f.numbers), ...lastAllowed.filter(n => Number.isInteger(n) || n < 100).slice(0, 40)], factLines: facts.map(f => f.text), ...(values.short ? {est: estSec, maxSec: 6.5} : {})}) : {ep, score: story0.score, history: [story0.score]};
   ep = improved.ep;
   const story = {...story0, score: improved.score, history: improved.history};
+  // story rewrites may run long; Shorts re-tighten and re-split before the storyboard sees the final text
+  if (values.short && improved.history.length > 1) ep = splitBeats(await tightenLong(client, ep, {model, est: estSec, maxSec: 4.4, log}), {max: 11, clauses: true});
+  if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
   const sc = scoreScript(ep);
   console.log(`DRAFT_NOTE script score ${sc.total}/100 (${sc.items.map(i => `${i.name} ${i.got}/${i.max}`).join(', ')})`);

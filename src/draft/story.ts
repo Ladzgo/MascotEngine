@@ -267,7 +267,7 @@ export async function judgeStory(client: Client, ep: Pick<Episode, 'scenes'>, mo
   return {...(a.score <= b.score ? a : b), score: Math.round((a.score + b.score) / 2)}; // the harsher call's weakest line and fix
 }
 async function judgeOnce(client: Client, ep: Pick<Episode, 'scenes'>, model?: string): Promise<{score: number; weakest?: string; fix?: string}> {
-  const lines = ep.scenes.map(s => s.narration);
+  const lines = ep.scenes.map(s => s.narration).filter(l => !/\b(follow|subscribe)\b/i.test(l)); // the CTA is required, not story: it kept being quoted as the weakest line
   try {
     const j = extractJson(text(await client.messages.create({model: model ?? MODEL, max_tokens: 500, system: `You are a tough YouTube Shorts editor. Score the script 0-100 against these anchors:\n${STORY_ANCHORS}\nCriteria: one genuinely surprising fact (25); a concrete person or worked example in the middle (20); a counter-intuitive turn (20); the ending pays off the opening line (20); a viewer could retell it to a friend in one sentence (15). Lines that state an invented-sounding figure, a vague claim, or a filler sentence pull the score down. Quote the weakest line of THIS script exactly. The anchors only calibrate the scale: never quote them or reuse their people, numbers or topic in your fix; the fix must be about this script's topic. Output ONLY JSON: {"weakest": "exact line", "score": number, "fix": "the single change that would raise the score most, one sentence"}`, messages: [{role: 'user', content: lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}]}))) as {score?: unknown; fix?: unknown; weakest?: unknown};
     let score = Math.max(0, Math.min(100, Number(j.score) || 0));
@@ -312,6 +312,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
   let cur = ep, j = first;
   const history = [first.score];
   // sourced facts are the only new material a rewrite may bring (their numbers are in o.facts)
+  const factText = (o.factLines ?? []).join(' '), nameOk = (l: string) => !fullName(l) || [...l.matchAll(/\b([A-Z][a-z]+ [A-Z][a-z]{2,})\b/g)].every(m => factText.includes(m[1])); // a real name is fine when a sourced fact names it
   const factBlock = o.factLines?.length ? `\nSourced facts you may use (copy their numbers exactly): ${o.factLines.join(' | ')}` : '';
   // under the target, one whole-body retell first: hook and last line stay, every middle line may change, line jobs kept, script + outline numbers only
   // (line-level rewrites plateaued at 59-62 on zzb-v1..v3: the missing person and turn need several lines at once)
@@ -320,7 +321,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
     try {
       const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}${factBlock}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
       const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim());
-      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : fullName(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
+      const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : !nameOk(l) ? 'full name' : spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
       const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
       const ok = !why;
       if (ok) {
@@ -342,7 +343,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
       let n = 0;
       for (const w of rw) {
         const line = String(w.line ?? '').trim(), i = Number(w.i);
-        const why = !(i > 0 && i < last) ? 'hook or last line' : !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words` : o.est && o.est({narration: line}) > (o.maxSec ?? 4.4) ? `${o.est({narration: line}).toFixed(1)} s to say` : !spokenNumbers(line).every(x => heard.includes(x)) ? 'new number' : slopHits(line).length ? 'stock phrase' : fullName(line) ? 'full name' : '';
+        const why = !(i > 0 && i < last) ? 'hook or last line' : !line ? 'empty' : wcount(line) > max ? `${wcount(line)} words` : o.est && o.est({narration: line}) > (o.maxSec ?? 4.4) ? `${o.est({narration: line}).toFixed(1)} s to say` : !spokenNumbers(line).every(x => heard.includes(x)) ? 'new number' : slopHits(line).length ? 'stock phrase' : !nameOk(line) ? 'full name' : '';
         if (why) { o.log?.(`story: line ${i + 1} rejected (${why}): ${line}`); continue; }
         scenes[i].narration = line; n++;
       }
