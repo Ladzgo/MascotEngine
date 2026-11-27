@@ -237,6 +237,18 @@ export async function testProvider(p: string, env: NodeJS.ProcessEnv = process.e
   } catch (e) { return {ok: false, ms: Date.now() - t0, message: (e as Error).message}; }
 }
 
+/** Smallest installed Ollama text model (no vision/embedding), or undefined when Ollama is not reachable. Cached per process. */
+let fastCache: string | null | undefined;
+export async function fastestOllama(env: NodeJS.ProcessEnv = process.env): Promise<string | undefined> {
+  if (fastCache !== undefined) return fastCache ?? undefined;
+  try {
+    const r = await fetch(`${ollamaHost(env)}/api/tags`, {signal: AbortSignal.timeout(1500)});
+    const ms = ((await r.json()) as {models?: {name: string; size: number}[]}).models ?? [];
+    fastCache = ms.filter(m => !/(embed|vl|llava|vision|bge|nomic)/i.test(m.name)).sort((a, b) => a.size - b.size)[0]?.name ?? null;
+  } catch { fastCache = null; }
+  return fastCache ?? undefined;
+}
+
 /** Multi-turn variant used by retry-with-errors loops. */
 export async function chat(o: {system: string; messages: ChatMsg[]; json?: boolean; env?: NodeJS.ProcessEnv}): Promise<string> {
   const env = o.env ?? process.env;
@@ -251,7 +263,9 @@ export async function chat(o: {system: string; messages: ChatMsg[]; json?: boole
       catch (e) { first ??= e as Error; }
     }
     if (env.LLM_FALLBACK === '0') throw first!;
-    try { return await viaOllama(o.system, o.messages, !!o.json, env); }
+    // the fallback is a stopgap for a spent free quota: the smallest installed text model answers 2-3x faster than the 7B default (storyboard batches timed out at 240 s)
+    const fast = env.LLM_FALLBACK_MODEL || await fastestOllama(env);
+    try { return await viaOllama(o.system, o.messages, !!o.json, fast ? {...env, OLLAMA_MODEL: fast} : env); }
     catch (e) { throw new Error(`${first!.message} (local Ollama fallback: ${(e as Error).message})`); }
   }
   return viaAnthropic(o.system, o.messages, env);

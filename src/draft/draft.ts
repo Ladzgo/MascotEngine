@@ -229,23 +229,28 @@ export async function expandThin(client: Client, ep: Episode, o: {model?: string
  * Last resort for very short drafts: ask (one narrow call each) for extra talk scenes that explain the topic further.
  * Kept only if 25+ words, no new numbers, no banned wording and no repeated phrase; inserted before the closing scene.
  */
-export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void; lang?: string; /** insert before the last N beats (Shorts keep recap + CTA last) */ before?: number} = {}): Promise<Episode> {
+export async function addScenes(client: Client, ep: Episode, o: {model?: string; minWords?: number; max?: number; log?: (m: string) => void; lang?: string; /** insert before the last N beats (Shorts keep recap + CTA last) */ before?: number; /** long-form: spread the new beats across the chapters instead of piling them before the ending */ spread?: boolean} = {}): Promise<Episode> {
   const scenes = [...ep.scenes];
   const count = () => scenes.reduce((n, s) => n + s.narration.trim().split(/\s+/).length, 0);
-  const asks = ['a concrete everyday example (no new numbers)', 'the most common mistake people make', 'what a sensible person does about it (no advice phrasing)', 'why it feels different from what people expect'];
-  for (let k = 0; k < (o.max ?? 4) && count() < (o.minWords ?? 560) && scenes.length >= 3; k++) {
+  // elaboration that needs no new figures: what a long-form editor adds between the data beats
+  const asks = ['a concrete everyday example with a person in it (no numbers)', 'what happens next as a consequence', 'a plain analogy from daily life', 'the most common mistake people make', 'why it feels different from what people expect', 'what a sensible person does about it (no advice phrasing)', 'the question a viewer would ask right now, and its short answer', 'what this looks like a year later'];
+  const max = o.max ?? 4;
+  for (let k = 0; k < max * 2 && k < asks.length * 2 && count() < (o.minWords ?? 560) && scenes.length >= 3; k++) {
     try {
+      const at = o.spread ? Math.max(2, Math.min(scenes.length - 2, Math.round(((k % max) + 1) * scenes.length / (max + 1)))) : scenes.length - (o.before ?? 1);
       const res = await client.messages.create({model: o.model ?? MODEL, max_tokens: 400,
         system: langNote(o.lang).trim() + ' You add one scene to an explainer video script. Output ONLY JSON: {"narration": string, "emotion": string}. 1 or 2 short spoken sentences, 14 to 30 words, plain words, dry humour allowed, no hype, no advice, no guarantees. Do not add any number, name or statistic. Never reuse a metaphor or phrase from the existing lines.',
-        messages: [{role: 'user', content: `Video: ${ep.title}\nExisting lines: ${scenes.map(x => x.narration).join(' ').slice(0, 1800)}\nWrite one new scene about: ${asks[k % asks.length]}.`}]});
+        messages: [{role: 'user', content: `Video: ${ep.title}\nLines around the spot: ${scenes.slice(Math.max(0, at - 3), at + 2).map(x => x.narration).join(' ')}\nAll lines so far: ${scenes.map(x => x.narration).join(' ').slice(0, 1500)}\nWrite one new scene about: ${asks[k % asks.length]}.`}]});
       const j = extractJson(res.content.filter(c => c.type === 'text').map(c => c.text ?? '').join('')) as {narration?: unknown; emotion?: unknown};
-      const cand = String(j.narration ?? '').trim();
       const known = new Set([...scenes.flatMap(x => numsIn(x.narration)), ...numsIn(ep.title)]);
+      // a sentence with a figure the script never said is dropped; the rest of the candidate can still be used
+      const raw = String(j.narration ?? '').trim(), kept = (raw.match(/[^.!?]+[.!?]*/g) ?? []).map(x => x.trim()).filter(x => x && numsIn(x).every(n => known.has(n)));
       const others = scenes.map(x => x.narration);
       const emo = EMOTIONS.includes(String(j.emotion)) ? String(j.emotion) : 'explaining';
-      const fixed = autoFixEpisode({...ep, scenes: [{...scenes[0], narration: 'x'}, {type: 'talk', emotion: emo, emphasis: [], narration: cand}] as Episode['scenes']}).scenes[1].narration;
-      if (cand.split(/\s+/).length < 12 || cand.split(/\s+/).length > 70 || numsIn(cand).some(n => !known.has(n)) || fixed !== cand || repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length) { o.log?.(`addScenes: rejected candidate ${k + 1} (${cand.split(/\s+/).length}w${fixed !== cand ? ', banned wording' : ''}${numsIn(cand).some(n => !known.has(n)) ? ', new number' : ''}${repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length ? ', repeat' : ''}): ${cand.slice(0, 80)}`); continue; }
-      scenes.splice(scenes.length - (o.before ?? 1), 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
+      const cand = autoFixEpisode({...ep, scenes: [{...scenes[0], narration: 'x'}, {type: 'talk', emotion: emo, emphasis: [], narration: kept.join(' ') || 'x'}] as Episode['scenes']}).scenes[1]?.narration ?? '';
+      const n = cand.split(/\s+/).length, rep = repeatedPhrases([...others, cand], 4).length > repeatedPhrases(others, 4).length;
+      if (n < 10 || n > 70 || rep || numsIn(cand).some(x => !known.has(x))) { o.log?.(`addScenes: rejected candidate ${k + 1} (${n}w${rep ? ', repeat' : ''}): ${raw.slice(0, 80)}`); continue; }
+      scenes.splice(at, 0, {type: 'talk', emotion: emo, emphasis: [], narration: cand} as Episode['scenes'][number]);
     } catch { /* skip */ }
   }
   return {...ep, scenes: scenes as Episode['scenes']};

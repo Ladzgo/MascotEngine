@@ -53,7 +53,7 @@ try {
   if (lastHookPick && ep0.scenes[0] && ep0.scenes[0].narration.trim() !== lastHookPick.hook) { log(`beat 1 reset to the judged hook (was: ${ep0.scenes[0].narration})`); ep0.scenes[0] = {...ep0.scenes[0], narration: lastHookPick.hook}; }
   // long-form target ~950 words (6-7 min at 140-160 wpm); zzb-long1 stopped at 567 because both passes quit at 560-600
   const ep1 = (values['no-expand'] || values.short) ? ep0 : await expandThin(client, ep0, {model: process.env.DRAFT_MODEL ?? MODEL, lang, targetWords: 950, log: m => console.log(`DRAFT_NOTE ${m}`)});
-  const ep1b = (values['no-expand'] || values.short) ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, lang, minWords: 950, max: 8, log: m => console.log(`DRAFT_NOTE ${m}`)});
+  const ep1b = (values['no-expand'] || values.short) ? ep1 : await addScenes(client, ep1, {model: process.env.DRAFT_MODEL ?? MODEL, lang, minWords: 950, max: 8, spread: true, log: m => console.log(`DRAFT_NOTE ${m}`)});
   const storyOn = !values.legacy && !values.device?.startsWith('none');
   // the story engine already picked a judged hook, so the old punch-up is skipped
   const ep2 = values['no-punchup'] || storyOn ? ep1b : await punchUpHook(client, ep1b, process.env.DRAFT_MODEL ?? MODEL, lang);
