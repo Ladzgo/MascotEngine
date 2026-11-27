@@ -52,8 +52,19 @@ export function punchSchedule(phrases: Phrase[]): Set<number> {
   phrases.forEach((p, i) => { if (p.start - last >= PUNCH_GAP && punchWord(p, 0)) { out.add(i); last = p.start; } });
   return out;
 }
-export const punchWord = (p: Phrase, n: number): CaptionWord | undefined => (n % 4 === 0 ? [...p.words].sort((a, b) => (/\d|%|\$/.test(b.w) ? 99 : b.w.length) - (/\d|%|\$/.test(a.w) ? 99 : a.w.length)).find(w => (/\d|%|\$/.test(w.w) || w.w.replace(/\W/g, '').length >= 6) && isKey(w.w) && !NO_PUNCH.test(w.w)) : undefined);
+export const punchWord = (p: Phrase, n: number): CaptionWord | undefined => (n % 4 === 0 ? [...p.words].sort((a, b) => (/\d|%|\$/.test(b.w) ? 99 : b.w.length) - (/\d|%|\$/.test(a.w) ? 99 : a.w.length)).find(w => (/\d|%|\$/.test(w.w) || w.w.replace(/\W/g, '').length >= 6) && isKey(w.w) && !NO_PUNCH.test(w.w) && !isBareVerb(w.w)) : undefined);
 // framing words ("The takeaway: ...") say nothing about the sentence: never the big punch word
+/** A bare verb or verb form says nothing alone on screen ("CREATES", "KEEPING"): punch words and headlines are nouns, numbers or adjectives. Heuristic, no POS tagger. */
+export const isBareVerb = (w: string) => { const x = w.toLowerCase().replace(/[^a-z]/g, ''); return /^(creates?|makes?|causes?|keeps?|gets?|means?|becomes?|leads?|adds?|takes?|gives?|helps?|lets?|needs?|shows?|turns?|stays?|goes|comes?|happens?|seems?|feels?|tells?|forces?|drives?|pushes?|pulls?|matters?|works?|changes?|stops?|starts?|equals?|triggers?|explains?|says?)$/.test(x) || /(ates|izes|ises|ifies|ing|ed)$/.test(x) && x.length > 4; };
+/** On-screen number: en-US separators, and millions/billions short ("$10000000" -> "$10M", "1825" -> "1,825"). Non-numbers pass through. */
+export function screenNumber(w: string): string {
+  const m = /^(\$?)([\d,]+(?:\.\d+)?)(%?)$/.exec(w);
+  if (!m) return w;
+  const n = Number(m[2].replace(/,/g, ''));
+  if (!Number.isFinite(n) || /^\d{4}$/.test(m[2]) && !m[1] && !m[3] && n >= 1900 && n <= 2100) return w; // years stay "2024"
+  const short = n >= 1e9 ? `${+(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n.toLocaleString('en-US', {maximumFractionDigits: 2});
+  return `${m[1]}${short}${m[3]}`;
+}
 const NO_PUNCH = /^(takeaways?|yourself|insights?|follow|basically|actually|remember)\W*$|['’]s\W*$/i; // possessives ("PHONE'S") read as a typo on their own
 
 export const PunchCaptions: React.FC<{phrases: Phrase[]; t: number; accent: string; w: number; h: number; punch?: boolean}> = ({phrases, t, accent, w, h, punch = true}) => {

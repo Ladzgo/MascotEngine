@@ -161,5 +161,19 @@ test('concept hero: charge -> plug, freezing -> snowflake, repeats avoided', asy
 test('kinetic headline never a bare small number', async () => {
   const {kineticWord} = await import('./FullBleedScene');
   assert.equal(kineticWord('That is a 2 dollar surcharge per basket.', []), 'surcharge');
-  assert.equal(kineticWord('It costs $1,825 a year.', []), '$1825');
+  assert.equal(kineticWord('It costs $1,825 a year.', []), '$1,825');
+});
+
+test('screen numbers and bare verbs', async () => {
+  const {screenNumber, isBareVerb} = await import('../fx/punch.js');
+  const {kineticWord} = await import('./FullBleedScene');
+  assert.equal(screenNumber('$10000000'), '$10M'); assert.equal(screenNumber('1825'), '1,825'); assert.equal(screenNumber('2024'), '2024'); assert.equal(screenNumber('1500000000'), '1.5B');
+  assert.ok(isBareVerb('CREATES') && isBareVerb('keeping') && !isBareVerb('pressure') && !isBareVerb('windows'));
+  assert.equal(kineticWord('A broken pane can cost $10,000,000.', []), '$10M');
+  assert.notEqual(kineticWord('That gap creates huge stress on the window.', []).toLowerCase(), 'creates');
+});
+
+test('kinetic headline: a number label beats a spelled-out number', async () => {
+  const {kineticWord} = await import('./FullBleedScene');
+  assert.equal(kineticWord('It creates a seven point four psi gap to manage.', [], '7.4 psi'), '7.4 psi');
 });
