@@ -31,3 +31,10 @@ test('procedural backdrops are deterministic, valid-looking SVG', () => {
   assert.equal(a[17].svg, b[17].svg);
   assert.ok(a.every(x => x.svg.startsWith('<svg') && x.svg.endsWith('</svg>') && !/NaN/.test(x.svg)));
 });
+
+test('aliases find the picture for abstract script words; plurals fold', () => {
+  if (!CATALOG.length) return;
+  assert.ok(search('interest', {kind: 'object', limit: 3}).some(a => /chart|percent|money/.test(a.id)));
+  assert.ok(search('memory', {limit: 2}).some(a => /brain/.test(a.id)));
+  assert.equal(search('batteries', {kind: 'object', limit: 1})[0]?.id, search('battery', {kind: 'object', limit: 1})[0]?.id);
+});
