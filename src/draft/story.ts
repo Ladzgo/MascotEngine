@@ -291,6 +291,21 @@ export function dropFlat(ep: Episode, est: (s: {narration: string}) => number, m
 export async function improveStory(client: Client, ep: Episode, first: {score: number; weakest?: string; fix?: string}, o: {model?: string; rounds?: number; target?: number; maxWords?: number; log?: (m: string) => void} = {}): Promise<{ep: Episode; score: number; history: number[]}> {
   let cur = ep, j = first;
   const history = [first.score];
+  // a weak script (< 60) gets one whole-body retell first: hook and last line stay, every middle line may change, same beat types, script numbers only
+  if (j.score < 60) {
+    const narr = cur.scenes.map(s => s.narration), heard = [...new Set(narr.flatMap(spokenNumbers))], max = o.maxWords ?? 14;
+    try {
+      const out = text(await client.messages.create({model: o.model ?? MODEL, max_tokens: 1500, system: `You are the story editor of a spoken vertical Short. Retell the middle of the script (lines 1 to ${narr.length - 2}) as a story: a concrete everyday person with a first name, one surprising fact, a counter-intuitive turn, and a setup the last line pays off. Return exactly ${narr.length - 2} lines in order, one per numbered line, each ${max} words or fewer, plain spoken. Keep each line's job (a line with a number keeps that number). Use only numbers already in the script (${heard.join(', ') || 'none'}). Output ONLY JSON: {"lines": [strings]}`, messages: [{role: 'user', content: `Editor's note: ${j.fix ?? ''}\n${narr.map((l, i) => `${i}: ${l}`).join('\n')}`}]}));
+      const lines = ((extractJson(out) as {lines?: unknown}).lines as unknown[] | undefined ?? []).map(x => String(x).trim());
+      const ok = lines.length === narr.length - 2 && lines.every((l, k) => l && wcount(l) <= max && spokenNumbers(l).every(x => heard.includes(x)) && !slopHits(l).length && !fullName(l) && (spokenNumbers(narr[k + 1]).length === 0 || spokenNumbers(l).length > 0));
+      if (ok) {
+        const next = {...cur, scenes: cur.scenes.map((s, i) => i > 0 && i < narr.length - 1 ? {...s, narration: lines[i - 1]} : s) as Episode['scenes']}, nj = await judgeStory(client, next, o.model);
+        history.push(nj.score);
+        o.log?.(`story retell: judge ${j.score} -> ${nj.score}`);
+        if (nj.score > j.score) { cur = next; j = nj; }
+      } else o.log?.(`story retell rejected (${lines.length}/${narr.length - 2} lines or a line broke a rule)`);
+    } catch (e) { o.log?.(`story retell skipped (${(e as Error).message.slice(0, 60)})`); }
+  }
   for (let r = 0; r < (o.rounds ?? 2) && j.score < (o.target ?? 75); r++) {
     const narr = cur.scenes.map(s => s.narration), key = (j.weakest ?? '').replace(/^"|"$/g, '').slice(0, 25);
     const weak = key ? narr.findIndex((l, i) => i > 0 && l.includes(key)) : -1;
