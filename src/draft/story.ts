@@ -343,7 +343,7 @@ export async function improveStory(client: Client, ep: Episode, first: {score: n
       const bad = (l: string, k: number) => !l ? 'empty' : wcount(l) > max ? `${wcount(l)} words` : o.est && o.est({narration: l}) > (o.maxSec ?? 4.4) ? 'too long to say' : !spokenNumbers(l).every(x => heard.includes(x)) ? 'new number' : slopHits(l).length ? 'stock phrase' : !nameOk(l) ? 'full name' : cur.scenes[k + 1]?.type !== 'talk' && spokenNumbers(narr[k + 1]).length && !spokenNumbers(l).length ? 'lost its number' : '';
       // talk lines may hand their number to a neighbour (the person needs a line of setup; sd-roulette retell died on "lost its number"); data beats keep theirs, and no number may vanish
       const said = new Set(lines.flatMap(spokenNumbers)), gone = narr.slice(1, -1).flatMap(spokenNumbers).filter(x => !said.has(x));
-      const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : gone.length ? `dropped ${gone.slice(0, 3).join(', ')}` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
+      const why = lines.length !== narr.length - 2 ? `${lines.length}/${narr.length - 2} lines` : gone.length > 1 ? `dropped ${gone.slice(0, 3).join(', ')}` : lines.map((l, k) => bad(l, k) && `line ${k + 2}: ${bad(l, k)}`).filter(Boolean).slice(0, 2).join('; ');
       const stray = why ? [] : (await strayLines(client, `${cur.title}\n${narr[0]}`, lines, o.model)).filter(i => !narr.includes(lines[i])); // only lines the retell wrote
       const ok = !why && !stray.length;
       if (!why && stray.length) o.log?.(`story retell rejected (off-topic or false: ${stray.slice(0, 2).map(i => `"${lines[i]}"`).join(', ')})`);
