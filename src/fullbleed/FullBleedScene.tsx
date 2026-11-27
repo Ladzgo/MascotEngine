@@ -3,7 +3,8 @@ import {Img, OffthreadVideo, staticFile} from 'remotion';
 import type {Scene} from '../schema';
 import type {SceneDecision} from '../director/types';
 import {DISPLAY, SANS, clamp, easeInOut, easeOut} from '../theme';
-import {GradDefs, IsoBox, Txt, pop, seg} from './kit';
+import {GradDefs, IsoBox, Txt, fitText, pop, seg} from './kit';
+import {isFunctionWord} from '../fx/captions';
 import {objectOf} from './assetObj';
 import {assetFile} from './assetPick';
 import {planShots} from './shots';
@@ -12,7 +13,7 @@ import {planEpisode, type ScenePlan} from './episodePlan';
 import {pickKeyword} from '../scenes/keyword';
 
 type Word = {w: string; start: number; end: number};
-export type FBProps = {scene: Scene; dec: SceneDecision; frame: number; fps: number; accent: string; w: number; h: number; words: Word[]; index: number; episodeTitle: string; prevKind?: string; preroll?: number; plan?: ScenePlan};
+export type FBProps = {scene: Scene; dec: SceneDecision; frame: number; fps: number; accent: string; w: number; h: number; words: Word[]; index: number; episodeTitle: string; prevKind?: string; preroll?: number; plan?: ScenePlan; hook?: string};
 
 type Env = 'city' | 'room' | 'vault' | 'abstract' | 'sky' | 'office' | 'street' | 'kitchen';
 const ENV_OF: Record<string, Env> = {
@@ -249,7 +250,23 @@ const Character: React.FC<{id: string; t: number; w: number; feet: number; left:
   );
 };
 
-export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0, plan: planIn}) => {
+/** Shorts beat 1: the 5-7 word hookOverlay for muted viewers, built word by word; the number or longest content word sits on a caption-yellow plate (one accent colour per frame).
+ *  Box = 9:16 safe zone top (220 px) down to just above the hero, centred in 84% of the width; captions (70%+) never reach it. */
+export const hookKey = (hook: string) => { const ws = hook.split(/\s+/); return ws.find(x => /\d/.test(x)) ?? [...ws].filter(x => !isFunctionWord(x)).sort((a, b) => b.length - a.length)[0] ?? ws[0]; };
+const HookOverlay: React.FC<{text: string; t: number; w: number; h: number; top: number; bottom: number; accent: string}> = ({text, t, w, h, top, bottom, accent}) => {
+  const {fs, lines} = fitText(text.toUpperCase(), w * 0.84 * 0.88, bottom - top, Math.min(150, w * 0.14)), key = hookKey(text).toUpperCase();
+  let k = 0;
+  return (
+    <div style={{position: 'absolute', left: w * 0.08, width: w * 0.84, top, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1.04, color: '#fff'}}>
+      {lines.map((ln, li) => <div key={li}>{ln.split(' ').map((wd, wi) => {
+        const e = easeOut(clamp((t - 0.08 - 0.09 * k++) / 0.22)), isKey = wd === key;
+        return <span key={wi} style={{display: 'inline-block', margin: `0 ${fs * 0.12}px`, opacity: e, transform: `translateY(${(1 - e) * fs * 0.35}px) ${isKey ? `rotate(${-2 * e}deg)` : ''}`, ...(isKey ? {background: '#ffe033', color: '#16182a', padding: `0 ${fs * 0.14}px`, borderRadius: fs * 0.1, boxShadow: '0 10px 30px rgba(0,0,0,0.45)'} : {textShadow: `0 ${fs * 0.05}px 0 rgba(0,0,0,0.55), 0 ${fs * 0.1}px ${fs * 0.3}px rgba(0,0,0,0.5)`}), WebkitTextStroke: `${fs * 0.025}px rgba(0,0,0,0.35)`}}>{wd}</span>;
+      })}</div>)}
+    </div>
+  );
+};
+
+export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0, plan: planIn, hook}) => {
   const f = frame + preroll, t = f / fps, dur = Math.max(1, dec.durSec), p = clamp(t / dur);
   const tall = h > w;
   const plan = planIn ?? planEpisode([scene], [words], [dur])[0];
@@ -276,6 +293,9 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
   // charts draw down to their baseline: in a tall frame they stand higher so the captions (70-78%) never cross the plot (ep011-v2 beat 10)
   const charty = lay === 'dataviz' || scene.type === 'chart' || CHARTY.has(plan.shots[0]?.kind ?? '');
   const hs = base * scale, groundY = tall ? h * (charty ? 0.66 : 0.7) : h * (charty ? 0.7 : 0.74), cy = groundY - 0.325 * hs;
+  // top of the hero box after the close framing (feet at 82.5% of the 400 box, push <= 1.12 about 62% height): text above it never overlaps the art
+  const heroTop = h * 0.62 + (groundY - 0.825 * hs - h * 0.62) * 1.12;
+  const showHook = !!hook && tall && !hasCallouts && !versus && scene.type !== 'big_number';
   // 16:9 talk beat: rule of thirds, the hero on the right third and the key phrase as a side title on the left (a centred object left both sides empty)
   const sideTitle = !tall && plan.layout === 'hero' && scene.type === 'talk' && !scene.stockFile;
   const hx = hasCallouts && !tall ? w * 0.7 : sideTitle ? w * 0.66 : w / 2;
@@ -327,11 +347,12 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           });
         })}
       </div>
-      {lay === 'kinetic' && (() => { const kw = pickKeyword(scene.narration, scene.emphasis).toUpperCase().slice(0, 28), e2 = easeOut((t - 0.1) / 0.3), fs = Math.min(w * 0.18, (w * 0.88) / (Math.max(...kw.split(/\s+/).map(x => x.length)) * 0.68), 220); return <div style={{position: 'absolute', left: w * 0.04, width: w * 0.92, top: tall ? h * 0.09 : h * 0.08, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{kw}</div>; })()}
+      {lay === 'kinetic' && !showHook && (() => { const top = tall ? h * 0.115 : h * 0.08, {fs, lines} = fitText(pickKeyword(scene.narration, scene.emphasis).toUpperCase(), w * 0.84, (tall ? heroTop - 30 : h * 0.3) - top, Math.min(w * 0.18, 220), 1), e2 = easeOut((t - 0.1) / 0.3); return <div style={{position: 'absolute', left: w * 0.08, width: w * 0.84, top, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>; })()}
+      {showHook && <HookOverlay text={hook!} t={t} w={w} h={h} top={h * 0.115} bottom={heroTop - 30} accent={accent} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {/* key light from the upper left + falloff to the lower right: one consistent light source reads as a lit 3D set, not flat vectors */}
       {!scene.stockFile && <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'soft-light', background: 'radial-gradient(ellipse 80% 60% at 22% 18%, rgba(255,244,220,0.85), rgba(255,244,220,0) 60%), linear-gradient(160deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45))'}} />}
-      {scene.type === 'title' && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
+      {scene.type === 'title' && !showHook && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} words={words} />}
       {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
       {hasCallouts && (() => {

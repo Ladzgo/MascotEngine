@@ -102,3 +102,13 @@ test('punch chunks follow sense units, not a fixed 3-word window', () => {
   assert.deepEqual(ph('One coffee costs $5. A year of them costs $1,825.'), ['One coffee costs $5.', 'A year of them', 'costs $1,825.']);
   assert.deepEqual(ph('That single cup habit quietly eats your yearly budget.'), ['That single cup habit', 'quietly eats', 'your yearly budget.']);
 });
+
+test('fitText: whole words only, fits the box, hook key is the number or longest content word', async () => {
+  const {fitText} = await import('./kit');
+  const {hookKey} = await import('./FullBleedScene');
+  const r = fitText('COLD DRAINS YOUR BATTERY FAST', 900, 460, 194, 1);
+  assert.equal(r.lines.join(' '), 'COLD DRAINS YOUR BATTERY FAST');
+  assert.ok(r.lines.length * r.fs <= 460 && Math.max(...r.lines.map(l => l.length)) * r.fs * 0.68 <= 900);
+  assert.equal(hookKey('Stop charging in freezing temps'), 'charging');
+  assert.equal(hookKey('Why 600 mAh loss? Not just cold'), '600');
+});

@@ -73,7 +73,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
   const host0 = (() => { try { return new URL(episode.sources[0]).hostname.replace(/^www\./, ''); } catch { return ''; } })();
   const acc = (i: number) => (decisions.accent === '' ? (episode.look === 'fullbleed' ? '#ff5a36' : INK) : accentHex(decisions.accent));
   const view = (i: number, frame: number, preroll = 0) => fullbleed ? (
-    <FullBleedScene scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} fps={fps} accent={acc(i)} w={width} h={height} words={sceneWordsRel[i]} index={i} episodeTitle={episode.title} plan={fbPlan[i]} preroll={preroll} />
+    <FullBleedScene scene={episode.scenes[i]} dec={decisions.scenes[i]} frame={frame} fps={fps} accent={acc(i)} w={width} h={height} words={sceneWordsRel[i]} index={i} episodeTitle={episode.title} plan={fbPlan[i]} preroll={preroll} hook={i === 0 && episode.format === 'short' ? episode.hookOverlay : undefined} />
   ) : (
     <>
     <Living frame={frame + preroll} seed={i} accent={acc(i)} />
@@ -105,7 +105,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
       ))}
       {!fullbleed && <Vignette />}
       {!fullbleed && g < endStart && <ProgressBar index={sceneAt(L, g)} count={totalScenes} p={(g - base) / Math.max(1, L.ends[sceneAt(L, g)] - L.froms[sceneAt(L, g)])} accent={accent} />}
-      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={!['big_number', 'title', 'compare', 'before_after'].includes(episode.scenes[sceneAt(L, g)].type) && fbPlan[sceneAt(L, g)]?.layout !== 'kinetic'} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
+      {fullbleed ? <PunchCaptions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} w={width} h={height} punch={!['big_number', 'title', 'compare', 'before_after', 'list', 'checklist', 'stats', 'table', 'timeline'].includes(episode.scenes[sceneAt(L, g)].type) && fbPlan[sceneAt(L, g)]?.layout !== 'kinetic' && !(sceneAt(L, g) === 0 && episode.hookOverlay)} /> : <Captions phrases={phrasesLocal} t={(g - base) / fps} accent={accent} style={decisions.captionStyle} {...cap} bottom={cap.offset} highlight={decisions.captions?.highlight} />}
       {episode.disclaimer && episode.format !== 'short' && (
         <Sequence from={endStart} durationInFrames={ENDCARD_FRAMES} layout="none">
           <EndCard episode={episode} accent={accent} />
