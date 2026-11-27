@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {withOllamaLock} from '../llm/ollamaLock.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -123,8 +124,8 @@ export async function vlmScore(hit: StockHit, sentence: string, format: Format, 
     const c = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-vf', crop, '-frames:v', '1', png]); fs.rmSync(src, {force: true});
     if (c.status !== 0) return null;
     const prompt = `This picture is b-roll in an explainer video. At this moment the narrator says: "${sentence}"\nDoes the picture illustrate what is said (the objects, people, place or action make sense for those words)? Reply with JSON only: {"score": integer 0-10 (0 = unrelated, 5 = loosely related, 10 = exactly what is described)}`;
-    const res = await fetch(`${VLM_HOST()}/api/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(240000),
-      body: JSON.stringify({model: VLM_MODEL(), stream: false, format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})});
+    const res = await withOllamaLock('stock-vlm', () => fetch(`${VLM_HOST()}/api/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(240000),
+      body: JSON.stringify({model: VLM_MODEL(), stream: false, keep_alive: '30s', format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})}));
     fs.rmSync(png, {force: true});
     if (!res.ok) return null;
     const score = Math.max(0, Math.min(10, Number(JSON.parse(((await res.json()) as {message?: {content?: string}}).message?.content ?? '{}').score) || 0));

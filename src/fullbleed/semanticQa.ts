@@ -1,6 +1,7 @@
 // npm run qa:semantic -- <episode-id> [--file video.mp4] [--model qwen2.5vl:7b]
 // One frame per beat (mid-point) goes to the local vision model: "does this picture illustrate the sentence?" -> score 0-10 + what is shown.
 // Prints a table of the weakest beats and writes episodes/<id>/build/semantic.json. Free: Ollama only.
+import {withOllamaLock} from '../llm/ollamaLock.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -55,8 +56,8 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semqa-'));
 export type Item = {scene: number; sentence: string; score: number; shown: string; reason: string};
 async function ask(png: string, sentence: string): Promise<{score: number; shown: string; reason: string}> {
   const prompt = `This is one frame of an explainer video. At this moment the narrator says: "${sentence}"\nDoes the picture illustrate what is said (the objects, scene or data shown make sense for those words)? Ignore captions and text overlays when judging; judge the artwork. Reply with JSON only: {"score": integer 0-10 (0 = unrelated, 5 = loosely related, 10 = exactly what is described), "shown": "what the picture shows, in 8 words", "reason": "one short sentence"}`;
-  const res = await fetch(`${host}/api/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(240000),
-    body: JSON.stringify({model, stream: false, keep_alive: '30s', format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})});
+  const res = await withOllamaLock('semantic-qa', () => fetch(`${host}/api/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(240000),
+    body: JSON.stringify({model, stream: false, keep_alive: '30s', format: 'json', options: {temperature: 0.1}, messages: [{role: 'user', content: prompt, images: [fs.readFileSync(png).toString('base64')]}]})}));
   if (!res.ok) throw new Error(`Ollama HTTP ${res.status} (is ${model} pulled?)`);
   const j: any = JSON.parse(((await res.json()) as any).message?.content ?? '{}');
   return {score: Math.max(0, Math.min(10, Number(j.score) || 0)), shown: String(j.shown ?? '').slice(0, 80), reason: String(j.reason ?? '').slice(0, 140)};
