@@ -157,3 +157,9 @@ test('concept hero: charge -> plug, freezing -> snowflake, repeats avoided', asy
   assert.equal(conceptHero('So stop charging your phone in the freezing cold.', new Set(['asset:fluent-electric-plug']))?.kind, 'asset:fluent-snowflake');
   assert.equal(conceptHero('Prices went up.', new Set()), undefined);
 });
+
+test('kinetic headline never a bare small number', async () => {
+  const {kineticWord} = await import('./FullBleedScene');
+  assert.equal(kineticWord('That is a 2 dollar surcharge per basket.', []), 'surcharge');
+  assert.equal(kineticWord('It costs $1,825 a year.', []), '$1825');
+});

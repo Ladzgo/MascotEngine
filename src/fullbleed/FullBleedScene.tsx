@@ -126,6 +126,12 @@ export const GRADES = [
   {name: 'gold', tint: '#ffd78a', filter: 'saturate(1.08) contrast(1.05) sepia(0.05)'},
 ] as const;
 export const gradeFor = (title: string) => GRADES[[...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % GRADES.length];
+/** Kinetic headline: the keyword, but never a bare small number with no unit ("2" said nothing on ep016 beat 5): then the longest content word. */
+export const kineticWord = (narration: string, emphasis: string[]) => {
+  const k = pickKeyword(narration, emphasis);
+  if (!/^\d{1,2}$/.test(k)) return k;
+  return narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(w => !isFunctionWord(w) && !/^\d+$/.test(w)).sort((a, b) => b.length - a.length)[0] ?? k;
+};
 /** QA zoom probe (scripts/qa/zoomFrames.ts renders with inputProps.qaMarks): four squares ride inside each camera layer and everything else is hidden,
  *  so the rendered frame shows exactly how much each layer scales, ancestors (transitions, wrappers) included. Stage squares sit apart from the others (overlap hid pixels). */
 export const QA_MARK_COLORS = {stock: '#00ff00', backdrop: '#ff0000', stage: '#0000ff'} as const;
@@ -441,7 +447,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accen
           });
         })}
       </div>
-      {lay === 'kinetic' && !showHook && (() => { const top = tall ? h * 0.115 : h * 0.08, {fs, lines} = fitText(pickKeyword(scene.narration, scene.emphasis).toUpperCase(), w * 0.84, (tall ? heroTop - 30 : h * 0.3) - top, Math.min(w * 0.18, 220), 1), e2 = easeOut((t - 0.1) / 0.3); return <div style={{position: 'absolute', left: w * 0.08, width: w * 0.84, top, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>; })()}
+      {lay === 'kinetic' && !showHook && (() => { const top = tall ? h * 0.115 : h * 0.08, {fs, lines} = fitText(kineticWord(scene.narration, scene.emphasis).toUpperCase(), w * 0.84, (tall ? heroTop - 30 : h * 0.3) - top, Math.min(w * 0.18, 220), 1), e2 = easeOut((t - 0.1) / 0.3); return <div style={{position: 'absolute', left: w * 0.08, width: w * 0.84, top, textAlign: 'center', fontFamily: DISPLAY, fontSize: fs, lineHeight: 1, color: '#fff', textShadow: `0 8px 0 ${accent}, 0 18px 40px rgba(0,0,0,0.55)`, WebkitTextStroke: '4px rgba(0,0,0,0.3)', opacity: e2, transform: `scale(${0.7 + 0.3 * e2}) rotate(${-2 * e2}deg)`}}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>; })()}
       {showHook && <HookOverlay text={hook!} t={t} w={w} h={h} top={h * 0.115} bottom={heroTop - 30} accent={accent} />}
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {/* key light from the upper left + falloff to the lower right: one consistent light source reads as a lit 3D set, not flat vectors */}
