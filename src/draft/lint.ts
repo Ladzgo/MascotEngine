@@ -102,7 +102,9 @@ export function fixClosing(ep: Episode): Episode {
   const last = ep.scenes.at(-1);
   if (!last || !closingContradiction(last.narration)) return ep;
   const kept = (last.narration.match(/[^.!?]+[.!?]*/g) ?? []).filter(x => !REVERSAL.test(x)).join('').trim();
-  return kept ? {...ep, scenes: [...ep.scenes.slice(0, -1), {...last, narration: kept}] as Episode['scenes']} : ep;
+  // every sentence is a reversal ("But it pays off."): drop the turn word instead of failing the whole draft
+  const unturned = kept || last.narration.replace(/^\s*(but|however|actually|then again|on the other hand),?\s*/i, '').replace(/^./, c => c.toUpperCase()).trim();
+  return unturned && !closingContradiction(unturned) ? {...ep, scenes: [...ep.scenes.slice(0, -1), {...last, narration: unturned}] as Episode['scenes']} : ep;
 }
 
 export const MAX_SIMILES = 2;

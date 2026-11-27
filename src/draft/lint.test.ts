@@ -110,3 +110,10 @@ test('autoFix merges talk runs AFTER grounding, so demoted big_numbers cannot le
   const out = autoFixEpisode({id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'wide', look: 'paper', scenes} as any);
   assert.equal(talkRuns(out.scenes).length, 0);
 });
+test('fixClosing: a closing that is one "But..." sentence loses the turn word instead of failing the draft', async () => {
+  const {fixClosing, closingContradiction} = await import('./lint.js');
+  const t = (n: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration: n});
+  const out = fixClosing({scenes: [t('Hook.'), t('But rent control keeps tenants in place.')]} as any);
+  assert.equal(out.scenes[1].narration, 'Rent control keeps tenants in place.');
+  assert.ok(!closingContradiction(out.scenes[1].narration));
+});
