@@ -58,3 +58,15 @@ test('a part that keeps inventing numbers falls back to the outline words', asyn
   const ep = await draftByOutline({client: c as any, topic: 't', id: 'ep-o', voice: FALLBACK_VOICE});
   assert.ok(!ep.scenes.some(s => /9,999|8,888|7,777/.test(s.narration)));
 });
+
+test('long-form plan: chapters open with their mini-hook, 5-8 beats / 130+ words each, a re-hook after the middle chapter', async () => {
+  const {planParts} = await import('./outline.js');
+  const sec = (i: number) => ({heading: `Chapter ${i}`, point: 'p', fact: `${i} dollars`, numbers: [i], tease: `Why ${i}?`});
+  const o = {title: 't', sources: [], hook: 'h', stakes: 's', sections: [1, 2, 3, 4, 5].map(sec), twist: 'tw', recap: 'r', cta: 'c', badResults: [], rehook: 'But the real surprise is still coming.'} as any;
+  const parts = planParts(o, false);
+  const keys = parts.map(p => p.key);
+  assert.deepEqual(keys, ['opening', 's1', 's2', 's3', 'rehook', 's4', 's5', 'twist', 'closing']);
+  const s1 = parts.find(p => p.key === 's1')!;
+  assert.ok(s1.min === 5 && s1.max === 8 && s1.minWords === 130 && /mini-hook/.test(s1.brief) && /Why 1\?/.test(s1.facts));
+  assert.ok(!planParts(o, true).some(p => p.key === 'rehook')); // Shorts keep their tight shape
+});

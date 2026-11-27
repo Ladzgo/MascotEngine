@@ -13,7 +13,8 @@ const text = (r: {content: Array<{type: string; text?: string}>}) => r.content.f
 
 export type Outline = {
   title: string; sources: string[]; hook: string; stakes: string;
-  sections: {heading: string; point: string; fact: string; numbers: number[]; calc?: {expr: string; result: number}}[];
+  sections: {heading: string; point: string; fact: string; numbers: number[]; calc?: {expr: string; result: number}; /** long-form: the chapter's opening question (mini-hook) */ tease?: string}[];
+  /** long-form: mid-video line that teases what is still coming (re-hook) */ rehook?: string;
   twist: string; recap: string; cta: string;
   /** results of calc expressions that did not check out; numbers equal to these are never allowed in narration */
   badResults: number[];
@@ -46,9 +47,9 @@ export function parseOutline(raw: any, lenient = false, minSections = 4): {outli
       else if (!Number.isFinite(said) || !near(got, said, 0.005)) { if (!lenient) errors.push(`Section ${i + 1} calc: ${x.calc.expr} = ${+got.toFixed(4)}, not ${x.calc.result}. Fix the arithmetic.`); if (Number.isFinite(said)) badResults.push(said); }
       else calc = {expr: String(x.calc.expr), result: got};
     }
-    return {heading: s(x?.heading), point: s(x?.point), fact: s(x?.fact), numbers: nums, ...(calc ? {calc} : {})};
+    return {heading: s(x?.heading), point: s(x?.point), fact: s(x?.fact), numbers: nums, ...(calc ? {calc} : {}), ...(s(x?.tease) ? {tease: s(x?.tease)} : {})};
   }).filter((x: {heading: string; fact: string}) => x.heading && x.fact);
-  const o = {title: s(raw.title), sources, hook: s(raw.hook), stakes: s(raw.stakes), sections, twist: s(raw.twist), recap: s(raw.recap), cta: s(raw.cta), badResults, ...(raw.extras && typeof raw.extras === 'object' ? {extras: raw.extras} : {})};
+  const o = {title: s(raw.title), sources, hook: s(raw.hook), stakes: s(raw.stakes), sections, twist: s(raw.twist), recap: s(raw.recap), cta: s(raw.cta), badResults, ...(s(raw.rehook) ? {rehook: s(raw.rehook)} : {}), ...(raw.extras && typeof raw.extras === 'object' ? {extras: raw.extras} : {})};
   if (!o.title || !o.hook || !o.twist || !o.recap || !o.cta || !o.stakes) errors.push('title, hook, stakes, twist, recap and cta are all required, non-empty strings.');
   if (wc(o.hook) > 15) errors.push(`hook has ${wc(o.hook)} words; 15 or fewer.`);
   if (sections.length < minSections) errors.push(`Only ${sections.length} usable sections (each needs heading and fact); write ${minSections} to 6.`);
@@ -84,7 +85,7 @@ const OUTLINE_SHAPE = `{"title": string, "sources": [real URLs of official stati
 
 export async function draftOutline(o: {device?: Device; short?: boolean; client: Client; topic: string; angle?: string; voice: string; channelContext?: string; lang?: string; model?: string; log?: (m: string) => void}): Promise<Outline> {
   const system = `You plan explainer YouTube videos.${o.channelContext ? `\n\nChannel profile:\n${o.channelContext}` : ''}${isHu(o.lang) ? `\n\n${LANG_RULES.hu}` : ''}\n\nVoice guide:\n${o.voice}\n\nOutput ONLY one JSON object (no prose, no code fences): ${OUTLINE_SHAPE}${o.device ? `\nAlso add the key "extras": ${o.device.extras}.\n\nNARRATIVE DEVICE (${o.device.name}): ${o.device.plan}` : ''}\nRules: use only facts you are sure about; never invent URLs or statistics; do the arithmetic carefully, every derived number needs a calc. No guarantees, no advice.`;
-  const messages: {role: 'user' | 'assistant'; content: string}[] = [{role: 'user', content: `Topic: ${o.topic}${o.angle ? `\nAngle: ${o.angle}` : ''}\n${o.short ? 'Plan a 40 second vertical Short: hook, stakes, exactly 3 sections (each with one concrete number or worked example), a twist, a recap, a call to action. Keep every field short.' : 'Plan a 4 minute video: hook, stakes, 4 to 6 sections (each with one concrete number or worked example), a twist, a recap, a call to action.'}`}];
+  const messages: {role: 'user' | 'assistant'; content: string}[] = [{role: 'user', content: `Topic: ${o.topic}${o.angle ? `\nAngle: ${o.angle}` : ''}\n${o.short ? 'Plan a 40 second vertical Short: hook, stakes, exactly 3 sections (each with one concrete number or worked example), a twist, a recap, a call to action. Keep every field short.' : `Plan a 7 minute video (6 to 10 minutes): a cold open hook, stakes (the promise: what the viewer will know by the end), 5 or 6 chapters (each with one concrete number or worked example and a "tease": a one-line question that opens the chapter and makes the viewer stay for it), a "rehook" (one line for the middle of the video that teases the twist still to come), a twist, a recap, a call to action. Add "tease" to every section and "rehook" at the top level.`}`}];
   let errors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     let out = '';
@@ -104,7 +105,9 @@ export type Part = {key: string; label: string; brief: string; min: number; max:
 export function planParts(o: Outline, short = false, device?: Device): Part[] {
   const FEATURES = ['big_number', 'compare', 'list', 'timeline', 'before_after', 'checklist', 'stats'];
   const parts: Part[] = [{key: 'opening', label: 'Hook and stakes', min: 3, max: 4, feature: 'big_number', facts: `Hook (first beat, a title scene, 15 words max): ${o.hook}\nStakes: ${o.stakes}`, brief: 'beat 1 is the hook (type title). Then 2 or 3 beats on the stakes.'}];
-  o.sections.forEach((x, i) => parts.push({key: `s${i + 1}`, label: x.heading, min: 3, max: 5, feature: FEATURES[(i + 1) % FEATURES.length], focus: x.calc?.result ?? x.numbers.at(-1), facts: `Section "${x.heading}"\nIdea: ${x.point}\nFact: ${x.fact}${x.calc ? `\nArithmetic: ${x.calc.expr} = ${x.calc.result}` : ''}`, brief: device ? `${device.roles[i % device.roles.length]}. Land the fact with its exact numbers.` : 'explain the idea, then land the fact with the exact numbers, then say what it means for the viewer.'}));
+  o.sections.forEach((x, i) => parts.push({key: `s${i + 1}`, label: x.heading, min: 3, max: 5, feature: FEATURES[(i + 1) % FEATURES.length], focus: x.calc?.result ?? x.numbers.at(-1), facts: `Section "${x.heading}"\nIdea: ${x.point}\nFact: ${x.fact}${x.calc ? `\nArithmetic: ${x.calc.expr} = ${x.calc.result}` : ''}${!short && x.tease ? `\nChapter mini-hook (beat 1): ${x.tease}` : ''}`, ...(!short ? {min: 5, max: 8, minWords: 130} : {}), brief: (!short && x.tease ? 'Beat 1 is the chapter\'s mini-hook question, said plainly. ' : '') + (device ? `${device.roles[i % device.roles.length]}. Land the fact with its exact numbers.` : 'explain the idea, then land the fact with the exact numbers, then say what it means for the viewer.')}));
+  // long-form: the re-hook sits after the middle chapter so viewers who drift at minute 3-4 get a reason to stay
+  if (!short && o.rehook && parts.length > 3) parts.splice(Math.ceil(parts.length / 2) + 1, 0, {key: 'rehook', label: 'Re-hook', min: 1, max: 2, facts: `Re-hook: ${o.rehook}`, brief: 'one or two short beats that tease what is still coming (the catch), without giving it away. No new numbers.'});
   parts.push({key: 'twist', label: 'The catch', min: 2, max: 4, feature: 'compare', facts: `Twist: ${o.twist}`, brief: 'start with a short turn ("but" is fine here), then explain the catch concretely.'});
   if (device && parts[0]) { parts[0].brief = `${device.opening} ${parts[0].brief}`; if (o.extras) parts[0].facts += `\nStory facts (use these exact names and numbers): ${JSON.stringify(o.extras)}`; }
   parts.push({key: 'closing', label: 'Recap and call to action', min: 2, max: 3, facts: `Recap: ${o.recap}\nCall to action: ${o.cta}`, brief: `a one-line recap (a checklist scene is good), then the call to action as the very last beat.${device ? ` The last beat must call back to the opening line ("${o.hook}") by reusing one of its key words, so the loop closes.` : ''}`, callback: o.hook});
