@@ -190,7 +190,10 @@ export async function stockForEpisode(epDir: string, scenes: {stock?: {query: st
     const keep = prev.find(x => x.scene === i && x.query === s.stock!.query && x.kind === s.stock!.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
     const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic, exclude: new Set(items.map(x => x.pageUrl)), sentence: s.narration, vlm, log: o.log});
     o.progress?.(++done, total, s.stock.query);
-    if (keep) { items.push(keep); continue; }
+    if (keep) { // a kept record from before the vision check gets its score from the local file (16:9 uses it: >= 7 full-frame, <= 5 drawn hero)
+      const lp = path.join(cache, path.basename(keep.file)), v = vlm && typeof keep.score !== 'number' && s.narration ? await vlmScore({thumb: lp} as StockHit, s.narration, format, cache, async u => new Response(fs.readFileSync(u))) : null;
+      items.push(typeof v === 'number' ? {...keep, score: v} : keep); continue;
+    }
     if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
     items.push({scene: i, query: s.stock.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind, ...(typeof got.score === 'number' ? {score: got.score} : {})});
   }

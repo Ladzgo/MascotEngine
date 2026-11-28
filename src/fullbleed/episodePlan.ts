@@ -107,6 +107,7 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     }
     // in a sky-body video 'spins' means the Moon/Earth turning: the orbit diagram beats a filler or a weak symbol (sc-moon2: skyline + plane)
     if (space && !s.stockFile && /\b(spin\w*|rotat\w*)\b/i.test(s.narration ?? '') && (WEAK.has(shots[0].kind) || /fallback|variety|mid-scene/.test(shots[0].why ?? '') || (!shots[0].kind.startsWith('asset:') && !said.includes(shots[0].kind))) && !perScene.at(-1)?.includes('orbit')) shots[0] = {...shots[0], kind: 'orbit', why: `${shots[0].why} -> orbit (spin, space topic)`};
+    if (space && !/\b(sleep\w*|bed\w*|asleep|nap\w*)\b/i.test(s.narration ?? '')) shots.forEach(x => { if (x.kind === 'bed') { x.kind = 'moon'; x.why = `${x.why} -> moon (night, space topic)`; } }); // 'every night' in a Moon video is the Moon, not a bed
     // a named thing (country, '$100 buys $50', a king, 833,997%) is the hero before any topic/money symbol (16:9 gap 2: Venezuela showed coins and a laptop)
     const ent = !s.stockFile && ['talk', 'big_number'].includes(s.type) ? entityHero(s.narration ?? '') : undefined;
     if (ent && !perScene.at(-1)?.includes(ent.kind)) { shots[0] = {...shots[0], kind: ent.kind, why: `entity: ${ent.why}`}; if (ent.kind.startsWith('asset:')) usedAssets.add(ent.kind.slice(6)); }
