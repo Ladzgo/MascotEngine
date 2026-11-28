@@ -52,4 +52,19 @@ All in `studio/web/src/styles.css` (`:root`, `[data-theme]`).
 
 Controls: 32px default height, 28px small, 40px large. Focus: 2px accent ring, 2px offset.
 
-Old names (`--paper`, `--ink`, `--line-2` ...) stay as aliases so page sheets keep working.
+Old names (`--paper`, `--ink`, `--field` ...) stay as aliases so page sheets and inline styles keep working.
+
+## 4. Layout
+
+- **Sidebar** (`Rail.tsx`): brand, channel picker (moved from the top bar), the one global "New video" button, nav in flow order (Today, Ideas, Pipeline, Library, Clipper, Analytics), footer with Channels, Settings and the theme switch (system -> light -> dark).
+- **Top bar** (`TopBar.tsx`): breadcrumb (the current page never truncates first), search/command palette, Jobs chip. Nothing else.
+- **Pages**: `page-head` = h1 + one muted line on the left, actions on the right (`page-actions`). Lists (Today, Library) are one bordered list with row dividers, not a stack of cards. Only one primary button per view.
+- **Episode** (`Workspace.tsx`, `ws.css`): title row (episode swatch, title, save state, cost, Undo/Redo, Episode menu) -> sticky stepper with the step's primary action -> content + 360px inspector. The live pipeline status (`StageTrack`) floats at the bottom only while a job for this episode exists.
+- **New video**: the Make step sticks to the bottom of the viewport, so the primary action is always in reach.
+- **No sideways scroll**: Pipeline columns wrap, storyboard cards wrap (width still follows scene duration), long chips wrap. `npm run smoke:ui` fails if any page scrolls sideways at 1280px or 390px.
+
+## 5. Verify
+
+`npm run smoke:ui` walks every route and the main path, then captures dark (`dark-*.png`) and phone (`phone-*.png`) screenshots into `out/smoke-ui/`. Before/after sets: `out/studio-design/before/`, `out/studio-design/after/`.
+
+Not in this lane, now stale: the root `DESIGN.md` and `.impeccable/surfaces/studio-web-index-html.md` still describe the old paper-and-ink direction. This file supersedes them for the Studio.

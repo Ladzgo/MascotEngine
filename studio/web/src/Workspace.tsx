@@ -86,12 +86,6 @@ export default function Workspace({id, step, scene, onRoute}: WorkspaceProps) {
   }, [id, load, refreshCost, refreshVersions]);
 
   const running = job?.status === 'running';
-  useEffect(() => {
-    const n = document.getElementById('boil-noise');
-    if (!running || !n || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let s = 3; const t = setInterval(() => n.setAttribute('seed', String((s = (s % 40) + 1))), 130);
-    return () => clearInterval(t);
-  }, [running]);
 
   const attach = useCallback((jobId: string) => {
     es.current?.close();
