@@ -80,3 +80,13 @@ callouts need the drawn growth picture). The 7B model is coarse: it answers 0 or
    these; the drawn set needs more concrete, sentence-named objects (more Fluent assets as heroes when the storyboard subject is a WEAK symbol).
 3. **Empty floor band under the captions** on drawn beats (lower ~25%): the reference keeps picture to the frame edge. Partly YouTube's own UI zone on Shorts,
    but footage-loop beats look fuller than procedural floors; more loop/photo backdrops or a richer floor would close it.
+
+## 16:9 long-form gaps (2026-11-28, lf-inflation as full-bleed 16:9: 90 beats, 460 s, QA 20/20, semantic median 5 / mean 5.4)
+By beat type: talk 52 beats median 5, stock 31 median 5 (mean 5.7), big_number 4 median 5, the hook title 2.
+1. **Homographs and idioms picked literal pictures**: "prices rose" got a rose, "a camel train" a dumbbell, "at its best" a trophy. Fixed: those words never
+   name a library object or a drawn subject (assetPick STOP, shots word lists).
+2. **Specific facts get generic money pictures**: Venezuela's 833,997%, "$100 buys $50 of goods", "a king with a camel train" all show coins/bills/cities.
+   Long-form needs a data/scene vocabulary (map pin + flag, before/after price card, people) chosen from the sentence's named things.
+3. **The hook title beat scores 2**: an arrow and text over a savings account. A long-form cold open needs a picture that states the claim (e.g. a $10,000
+   counter draining to $7,000), not the title card.
+Also done this round: 16:9 heroes at 0.98h (0.86h read as small props), headline never a bare verb or hedge word ("IMAGINE", "UNDERSTAND").

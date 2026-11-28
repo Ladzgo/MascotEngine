@@ -199,3 +199,9 @@ test('captions: spoken number words become one numeral token', async () => {
   assert.equal(r[3].start, 3); assert.equal(r[3].end, 9.5);
   assert.equal(numeralWords(w('It lasts ten days.')).map(x => x.w).join(' '), 'It lasts ten days.');
 });
+
+test('homographs never pick a literal picture: prices rose (no flower), camel train (no dumbbell)', async () => {
+  const {objectAsset} = await import('./assetPick.js');
+  assert.equal(objectAsset('prices on average rose perhaps sixfold'), undefined);
+  assert.ok(!'a king with a camel train'.split(' ').flatMap(candidatesFor).includes('dumbbell'));
+});
