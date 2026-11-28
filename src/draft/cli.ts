@@ -106,6 +106,7 @@ try {
   if (values.short && improved.history.length > 1) ep = splitBeats(await tightenLong(client, ep, {model, est: estSec, maxSec: 4.4, log}), {max: 11, clauses: true});
   const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
   ep = {...ep, scenes: ep.scenes.map(s => ({...s, narration: numeralize(s.narration)})).filter((s, i, a) => i === 0 || norm(s.narration) !== norm(a[i - 1].narration)) as typeof ep.scenes}; // a line said twice in a row (sd-banana hook twice) goes // story/tighten rewrites run after autoFix and can spell amounts out again (ep011-v3 "one thousand eight hundred twenty five dollars")
+  if (values.short) ep = splitBeats(ep, {max: 11, clauses: true, est: estSec, maxSec: 4.4}); // last word: a beat over 4.4 s spoken splits at a sentence end even under 11 words (sc-honey compare beat read 5.0 s, QA max 5 s)
   if (!values['no-storyboard']) ep = await storyboard(client, ep, {model, log: m => console.log(`DRAFT_NOTE ${m}`)});
   if (storyOn) log(`story judge ${story.score}/100${story.score < 75 && story.fix ? ` (fix: ${story.fix})` : ''}`);
   const sc = scoreScript(ep);

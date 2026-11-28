@@ -10,8 +10,9 @@ const MAX_BEAT = 22; // words (about 8 s spoken): longer talk scenes become seve
  * (new picture, new illustration pick, fresh caption block). Text is only cut at sentence ends, never rewritten.
  * The hook (scene 1), the closing scene, quotes and every non-talk scene are left alone.
  */
-export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {}): Episode {
+export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean; /** spoken seconds per scene: over maxSec splits too (10 words with two numbers read 5 s, sc-honey) */ est?: (s: {narration: string}) => number; maxSec?: number} = {}): Episode {
   const MAX = o.max ?? MAX_BEAT;
+  const long = (s: {narration: string}) => wc(s.narration) > MAX || (!!o.est && o.est(s) > (o.maxSec ?? 4.4));
   const last = ep.scenes.length - 1;
   const out: Sc[] = [];
   ep.scenes.forEach((s, i) => {
@@ -28,18 +29,18 @@ export function splitBeats(ep: Episode, o: {max?: number; clauses?: boolean} = {
       return wc(a) >= 4 && wc(b) >= 4 ? [a, b] : [x]; // no 2-word fragments as beats of their own
     });
     // shorts-pro: a long data scene keeps its first sentence(s); the rest becomes a talk beat after it (a list or compare is never cut mid-sentence)
-    if (o.clauses && s.type !== 'talk' && s.type !== 'title' && i > 0 && real.length >= 2 && wc(s.narration) > MAX) {
+    if (o.clauses && s.type !== 'talk' && s.type !== 'title' && i > 0 && real.length >= 2 && long(s)) {
       let k = 1;
-      while (k < real.length - 1 && wc(real.slice(0, k + 1).join(' ')) <= MAX) k++;
+      while (k < real.length - 1 && !long({narration: real.slice(0, k + 1).join(' ')})) k++;
       const head = real.slice(0, k).join(' '), tail = real.slice(k).join(' ');
       const em = (t: string) => ((s as {emphasis?: string[]}).emphasis ?? []).filter(e => t.toLowerCase().includes(e.toLowerCase()));
       out.push({...s, narration: head, ...('emphasis' in s ? {emphasis: em(head)} : {})} as Sc);
       out.push({type: 'talk', emotion: (s as {emotion?: string}).emotion ?? 'neutral', emphasis: em(tail), narration: tail} as Sc);
       return;
     }
-    if (s.type !== 'talk' || s.quote || i === 0 || (i === last && !o.clauses) || sents.length < 2 || wc(s.narration) <= MAX) { out.push(s); return; }
+    if (s.type !== 'talk' || s.quote || i === 0 || (i === last && !o.clauses) || sents.length < 2 || !long(s)) { out.push(s); return; }
     const groups: string[][] = [[]];
-    for (const x of sents) { const g = groups[groups.length - 1]; if (g.length && wc(g.join(' ')) + wc(x) > MAX) groups.push([x]); else g.push(x); }
+    for (const x of sents) { const g = groups[groups.length - 1]; if (g.length && long({narration: [...g, x].join(' ')})) groups.push([x]); else g.push(x); }
     groups.forEach((g, k) => {
       const text = g.join(' ');
       const emphasis = (s.emphasis ?? []).filter(e => text.toLowerCase().includes(e.toLowerCase()));

@@ -103,6 +103,13 @@ test('splitBeats never cuts a decimal number ("4.8%") as a sentence end', async 
   assert.ok(out.includes('At 32°F it drops 4.8% and more.'), out.join(' | '));
 });
 
+test('splitBeats: a short data beat that takes too long to say splits at the sentence end', async () => {
+  const {splitBeats} = await import('./beats.js');
+  const ep = {id: 'x', title: 't', series: 's', seed: 0, channel: 'default', sources: [], disclaimer: true, format: 'short', look: 'fullbleed', scenes: [{type: 'title', narration: 'Hook.', emotion: 'neutral', emphasis: []}, {type: 'compare', narration: 'Honey has 17% water. Not 70%.', emotion: 'neutral', left: {title: 'a', value: '17%'}, right: {title: 'b', value: '70%'}}, {type: 'talk', narration: 'End.', emotion: 'neutral', emphasis: []}]} as any;
+  const out = splitBeats(ep, {max: 11, clauses: true, est: s => s.narration.length / 6, maxSec: 4.4}).scenes.map(s => s.narration);
+  assert.deepEqual(out, ['Hook.', 'Honey has 17% water.', 'Not 70%.', 'End.']);
+});
+
 test('tightenLong: long Short beats become two sentences only when every number survives', async () => {
   const {tightenLong} = await import('./draft.js');
   const client = {messages: {create: async () => ({content: [{type: 'text', text: JSON.stringify({rewrites: [{i: 1, narration: 'A 3000 mAh phone. It loses 600 at zero.'}, {i: 2, narration: 'Short. And new 99.'}]})}]})}} as any;
