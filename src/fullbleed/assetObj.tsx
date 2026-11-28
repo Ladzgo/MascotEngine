@@ -3,6 +3,7 @@ import {Img, staticFile} from 'remotion';
 import {Shadow, pop, wave} from './kit';
 import {OBJECTS, type Obj} from './objects';
 import {assetFile} from './assetPick';
+import {flagObj, tagsObj} from './entities';
 
 // A library asset (Fluent 3D PNG) drawn like the procedural objects: same 400 box, ground shadow, pop-in and a slow float.
 // A missing file (assets/lib is fetched locally, not in git/CI) renders nothing instead of failing the render.
@@ -22,6 +23,8 @@ const make = (file: string): Obj => ({t}) => {
 /** Renderer for a planned kind: a procedural object, or `asset:<id>` from the library. */
 export function objectOf(kind: string): Obj | undefined {
   if (OBJECTS[kind]) return OBJECTS[kind];
+  if (kind.startsWith('flag:')) return flagObj(kind.slice(5));
+  if (kind.startsWith('tags:')) return tagsObj(kind.slice(5));
   if (!kind.startsWith('asset:')) return undefined;
   const file = assetFile(kind.slice(6)); if (!file) return undefined;
   if (!cache.has(file)) cache.set(file, make(file));

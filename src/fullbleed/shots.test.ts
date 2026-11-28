@@ -212,3 +212,19 @@ test('16:9 stock rule: score >= 7 full-frame alone, <= 5 a drawn hero, Shorts un
   assert.deepEqual(wide.map(p => [p.layout, !!p.noStock]), [['broll', false], ['hero', true], ['pip', false]]);
   assert.deepEqual(tall.map(p => p.layout), ['pip', 'pip', 'pip']);
 });
+test('named things pick a specific picture before topic/money symbols', async () => {
+  const {entityHero} = await import('./entities.js');
+  const k = (t: string) => entityHero(t)?.kind;
+  assert.equal(k('Hyperinflation in Venezuela reached 833,997% in 2018.'), 'flag:venezuela');
+  assert.equal(entityHero("Venezuela's inflation rate hit 833,997%.")?.headline, '833,997%');
+  assert.equal(k('A year later, your $100 could buy you a mere $50 worth of goods.'), 'tags:$100|$50');
+  assert.equal(k('If you had 100 dollars, it would be worth only 50 dollars the next year.'), 'tags:$100|$50');
+  assert.equal(k('Imagine a king traveling with a camel train the size of a city.'), 'asset:fluent-person-with-crown');
+  assert.equal(k('Even in the 16th century, prices in Europe rose sixfold.'), 'asset:fluent-globe-showing-europe-africa');
+  assert.equal(k('From 2013 to 2023, the inflation rate was about 130%.'), 'arrow_up');
+  assert.equal(k('Roast the turkey and let us eat.'), undefined); // the bird, the pronoun
+  assert.equal(k('That is a 43% loss to inflation.'), undefined);
+  const n = 'Hyperinflation in Venezuela reached 833,997% in 2018.', p = planEpisode([{type: 'talk', narration: n, emphasis: [], emotion: 'neutral', shot: {subject: 'coin_stacks'}}], [words(n)], [4]);
+  assert.equal(p[0].shots[0].kind, 'flag:venezuela'); assert.equal(p[0].headline, '833,997%');
+  assert.ok((await import('./assetObj.js')).objectOf('flag:venezuela') && (await import('./assetObj.js')).objectOf('tags:$100|$50'));
+});

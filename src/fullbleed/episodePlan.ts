@@ -2,11 +2,12 @@ import {planShots, objectFor, candidatesFor} from './shots';
 import {OBJECTS} from './objects';
 import {objectAsset, characterAsset, loopAsset, loopCats} from './assetPick';
 import {byId} from '../assets/catalog';
+import {entityHero} from './entities';
 import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} from './catalog';
 
 type W = {w: string; start: number; end: number};
 export type PlannedShot = {kind: string; at: number; why?: string; action: string};
-export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string; matchCut?: boolean; noStock?: boolean};
+export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string; matchCut?: boolean; noStock?: boolean; headline?: string};
 /** 16:9 stock rule: a clip the vision check scored <= 5 ('loosely related') loses to a large drawn hero; >= 7 plays full-frame with no drawn accent. */
 export const wideStockDrop = (s: {stockFile?: string; stockScore?: number}, wide: boolean) => wide && !!s.stockFile && typeof s.stockScore === 'number' && s.stockScore <= 5;
 
@@ -97,6 +98,9 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
         if (a) { usedAssets.add(a.id); shots.push({kind: `asset:${a.id}`, at, why: `asset "${a.word}"`, action: 'pop_in'}); }
       }
     }
+    // a named thing (country, '$100 buys $50', a king, 833,997%) is the hero before any topic/money symbol (16:9 gap 2: Venezuela showed coins and a laptop)
+    const ent = !s.stockFile && ['talk', 'big_number'].includes(s.type) ? entityHero(s.narration ?? '') : undefined;
+    if (ent && !perScene.at(-1)?.includes(ent.kind)) { shots[0] = {...shots[0], kind: ent.kind, why: `entity: ${ent.why}`}; if (ent.kind.startsWith('asset:')) usedAssets.add(ent.kind.slice(6)); }
     // a character (a person doing it, or a face reacting) beside the hero in every third drawn beat
     const character = !s.stockFile && i % 3 === 1 && ['talk', 'list', 'checklist', 'timeline'].includes(s.type) ? characterAsset(s.narration ?? '', String(s.emotion ?? 'neutral'), usedAssets) : undefined;
     if (character) usedAssets.add(character);
@@ -128,12 +132,13 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     if (o.wide && s.stockFile && (s.stockScore ?? 0) >= 7) layout = 'broll'; // a clip the vision check calls a match carries the beat alone
     // a drawn beat of 4 s+ that still has one picture gets its group companion half-way (QA change rate: a new picture every <= 3 s; ep017 failed at 3.3 s)
     if (shots.length === 1 && dur >= 4 && companion && !s.stockFile && s.type === 'talk' && !['split', 'grid', 'dataviz'].includes(layout)) shots.push({kind: companion, at: Math.min(dur - 1.5, Math.max(shots[0].at + 1.5, dur / 2)), why: 'companion (change rate)', action: 'pop_in'});
+    if (ent?.headline && layout === 'split') layout = 'kinetic'; // the huge number needs the headline slot
     if (layout === 'grid') layout = WEAK.has(shots[0]?.kind ?? '') ? 'kinetic' : 'hero'; // an explicit shot.layout grid too // six shields for 'the real reason' read as clip art (ep016); a full-size lone symbol was clipped, so the headline carries it
     const own = loopCats(s.narration ?? ''), loop = !s.stockFile && layout !== 'dataviz' && s.type !== 'chart' && (own.length || !prevLoop) ? loopAsset([...own, ...(topCat ? [topCat] : [])], new Set(looks.slice(-2).filter(l => l.startsWith('loop:')).map(l => l.slice(5))), usedLoops) : undefined;
     if (loop) usedLoops.add(loop.file);
     if (!s.stockFile) prevLoop = !!loop;
     looks.push(s.stockFile ? `stock:${s.stockFile}` : loop ? `loop:${loop.cat}` : env);
-    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character, bgLoop: loop?.file, ...(dropped[i] ? {noStock: true} : {})});
+    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character, bgLoop: loop?.file, ...(dropped[i] ? {noStock: true} : {}), ...(ent?.headline ? {headline: ent.headline} : {})});
     prevEnv = env; prevLayout = layout; prevCam = camera;
   });
   // palettes: never the same index twice in a row
