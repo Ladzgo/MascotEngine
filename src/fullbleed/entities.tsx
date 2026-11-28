@@ -103,6 +103,39 @@ export function flagObj(country: string): Obj | undefined {
   return flagCache.get(country);
 }
 
+/** The hook's from -> to drop ("$10,000. Ten years. 7,000 left."): the first amount and the next smaller one, years skipped; needs a dollar sign or 'dollars'. */
+export function drainOf(text: string): {a: number; b: number} | undefined {
+  if (!/\$|\bdollars?\b/i.test(text)) return undefined;
+  const ns = [...text.matchAll(/(\$)?(\d[\d,]*(?:\.\d+)?)/g)].filter(m => m[1] || !/^(1[5-9]|20)\d\d$/.test(m[2])).map(m => num(m[2]));
+  return ns.length >= 2 && ns[1] < ns[0] && ns[1] > 0 ? {a: ns[0], b: ns[1]} : undefined;
+}
+/** Seconds the drain counts over (counter text and jar level share it). */
+export const DRAIN: [number, number] = [0.3, 2.3];
+export const drainValue = (a: number, b: number, t: number) => a + (b - a) * seg(t, DRAIN[0], DRAIN[1]);
+/** A jar of gold whose level falls from full to b/a while coins leak out of a crack at the bottom. */
+const drainCache = new Map<string, Obj>();
+export function drainObj(pair: string): Obj {
+  if (!drainCache.has(pair)) {
+    const [a, b] = pair.split('|').map(Number), id = `fbdrain${flagSeq++}`;
+    drainCache.set(pair, ({t}) => {
+      const k = seg(t, DRAIN[0], DRAIN[1]), lvl = 0.86 * (1 - k * (1 - b / a)), y = 318 - lvl * 236, leaking = k > 0 && k < 1;
+      return (
+        <g>
+          <Shadow rx={120} />
+          <rect x={110} y={70} width={180} height={254} rx={36} fill="#cfe9ff" opacity={0.28} />
+          <clipPath id={id}><rect x={116} y={76} width={168} height={242} rx={32} /></clipPath>
+          <g clipPath={`url(#${id})`}><rect x={110} y={y} width={180} height={lvl * 236 + 4} fill="url(#fb-gold-v)" /><path d={`M110 ${y} q22 ${wave(t, 1.1) * 7} 45 0 t45 0 t45 0 t45 0`} fill="#ffe27a" /></g>
+          <rect x={110} y={70} width={180} height={254} rx={36} fill="none" stroke="#fff" strokeOpacity={0.7} strokeWidth={6} /><rect x={124} y={84} width={14} height={150} rx={7} fill="#fff" opacity={0.4} />
+          <rect x={126} y={46} width={148} height={30} rx={10} fill="url(#fb-red)" />
+          <path d="M262 300 l10 -12 l-4 -8 l12 -10" stroke="#2a1f12" strokeWidth={4} fill="none" />
+          {Array.from({length: 6}, (_, i) => { const u = ((t * 1.6 + i / 6) % 1); return leaking || u < 0.3 ? <circle key={i} cx={282 + u * 40} cy={300 + u * u * 40} r={9 * (1 - u * 0.4)} fill="url(#fb-gold)" opacity={leaking ? 1 - u : 0} /> : null; })}
+        </g>
+      );
+    });
+  }
+  return drainCache.get(pair)!;
+}
+
 /** Before/after price tags: the old amount, an arrow, the new amount in red (less) or green (more). */
 const tagCache = new Map<string, Obj>();
 export function tagsObj(pair: string): Obj {

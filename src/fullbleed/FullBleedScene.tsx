@@ -12,6 +12,7 @@ import {animatedTwin, assetFile} from './assetPick';
 import {planShots} from './shots';
 import {actionCopies, ActionOverlay} from './actions';
 import {planEpisode, type ScenePlan} from './episodePlan';
+import {DRAIN, drainValue} from './entities';
 import {pickKeyword} from '../scenes/keyword';
 
 type Word = {w: string; start: number; end: number};
@@ -373,6 +374,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene: sceneIn, dec, frame, f
   const tall = h > w;
   const plan = planIn ?? planEpisode([sceneIn], [words], [dur], {wide: !tall})[0];
   const scene = plan.noStock ? ({...sceneIn, stockFile: undefined} as Scene) : sceneIn; // 16:9 weak clip -> drawn hero (wideStockDrop)
+  const drain = plan.shots[0]?.kind.startsWith('drain:') ? plan.shots[0].kind.slice(6).split('|').map(Number) : undefined; // hook counter counts with the jar
   const shots = plan.shots;
   const active = Math.max(0, shots.reduce((a, s, i) => (t >= s.at ? i : a), 0));
   const kindAt = (tt: number) => shots[Math.max(0, shots.reduce((a, s, i) => (tt >= s.at ? i : a), 0))].kind;
@@ -460,7 +462,7 @@ export const FullBleedScene: React.FC<FBProps> = ({scene: sceneIn, dec, frame, f
       <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'screen', background: 'linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.13) 50%, rgba(255,255,255,0) 60%)', transform: `translateX(${sweepX}px)`, width: w * 0.9}} />
       {/* key light from the upper left + falloff to the lower right: one consistent light source reads as a lit 3D set, not flat vectors */}
       {!scene.stockFile && <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', mixBlendMode: 'soft-light', background: 'radial-gradient(ellipse 80% 60% at 22% 18%, rgba(255,244,220,0.85), rgba(255,244,220,0) 60%), linear-gradient(160deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45))'}} />}
-      {scene.type === 'title' && !showHook && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150), lineHeight: 1.04, color: '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{episodeTitle}</div>}
+      {scene.type === 'title' && !showHook && <div style={{position: 'absolute', left: w * 0.06, width: w * 0.88, top: tall ? 250 : h * 0.1, textAlign: 'center', fontFamily: DISPLAY, fontSize: Math.min(w * 0.115, 150) * (drain ? 1.25 : 1), lineHeight: 1.04, color: drain && t > DRAIN[1] ? '#ff6b57' : '#fff', textShadow: `0 6px 0 ${accent}, 0 12px 30px rgba(0,0,0,0.5)`, opacity: easeOut((t - 0.1) / 0.35), transform: `translateY(${(1 - easeOut((t - 0.1) / 0.35)) * -40}px)`}}>{drain ? `$${Math.round(drainValue(drain[0], drain[1], t)).toLocaleString('en-US')}` : episodeTitle}</div>}
       {scene.type === 'big_number' && <Counter s={scene} t={t} w={w} y={tall ? h * 0.12 : h * 0.14} accent={accent} words={words} />}
       {versus && <Versus a={scene.type === 'compare' ? scene.left : scene.before} b={scene.type === 'compare' ? scene.right : scene.after} t={t} w={w} h={h} y={tall ? h * 0.085 : h * 0.07} accent={accent} />}
       {hasCallouts && (() => {

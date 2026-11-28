@@ -228,3 +228,14 @@ test('named things pick a specific picture before topic/money symbols', async ()
   assert.equal(p[0].shots[0].kind, 'flag:venezuela'); assert.equal(p[0].headline, '833,997%');
   assert.ok((await import('./assetObj.js')).objectOf('flag:venezuela') && (await import('./assetObj.js')).objectOf('tags:$100|$50'));
 });
+test('16:9 hook title states its drop as a draining jar (stock dropped), Shorts keep theirs', async () => {
+  const {drainOf} = await import('./entities.js');
+  const n = '$10,000. Ten years. 7,000 left.';
+  assert.deepEqual(drainOf(n), {a: 10000, b: 7000});
+  assert.equal(drainOf('In 2013 you had 2023 reasons.'), undefined);
+  assert.deepEqual(drainOf('$10,000 in 2013 is $5,700 in 2023.'), {a: 10000, b: 5700});
+  const t = {type: 'title', narration: n, emphasis: [], emotion: 'neutral', stockFile: 'a.jpg', shot: {subject: 'arrow_down'}};
+  const [p] = planEpisode([t], [words(n)], [3], {wide: true});
+  assert.equal(p.shots.map(x => x.kind).join(), 'drain:10000|7000'); assert.ok(p.noStock);
+  assert.ok(!planEpisode([t], [words(n)], [3])[0].shots[0].kind.startsWith('drain'));
+});

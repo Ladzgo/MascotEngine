@@ -2,7 +2,7 @@ import {planShots, objectFor, candidatesFor} from './shots';
 import {OBJECTS} from './objects';
 import {objectAsset, characterAsset, loopAsset, loopCats} from './assetPick';
 import {byId} from '../assets/catalog';
-import {entityHero} from './entities';
+import {drainOf, entityHero} from './entities';
 import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} from './catalog';
 
 type W = {w: string; start: number; end: number};
@@ -45,7 +45,9 @@ const validSetting = (s: unknown): s is Setting => (SETTINGS as readonly string[
  * and layouts rotate (never the same twice in a row), zoom alternates wide/close. A beat's explicit `shot` (subject, action, setting, camera, layout) wins over inference.
  */
 export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o: {wide?: boolean} = {}): ScenePlan[] {
-  const dropped = scenesIn.map(s => wideStockDrop(s, !!o.wide)), scenes = scenesIn.map((s, i) => (dropped[i] ? {...s, stockFile: undefined} : s));
+  // the 16:9 hook title states its claim as a draining counter + jar (gap 3: arrow and title text over a savings-account photo scored 2)
+  const drains = scenesIn.map((s, i) => (o.wide && i === 0 && s.type === 'title' ? drainOf(s.narration ?? '') : undefined));
+  const dropped = scenesIn.map((s, i) => wideStockDrop(s, !!o.wide) || (!!drains[i] && !!s.stockFile)), scenes = scenesIn.map((s, i) => (dropped[i] ? {...s, stockFile: undefined} : s));
   const perScene: string[][] = [], out: ScenePlan[] = [];
   // the topic's own groups (what the storyboard's subjects belong to) are tried first when a picture must change: a running video never falls back to coins
   const money = MONEY_TOPIC.test(scenes.map(s => s.narration ?? '').join(' '));
@@ -101,6 +103,8 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     // a named thing (country, '$100 buys $50', a king, 833,997%) is the hero before any topic/money symbol (16:9 gap 2: Venezuela showed coins and a laptop)
     const ent = !s.stockFile && ['talk', 'big_number'].includes(s.type) ? entityHero(s.narration ?? '') : undefined;
     if (ent && !perScene.at(-1)?.includes(ent.kind)) { shots[0] = {...shots[0], kind: ent.kind, why: `entity: ${ent.why}`}; if (ent.kind.startsWith('asset:')) usedAssets.add(ent.kind.slice(6)); }
+    const dr = drains[i];
+    if (dr) shots.splice(0, shots.length, {kind: `drain:${dr.a}|${dr.b}`, at: 0, why: `hook drain ${dr.a} -> ${dr.b}`, action: 'pop_in'});
     // a character (a person doing it, or a face reacting) beside the hero in every third drawn beat
     const character = !s.stockFile && i % 3 === 1 && ['talk', 'list', 'checklist', 'timeline'].includes(s.type) ? characterAsset(s.narration ?? '', String(s.emotion ?? 'neutral'), usedAssets) : undefined;
     if (character) usedAssets.add(character);
