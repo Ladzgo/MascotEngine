@@ -122,6 +122,7 @@ test('numeralize: paired amounts and years; times stay words', async () => {
   assert.equal(numeralize('That is eighteen twenty-five dollars a year.'), 'That is $1,825 a year.');
   assert.equal(numeralize('Back in nineteen eighty-four.'), 'Back in 1984.');
   assert.equal(numeralize('Meet at eleven thirty.'), 'Meet at eleven thirty.');
+  assert.equal(numeralize('Within 10 to 20 million years, a million stars.'), 'Within 10 to 20 million years, 1,000,000 stars.');
   assert.equal(numeralize('You could spend one thousand eight hundred twenty five dollars a year.'), 'You could spend $1,825 a year.');
 });
 

@@ -68,6 +68,7 @@ export function numeralize(text: string): string {
   text = text.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\s+point\s+(zero|one|two|three|four|five|six|seven|eight|nine)\b(\s+(?:million|billion|thousand))?/gi, (_m, a: string, b: string, sc?: string) => `${NUM_W[a.toLowerCase()]}.${NUM_W[b.toLowerCase()]}${sc ? `_${sc.trim()}` : ''}`); // '_' (a word char) hides the scale word from the run matcher's \b; restored below
   return text.replace(NUM_RUN, (m: string, unit?: string) => {
     const words = m.slice(0, unit ? m.length - unit.length : m.length).toLowerCase().split(/[\s-]+/).filter(w => w !== 'and');
+    if (words[0] in SCALE_W) return m; // "20 million years": a scale word with no number word before it belongs to digits ("20 1,000,000 years" on sc-moon)
     const u = unit?.trim().toLowerCase(), fmt = (n: number) => { const f = n.toLocaleString('en-US'); return u === 'percent' ? `${f}%` : u ? `$${f}` : f; };
     // paired form: "eighteen twenty-five dollars" = $1,825; without a unit only a year ("nineteen eighty-four"), so "eleven thirty" stays a time
     for (let k = 1; k < words.length && k < 3; k++) { const a = twoDigit(words.slice(0, k)), b = twoDigit(words.slice(k)); if (a >= 10 && b >= 10 && (u || (a >= 15 && a <= 20))) return u ? fmt(a * 100 + b) : String(a * 100 + b); }
