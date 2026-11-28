@@ -4,6 +4,7 @@ import {extractJson, type Client} from '../llm/llm.js';
 import type {Episode} from '../schema.js';
 import {FB_FOR, FB_KINDS} from '../fullbleed/objects.js';
 import {candidatesFor} from '../fullbleed/shots.js';
+import {GROUPS} from '../fullbleed/catalog.js';
 import {spokenNumbers} from './lint.js';
 
 export const ACTIONS = ['drops', 'grows', 'shrinks', 'swipes', 'splits', 'counts', 'crosses', 'stacks', 'spins', 'pops', 'fills', 'drains', 'slides', 'flips'] as const;
@@ -24,6 +25,8 @@ const atWord = (w: unknown, narration: string): string | undefined => { const t 
 const near = (a: number, b: number) => Math.abs(a - b) <= 0.01 * Math.max(Math.abs(a), Math.abs(b), 1e-9);
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 const subjectOf = (k: unknown): string | null => { const s = String(k ?? '').toLowerCase().replace(/\s+/g, '_'); return FB_KINDS.includes(s) ? s : FB_FOR[s] ?? null; };
+// literal theme pictures (food, sky bodies, gym, travel...) are never a random filler: sc-moon2 drew groceries for "Same as its orbit"
+const THEMED = new Set(['food', 'space', 'sport', 'health', 'travel', 'tech', 'sleep', 'science'].flatMap(g => GROUPS[g] ?? []));
 const hint: Record<string, (typeof ACTIONS)[number]> = {big_number: 'counts', list: 'stacks', compare: 'splits', before_after: 'flips', timeline: 'slides', chart: 'grows', checklist: 'pops', title: 'drops'};
 
 /** Numbers a shot may show: any number spoken anywhere in the script (the facts). */
@@ -54,7 +57,7 @@ export function repairShots(ep: Episode, raw: Record<number, Partial<Shot> & {st
     let subject = subjectOf(r.subject);
     const avoid = recent();
     if (!subject || avoid.includes(subject)) {
-      const cands = [...words.flatMap(w => candidatesFor(w)), ...FB_KINDS.filter(k => !/^person_/.test(k))].filter(k => !avoid.includes(k));
+      const cands = [...words.flatMap(w => candidatesFor(w)), ...FB_KINDS.filter(k => !/^person_/.test(k) && !THEMED.has(k))].filter(k => !avoid.includes(k));
       const first = words.flatMap(w => candidatesFor(w)).find(k => !avoid.includes(k));
       subject = first ?? cands[hash(s.narration) % Math.max(1, cands.length)] ?? 'coin_stacks';
     }

@@ -186,6 +186,20 @@ export const Moon: Obj = ({t}) => (
     <g transform={`rotate(${wave(t, 4) * 5} 200 190)`}><path d="M240 80 A110 110 0 1 0 300 260 A90 90 0 1 1 240 80Z" fill={url('gold')} /><circle cx={170} cy={230} r={12} fill={PALETTES.gold[2]} opacity={0.35} /><circle cx={150} cy={170} r={8} fill={PALETTES.gold[2]} opacity={0.3} /></g>
   </g></Stage>
 );
+/** Earth with the Moon circling it on a dashed orbit; the Moon's dark crater always faces Earth (tidal lock). sc-moon2 showed a burger for "as it orbits". */
+export const Orbit: Obj = ({t}) => {
+  const a = t * 0.9 - Math.PI / 2, mx = 200 + Math.cos(a) * 150, my = 190 + Math.sin(a) * 70, front = Math.sin(a) > 0;
+  const moon = <g transform={`translate(${mx} ${my}) rotate(${(a * 180) / Math.PI})`}><circle r={30} fill={url('grey')} /><circle cx={-12} cy={0} r={8} fill={PALETTES.grey[2]} opacity={0.6} /><circle cx={8} cy={-12} r={5} fill={PALETTES.grey[2]} opacity={0.4} /></g>;
+  return <Stage t={t} rx={120}>
+    {Array.from({length: 9}, (_, i) => <circle key={i} cx={30 + ((i * 83) % 340)} cy={30 + ((i * 47) % 120)} r={2 + (i % 3)} fill="#fff" opacity={0.3 + 0.5 * Math.abs(wave(t, 1.7 + i * 0.3))} />)}
+    <ellipse cx={200} cy={190} rx={150} ry={70} fill="none" stroke="#fff" strokeOpacity={0.45} strokeWidth={4} strokeDasharray="10 12" />
+    {!front && moon}
+    <circle cx={200} cy={190} r={72} fill={url('blue')} />
+    <path d="M160 150 q24 -24 48 0 q-8 32 -40 40 q-16 -16 -8 -40Z M214 200 q32 -8 40 24 q-24 24 -48 0Z" fill={PALETTES.green[1]} transform={`translate(${((t * 12) % 30) - 15} 0)`} opacity={0.9} />
+    <ellipse cx={176} cy={160} rx={26} ry={12} fill="#fff" opacity={0.25} transform="rotate(-25 176 160)" />
+    {front && moon}
+  </Stage>;
+};
 
 /** key -> renderer; the catalog's SUBJECTS lists the same names (a test keeps both in sync). */
-export const THEME_SUBJECTS: Record<string, Obj> = {shoe: Shoe, dumbbell: Dumbbell, stopwatch: Stopwatch, heart: Heart, apple: Apple, pill: Pill, drop: Drop, plane: Plane, globe: Globe, suitcase: Suitcase, mountain: Mountain, laptop: Laptop, chip: Chip, flask: Flask, atom: Atom, sprout: Sprout, sun: Sun, burger: Burger, book: Book, medal: Medal, battery: Battery, brain: Brain, bed: Bed, moon: Moon};
+export const THEME_SUBJECTS: Record<string, Obj> = {shoe: Shoe, dumbbell: Dumbbell, stopwatch: Stopwatch, heart: Heart, apple: Apple, pill: Pill, drop: Drop, plane: Plane, globe: Globe, suitcase: Suitcase, mountain: Mountain, laptop: Laptop, chip: Chip, flask: Flask, atom: Atom, sprout: Sprout, sun: Sun, burger: Burger, book: Book, medal: Medal, battery: Battery, brain: Brain, bed: Bed, moon: Moon, orbit: Orbit};

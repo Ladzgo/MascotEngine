@@ -228,6 +228,16 @@ test('named things pick a specific picture before topic/money symbols', async ()
   assert.equal(p[0].shots[0].kind, 'flag:venezuela'); assert.equal(p[0].headline, '833,997%');
   assert.ok((await import('./assetObj.js')).objectOf('flag:venezuela') && (await import('./assetObj.js')).objectOf('tags:$100|$50'));
 });
+test('sky bodies: orbit/moon/earth get space pictures, never food by loose match', () => {
+  assert.equal(candidatesFor('orbits')[0], 'orbit'); assert.ok(!candidatesFor('fast').includes('burger')); assert.ok(candidatesFor('Earth’s').includes('globe'));
+  assert.ok(!candidatesFor('Sunday').includes('sun'));
+  const ns = ['Three things about the Moon.', 'It spins once every 27.3 days.', 'Same as its orbit.', "That's 1.5 times as fast as it orbits."];
+  const subj = ['moon', 'skyline', 'groceries', 'burger'];
+  const scenes = ns.map((n, i) => ({type: 'talk', narration: n, emphasis: [], emotion: 'neutral', shot: {subject: subj[i]}, visuals: [{kind: subj[i]}]}));
+  const p = planEpisode(scenes, ns.map(words), [3, 3, 3, 3]), kinds = p.flatMap(x => x.shots.map(s => s.kind));
+  assert.ok(!kinds.some(k => ['burger', 'groceries', 'apple', 'coffee', 'plane'].includes(k)), kinds.join());
+  assert.equal(p[1].shots[0].kind, 'orbit'); assert.equal(p[3].shots[0].kind, 'orbit');
+});
 test('16:9 hook title states its drop as a draining jar (stock dropped), Shorts keep theirs', async () => {
   const {drainOf} = await import('./entities.js');
   const n = '$10,000. Ten years. 7,000 left.';

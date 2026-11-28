@@ -17,7 +17,7 @@ export const SUBJECTS = [
   // ideas and people
   'bulb', 'magnifier', 'gears', 'handshake', 'gradcap', 'people',
   // theme packs: sport, health, travel, tech, food, science (src/fullbleed/objects5.tsx)
-  'shoe', 'dumbbell', 'stopwatch', 'medal', 'heart', 'apple', 'pill', 'drop', 'plane', 'globe', 'suitcase', 'mountain', 'laptop', 'chip', 'book', 'flask', 'atom', 'sprout', 'sun', 'burger', 'battery', 'brain', 'bed', 'moon',
+  'shoe', 'dumbbell', 'stopwatch', 'medal', 'heart', 'apple', 'pill', 'drop', 'plane', 'globe', 'suitcase', 'mountain', 'laptop', 'chip', 'book', 'flask', 'atom', 'sprout', 'sun', 'burger', 'battery', 'brain', 'bed', 'moon', 'orbit',
   'person_atm', 'person_bills', 'person_celebrate', 'person_shocked', 'person_thinking', 'person_walking',
 ] as const;
 
@@ -61,5 +61,6 @@ export const GROUPS: Record<string, string[]> = {
   sleep: ['bed', 'moon', 'brain', 'clock', 'book'],
   food: ['burger', 'apple', 'groceries', 'coffee', 'drop'],
   science: ['flask', 'atom', 'brain', 'sprout', 'book', 'globe', 'sun', 'gradcap'],
+  space: ['orbit', 'moon', 'globe', 'sun', 'rocket'],
   ideas: ['bulb', 'magnifier', 'gears', 'handshake', 'gradcap', 'dice', 'ticker'],
 };

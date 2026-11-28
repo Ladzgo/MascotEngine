@@ -14,12 +14,12 @@ export const wideStockDrop = (s: {stockFile?: string; stockScore?: number}, wide
 /** Where each kind of subject likes to live; the engine rotates through these so neighbouring scenes never share a setting. */
 const ENV_BY_GROUP: Record<string, Setting[]> = {
   money: ['vault', 'office', 'room'], rate: ['abstract', 'sky'], time: ['room', 'sky', 'abstract'], debt: ['room', 'street', 'abstract'], growth: ['abstract', 'sky', 'city'], spending: ['street', 'kitchen', 'room'],
-  card: ['room', 'office', 'street'], safety: ['vault', 'room', 'abstract'], place: ['city', 'street', 'sky'], docs: ['office', 'room'], compare: ['abstract', 'office'], fall: ['abstract', 'street'], people: ['street', 'office', 'room', 'sky'], ideas: ['office', 'abstract', 'sky'],
+  card: ['room', 'office', 'street'], safety: ['vault', 'room', 'abstract'], place: ['city', 'street', 'sky'], docs: ['office', 'room'], compare: ['abstract', 'office'], fall: ['abstract', 'street'], people: ['street', 'office', 'room', 'sky'], ideas: ['office', 'abstract', 'sky'], space: ['abstract'],
 };
 const ACTION_BY_GROUP: Record<string, string[]> = {
   money: ['drop', 'stack', 'pop_in', 'bounce'], rate: ['pulse', 'shake', 'grow'], time: ['pop_in', 'wobble', 'tilt'], debt: ['sink', 'shake', 'cross_out', 'fall'], growth: ['rise', 'grow', 'pulse', 'pop_in'],
   spending: ['slide_in_left', 'swipe', 'drop', 'cross_out'], card: ['swipe', 'slide_in_right', 'flip'], safety: ['lock', 'pop_in', 'check'], place: ['pop_in', 'pan_across', 'grow'], docs: ['slide_in_left', 'check', 'flip'],
-  compare: ['compare_slide', 'pop_in', 'split'], fall: ['sink', 'fall', 'shake'], people: ['pop_in', 'bounce', 'slide_in_right'], ideas: ['pop_in', 'float', 'orbit'],
+  compare: ['compare_slide', 'pop_in', 'split'], fall: ['sink', 'fall', 'shake'], people: ['pop_in', 'bounce', 'slide_in_right'], ideas: ['pop_in', 'float', 'orbit'], space: ['pop_in', 'float'],
 };
 export const groupOf = (kind: string): string => Object.entries(GROUPS).find(([, v]) => v.includes(kind))?.[0] ?? 'ideas';
 
@@ -30,11 +30,15 @@ export const MONEY_ONLY = new Set(['coin_stacks', 'cash', 'wallet', 'piggy', 'ja
 // overdue bills / DUE stamps mean owing: a sentence about spending or a yearly total is not a bill (ep011: "You could spend $1,825 a year" over a DUE stack scored 5)
 const BILLS = new Set(['bills', 'person_bills', 'receipts', 'debt_counter']), BILL_TEXT = /\b(bills?|due|overdue|owe[sd]?|owing|debts?|loans?|invoices?|receipts?|statements?|minimum)\b/i;
 export const MONEY_TOPIC = /\$|\b(money|dollars?|cents?|debts?|loans?|invest\w*|sav(e|es|ed|ing|ings)|budget\w*|spend\w*|prices?|costs?|banks?|credit|tax(es)?|income|pay(s|ing|ment\w*)?|paid|cash|mortgage|rent|salary|wealth|retire\w*|stocks?|funds?|interest|cheap|expensive|afford\w*)\b/i;
-function fresh(kind: string, recent: string[], also: string[] = [], text = '', home: string[] = [], money = true): string {
+/** A sky-body video files moon/globe/sun under 'space' (not sleep/travel: a moon repeat became a bed, a globe's companion a plane). */
+const groupIn = (kind: string, space: boolean) => (space && GROUPS.space.includes(kind) ? 'space' : groupOf(kind));
+function fresh(kind: string, recent: string[], also: string[] = [], text = '', home: string[] = [], money = true, space = false): string {
   const bad = new Set([...recent, ...also, ...(money ? [] : MONEY_ONLY)]);
   if (!DEBT_TEXT.test(text)) bad.add('debt_counter'); // the red 'you owe' panel only illustrates owing
   if (!bad.has(kind)) return kind;
-  const pool = [...GROUPS[groupOf(kind)] ?? [], ...home.flatMap(g => GROUPS[g] ?? []), ...Object.values(GROUPS).flat()].filter(k => OBJECTS[k] && !bad.has(k));
+  const own = GROUPS[groupIn(kind, space)] ?? [], said = text.split(/\s+/).flatMap(candidatesFor);
+  // another theme's literal picture only when the sentence names it (sc-moon2: a plane for 'It spins once every 27.3 days')
+  const pool = [...own, ...home.flatMap(g => GROUPS[g] ?? []), ...Object.values(GROUPS).flat()].filter(k => OBJECTS[k] && !bad.has(k) && (!THEMED.has(k) || own.includes(k) || said.includes(k)));
   return pool[0] ?? kind;
 }
 
@@ -50,7 +54,7 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
   const dropped = scenesIn.map((s, i) => wideStockDrop(s, !!o.wide) || (!!drains[i] && !!s.stockFile)), scenes = scenesIn.map((s, i) => (dropped[i] ? {...s, stockFile: undefined} : s));
   const perScene: string[][] = [], out: ScenePlan[] = [];
   // the topic's own groups (what the storyboard's subjects belong to) are tried first when a picture must change: a running video never falls back to coins
-  const money = MONEY_TOPIC.test(scenes.map(s => s.narration ?? '').join(' '));
+  const money = MONEY_TOPIC.test(scenes.map(s => s.narration ?? '').join(' ')), space = /\b(moons?|orbit\w*|planets?|lunar)\b/i.test(scenes.map(s => s.narration ?? '').join(' '));
   const home = [...new Set(scenes.map(s => s.shot?.subject).filter((x): x is string => typeof x === 'string').map(groupOf))];
   const lastSix = () => perScene.slice(-8).flat(); // variety window = the last 8 beats (scenes), not 8 shots
   const envHist: Setting[] = []; // backdrops of drawn beats only (stock beats show footage)
@@ -63,11 +67,12 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
   let prevLoop = false;
   scenes.forEach((s, i) => {
     const sh = s.shot ?? {}, words = wordsPer[i] ?? [], dur = durs[i] ?? 4;
-    const billOk = BILL_TEXT.test(s.narration ?? ''), visuals = s.visuals?.filter((v: {kind: string}) => (money || !MONEY_ONLY.has(objectFor(v.kind))) && (billOk || !BILLS.has(objectFor(v.kind))));
+    const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor);
+    const billOk = BILL_TEXT.test(s.narration ?? ''), visuals = s.visuals?.filter((v: {kind: string}) => (money || !MONEY_ONLY.has(objectFor(v.kind))) && (billOk || !BILLS.has(objectFor(v.kind))) && (!LITERAL.has(objectFor(v.kind)) || said.includes(objectFor(v.kind))));
     const raw = planShots({...s, visuals: visuals?.length ? visuals : undefined}, words, dur, {seed: i, skip: perScene.at(-1)?.at(-1)});
     // a topic word said in the sentence ("battery", "sleep", "coffee") beats a storyboard subject the sentence never names (after-tech: pie for "sluggish chemistry")
-    const said = String(s.narration ?? '').split(/\s+/).flatMap(candidatesFor), topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-1).flat().includes(k));
-    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (!METAPHOR.has(sh.subject) || said.includes(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || (said.includes(sh.subject) && !WEAK.has(sh.subject)))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
+    const topical = said.find(k => TOPICAL.has(k) && OBJECTS[k] && !perScene.slice(-1).flat().includes(k));
+    if (typeof sh.subject === 'string' && OBJECTS[objectFor(sh.subject)] && (SUBJECT_SET.has(sh.subject)) && (!METAPHOR.has(sh.subject) && !LITERAL.has(sh.subject) || said.includes(sh.subject)) && (money || !MONEY_ONLY.has(sh.subject)) && (!BILLS.has(sh.subject) || BILL_TEXT.test(s.narration ?? '')) && (!topical || (said.includes(sh.subject) && !WEAK.has(sh.subject)))) raw[0] = {kind: sh.subject, at: 0, why: `shot.subject=${sh.subject}`};
     else if (topical) raw[0] = {kind: topical, at: 0, why: `shot.topic word -> ${topical}`};
     // the drawn subject lands when the voice says its word (max 1.2 s in; before that the backdrop/footage carries the beat)
     if (typeof sh.at === 'string' && raw[0]?.why?.startsWith('shot.')) {
@@ -78,7 +83,7 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     const shots: PlannedShot[] = [];
     for (const [k, r] of raw.entries()) {
       const explicit = !!r.why?.startsWith('shot.') || !!r.why?.startsWith('visual') ;
-      const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home, money);
+      const kind = explicit && k === 0 && r.why!.startsWith('shot.') ? r.kind : fresh(r.kind, lastSix(), shots.map(x => x.kind), s.narration ?? '', home, money, space);
       shots.push({kind, at: r.at, why: kind === r.kind ? r.why : `${r.why} -> ${kind} (variety)`, action: k === 0 && ACTIONS.includes(sh.action) ? sh.action : ACTION_BY_GROUP[groupOf(kind)]?.[(i + k) % (ACTION_BY_GROUP[groupOf(kind)]?.length ?? 1)] ?? 'pop_in'});
     }
     if (s.type === 'chart') shots.splice(1); // the chart IS the picture: a later object replaced the plot with a clock (fb-wide)
@@ -100,6 +105,8 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
         if (a) { usedAssets.add(a.id); shots.push({kind: `asset:${a.id}`, at, why: `asset "${a.word}"`, action: 'pop_in'}); }
       }
     }
+    // in a sky-body video 'spins' means the Moon/Earth turning: the orbit diagram beats a filler or a weak symbol (sc-moon2: skyline + plane)
+    if (space && !s.stockFile && /\b(spin\w*|rotat\w*)\b/i.test(s.narration ?? '') && (WEAK.has(shots[0].kind) || /fallback|variety|mid-scene/.test(shots[0].why ?? '') || (!shots[0].kind.startsWith('asset:') && !said.includes(shots[0].kind))) && !perScene.at(-1)?.includes('orbit')) shots[0] = {...shots[0], kind: 'orbit', why: `${shots[0].why} -> orbit (spin, space topic)`};
     // a named thing (country, '$100 buys $50', a king, 833,997%) is the hero before any topic/money symbol (16:9 gap 2: Venezuela showed coins and a laptop)
     const ent = !s.stockFile && ['talk', 'big_number'].includes(s.type) ? entityHero(s.narration ?? '') : undefined;
     if (ent && !perScene.at(-1)?.includes(ent.kind)) { shots[0] = {...shots[0], kind: ent.kind, why: `entity: ${ent.why}`}; if (ent.kind.startsWith('asset:')) usedAssets.add(ent.kind.slice(6)); }
@@ -109,7 +116,7 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     const character = !s.stockFile && i % 3 === 1 && ['talk', 'list', 'checklist', 'timeline'].includes(s.type) ? characterAsset(s.narration ?? '', String(s.emotion ?? 'neutral'), usedAssets) : undefined;
     if (character) usedAssets.add(character);
     perScene.push(shots.map(x => x.kind));
-    const g = groupOf(shots[0].kind), envs = ENV_BY_GROUP[g] ?? ['abstract'];
+    const g = groupIn(shots[0].kind, space), envs = ENV_BY_GROUP[g] ?? ['abstract'];
     // backdrop: the explicit/group choice unless it was seen in the last 8 drawn beats, then the least recently used one (group settings first)
     const recent = envHist.slice(-8), age = (e: Setting) => { const k = recent.lastIndexOf(e); return k < 0 ? Infinity : recent.length - k; };
     const pref = [...(validSetting(sh.setting) ? [sh.setting] : []), ...envs.slice(i % envs.length), ...envs, ...SETTINGS] as Setting[];
@@ -120,7 +127,7 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     if (camera === prevCam) camera = (camera + 1) % 4;
     // layout: content decides first, talk beats rotate through the composed layouts
     let layout: Layout;
-    const companion = GROUPS[g]?.find(k => OBJECTS[k] && !METAPHOR.has(k) && (money || !MONEY_ONLY.has(k)) && !shots.some(x => x.kind === k) && !lastSix().includes(k));
+    const companion = GROUPS[g]?.find(k => OBJECTS[k] && !METAPHOR.has(k) && (!LITERAL.has(k) || said.includes(k)) && (money || !MONEY_ONLY.has(k)) &&!shots.some(x => x.kind === k) && !lastSix().includes(k));
     if (typeof sh.layout === 'string' && (LAYOUTS as readonly string[]).includes(sh.layout)) layout = sh.layout as Layout;
     else if (s.type === 'chart') layout = 'dataviz';
     else if (s.stockFile) layout = shots[0]?.why?.startsWith('shot.') ? 'pip' : 'broll'; // footage + the named object as an accent reads as "exactly this" (semantic QA: bare snow footage for "zero degrees" scored 5)
@@ -153,7 +160,10 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
 const SUBJECT_SET = new Set(Object.keys(OBJECTS));
 // symbols any sentence could carry: a topic object the sentence names beats them (en-sleep title: a clock for "memory after missing eight hours of sleep" scored 5)
 const WEAK = new Set(['hole', 'clock', 'calendar', 'hourglass', 'gears', 'bulb', 'people', 'magnifier', 'shield', 'lock', 'scale', 'pie', 'percent', 'arrow_up', 'arrow_down', 'doc', 'clipboard']);
-const TOPICAL = new Set(['sport', 'health', 'travel', 'tech', 'food', 'science', 'sleep'].flatMap(g => GROUPS[g]).filter(k => !WEAK.has(k) && !['person_walking', 'globe', 'sun'].includes(k)));
+// literal things (food, sky bodies): a storyboard pick only stands when the sentence names it (sc-moon2: a burger for "as it orbits", a sun for the Moon)
+const LITERAL = new Set([...GROUPS.food, ...GROUPS.space]);
+const THEMED = new Set(['food', 'space', 'sport', 'health', 'travel', 'tech', 'sleep', 'science'].flatMap(g => GROUPS[g]));
+const TOPICAL = new Set(['sport', 'health', 'travel', 'tech', 'food', 'science', 'sleep', 'space'].flatMap(g => GROUPS[g]).filter(k => !WEAK.has(k) && !['person_walking', 'globe', 'sun'].includes(k)));
 
 /** Variety numbers of a plan: share of plain beats (one centred object on a talk beat), distinct pictures, closest repeat, stock share, layout mix. Targets: plain <= 25%, distinct >= 60%, repeat gap >= 8. */
 export function planStats(plans: ScenePlan[], scenes: {type: string; stockFile?: string; stock?: unknown}[]) {
