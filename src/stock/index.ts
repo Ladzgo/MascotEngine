@@ -62,7 +62,7 @@ export function prepVideo(raw: string, format: Format, dir: string): string {
   return out;
 }
 
-export type Fetched = {file: string; hit: StockHit};
+export type Fetched = {file: string; hit: StockHit; score?: number};
 /** Download one hit into the cache (once) and prepare video for the frame; null when the download fails. */
 export async function downloadHit(hit: StockHit, f: Fetcher, dir: string, format: Format): Promise<string | null> {
   const ext = (/\.(jpe?g|png|webp|mp4)(\?|$)/i.exec(hit.url)?.[1] ?? (hit.kind === 'video' ? 'mp4' : 'jpg')).toLowerCase().replace('jpeg', 'jpg');
@@ -154,8 +154,8 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
       let hits: StockHit[] = [];
       try { hits = await t(); } catch { continue; } // a provider being down is never an error
       let cands = rank(hits, kinds, o.format, topic).filter(h => !o.exclude?.has(h.pageUrl)).slice(0, o.vlm && o.sentence ? 4 : 3); // one picture once per video
+      const sc = new Map<StockHit, number>();
       if (o.vlm && o.sentence && cands.length) { // the vision model re-orders the top candidates by how well their frame shows the sentence and drops weak ones
-        const sc = new Map<StockHit, number>();
         if (checked >= VLM_BUDGET) return null;
         for (const h of cands) { const v = await vlmScore(h, o.sentence, o.format, dir, f); checked++; sc.set(h, v ?? VLM_MIN); }
         o.log?.(`  vlm "${kinds.query}" ${kinds.kind}: ${cands.map(h => sc.get(h)).join(', ')}`);
@@ -163,14 +163,14 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
       }
       for (const hit of cands) {
         const file = await downloadHit(hit, f, dir, o.format);
-        if (file) return {file, hit};
+        if (file) return {file, hit, ...(sc.has(hit) ? {score: sc.get(hit)} : {})};
       }
     }
   }
   return null;
 }
 
-export type StockRecord = {scene: number; query: string; file: string; provider: string; pageUrl: string; author: string; license: string; title: string; kind: string};
+export type StockRecord = {scene: number; query: string; file: string; provider: string; pageUrl: string; author: string; license: string; title: string; kind: string; /** vision score 0-10 against the sentence, when checked */ score?: number};
 /** Credit lines for the video description: one per distinct source that needs or deserves attribution. */
 export function creditLines(items: StockRecord[]): string[] {
   const seen = new Set<string>();
@@ -192,7 +192,7 @@ export async function stockForEpisode(epDir: string, scenes: {stock?: {query: st
     o.progress?.(++done, total, s.stock.query);
     if (keep) { items.push(keep); continue; }
     if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
-    items.push({scene: i, query: s.stock.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind});
+    items.push({scene: i, query: s.stock.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind, ...(typeof got.score === 'number' ? {score: got.score} : {})});
   }
   fs.writeFileSync(path.join(epDir, 'stock.json'), JSON.stringify({items, credits: creditLines(items)}, null, 2));
   return items;

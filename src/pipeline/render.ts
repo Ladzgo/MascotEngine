@@ -37,7 +37,7 @@ export function loadCharacterAssets(): CharacterAssets {
 /** Licensed b-roll fetched by `npm run stock`: scene.stockFile = cache file listed in episodes/<id>/stock.json (and present in assets/stock-cache). */
 export function withStock(ep: Episode, dir: string): Episode {
   const items = readStock(dir).items.filter(i => /^stock-cache\/[A-Za-z0-9._-]+$/.test(i.file) && fs.existsSync(`${ROOT}assets/${i.file}`));
-  return items.length ? {...ep, scenes: ep.scenes.map((s, i) => { const it = items.find(x => x.scene === i); return it ? {...s, stockFile: it.file} : s; }) as Episode['scenes']} : ep;
+  return items.length ? {...ep, scenes: ep.scenes.map((s, i) => { const it = items.find(x => x.scene === i); return it ? {...s, stockFile: it.file, ...(typeof it.score === 'number' ? {stockScore: it.score} : {})} : s; }) as Episode['scenes']} : ep;
 }
 
 /**
