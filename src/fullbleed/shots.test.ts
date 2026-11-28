@@ -182,6 +182,10 @@ test('kinetic headline: no connectives, dollar labels as $', async () => {
   const {kineticWord} = await import('./FullBleedScene');
   assert.notEqual(kineticWord('Follow Money Myths, because the reason you lose money isn’t what you think.', []).toLowerCase(), 'because');
   assert.equal(kineticWord('A 2 dollars surcharge per basket.', [], '2 dollars'), '$2');
+  // sc-moon2 / lf-inflation-fb: 'EVERY', "EARTH'S", '16TH' said nothing alone
+  assert.equal(kineticWord('She sees the same face every night.', ['every']), 'night');
+  assert.equal(kineticWord('But Earth’s gravity locks the Moon.', ['Earth’s']), 'Earth’s gravity');
+  assert.equal(kineticWord('Even in the 16th century, prices rose sixfold.', []), '16th century');
 });
 
 test('reselect: dropping stock is kept on a tie', async () => {

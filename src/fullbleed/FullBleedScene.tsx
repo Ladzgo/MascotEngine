@@ -129,10 +129,12 @@ export const GRADES = [
 ] as const;
 export const gradeFor = (title: string) => GRADES[[...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % GRADES.length];
 /** Kinetic headline: the keyword, but never a bare small number with no unit ("2" said nothing on ep016 beat 5): then the longest content word. */
-const NO_HEADLINE = /^(because|although|however|therefore|actually|really|without|through|whether|instead|another|anything|something|everything|nothing|remember|follow)$/i; // connectives say nothing alone ('BECAUSE', ep016)
+const NO_HEADLINE = /^(because|although|however|therefore|actually|really|without|through|whether|instead|another|anything|something|everything|nothing|remember|follow|every|each|some|many|much|most|other|same|still|even|also|just|only|very|about|never|always)$/i; // connectives/determiners say nothing alone ('BECAUSE', ep016; 'EVERY', sc-moon2)
 export const kineticWord = (narration: string, emphasis: string[], label?: string) => {
   if (label && /\d/.test(label) && label.split(/\s+/).length <= 3) return label.replace(/(\d[\d,.]*)\s*dollars?\b/i, '$$$1'); // the storyboard's number label ('7.4 psi') beats a spelled-out number the keyword picker can't see ('seven point four')
-  const k = pickKeyword(narration, emphasis), content = () => narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(w => !isFunctionWord(w) && !NO_HEADLINE.test(w) && !/^\d+$/.test(w) && !isBareVerb(w)).sort((a, b) => b.length - a.length)[0];
+  const k0 = pickKeyword(narration, emphasis), nx = !k0.includes(' ') && /^\d+(st|nd|rd|th)$|['’]s$/i.test(k0) ? narration.replace(/[.!?,;:"]/g, '').match(new RegExp(`(?:^|\\s)${k0.replace(/[$.*+?^()[\]{}|\\]/g, '\\$&')}\\s+([A-Za-z]+)`))?.[1] : undefined;
+  // an ordinal or a possessive needs its noun: '16TH' -> '16TH CENTURY', "EARTH'S" -> "EARTH'S GRAVITY"
+  const k = nx && !isFunctionWord(nx) ? `${k0} ${nx}` : k0, content = () => narration.replace(/[.!?,;:"]/g, '').split(/\s+/).filter(w => !isFunctionWord(w) && !NO_HEADLINE.test(w) && !/^\d+$/.test(w) && !isBareVerb(w)).sort((a, b) => b.length - a.length)[0];
   if (/^\d{1,2}$/.test(k) || (!k.includes(' ') && (isBareVerb(k) || NO_HEADLINE.test(k)))) return content() ?? k; // a bare small number or a bare verb ("CREATES", ep017) says nothing
   return k.split(' ').map(w => (/\d/.test(w) ? screenNumber(w) : w)).join(' '); // en-US or short: pickKeyword strips commas ('$10000000' -> '$10M', ep017)
 };
