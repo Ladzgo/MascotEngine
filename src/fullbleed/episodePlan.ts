@@ -6,7 +6,9 @@ import {ACTIONS, GROUPS, SETTINGS, CAMERAS, LAYOUTS, type Layout, type Setting} 
 
 type W = {w: string; start: number; end: number};
 export type PlannedShot = {kind: string; at: number; why?: string; action: string};
-export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string; matchCut?: boolean};
+export type ScenePlan = {env: Setting; pal: number; camera: number; zoom: 'wide' | 'close'; layout: Layout; shots: PlannedShot[]; companion?: string; character?: string; bgLoop?: string; matchCut?: boolean; noStock?: boolean};
+/** 16:9 stock rule: a clip the vision check scored <= 5 ('loosely related') loses to a large drawn hero; >= 7 plays full-frame with no drawn accent. */
+export const wideStockDrop = (s: {stockFile?: string; stockScore?: number}, wide: boolean) => wide && !!s.stockFile && typeof s.stockScore === 'number' && s.stockScore <= 5;
 
 /** Where each kind of subject likes to live; the engine rotates through these so neighbouring scenes never share a setting. */
 const ENV_BY_GROUP: Record<string, Setting[]> = {
@@ -41,7 +43,8 @@ const validSetting = (s: unknown): s is Setting => (SETTINGS as readonly string[
  * Plans every scene of an episode at once, so variety rules can look across beats: no subject within the last 6 scenes (or 2 shots), settings, palettes, camera moves
  * and layouts rotate (never the same twice in a row), zoom alternates wide/close. A beat's explicit `shot` (subject, action, setting, camera, layout) wins over inference.
  */
-export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): ScenePlan[] {
+export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o: {wide?: boolean} = {}): ScenePlan[] {
+  const dropped = scenesIn.map(s => wideStockDrop(s, !!o.wide)), scenes = scenesIn.map((s, i) => (dropped[i] ? {...s, stockFile: undefined} : s));
   const perScene: string[][] = [], out: ScenePlan[] = [];
   // the topic's own groups (what the storyboard's subjects belong to) are tried first when a picture must change: a running video never falls back to coins
   const money = MONEY_TOPIC.test(scenes.map(s => s.narration ?? '').join(' '));
@@ -113,6 +116,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     if (typeof sh.layout === 'string' && (LAYOUTS as readonly string[]).includes(sh.layout)) layout = sh.layout as Layout;
     else if (s.type === 'chart') layout = 'dataviz';
     else if (s.stockFile) layout = shots[0]?.why?.startsWith('shot.') ? 'pip' : 'broll'; // footage + the named object as an accent reads as "exactly this" (semantic QA: bare snow footage for "zero degrees" scored 5)
+    else if (dropped[i]) layout = 'hero';
     else if (s.type !== 'talk') layout = 'hero';
     else {
       const order: Layout[] = ['hero', 'kinetic', 'split', 'hero', 'kinetic', 'split']; // no grid: one picture six times read as clip art (fbw-ep014: six phones)
@@ -121,6 +125,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
       if (layout === prevLayout) layout = layout === 'hero' ? 'kinetic' : 'hero';
     }
     if ((layout === 'pip' || layout === 'broll') && !s.stockFile) layout = 'hero';
+    if (o.wide && s.stockFile && (s.stockScore ?? 0) >= 7) layout = 'broll'; // a clip the vision check calls a match carries the beat alone
     // a drawn beat of 4 s+ that still has one picture gets its group companion half-way (QA change rate: a new picture every <= 3 s; ep017 failed at 3.3 s)
     if (shots.length === 1 && dur >= 4 && companion && !s.stockFile && s.type === 'talk' && !['split', 'grid', 'dataviz'].includes(layout)) shots.push({kind: companion, at: Math.min(dur - 1.5, Math.max(shots[0].at + 1.5, dur / 2)), why: 'companion (change rate)', action: 'pop_in'});
     if (layout === 'grid') layout = WEAK.has(shots[0]?.kind ?? '') ? 'kinetic' : 'hero'; // an explicit shot.layout grid too // six shields for 'the real reason' read as clip art (ep016); a full-size lone symbol was clipped, so the headline carries it
@@ -128,7 +133,7 @@ export function planEpisode(scenes: any[], wordsPer: W[][], durs: number[]): Sce
     if (loop) usedLoops.add(loop.file);
     if (!s.stockFile) prevLoop = !!loop;
     looks.push(s.stockFile ? `stock:${s.stockFile}` : loop ? `loop:${loop.cat}` : env);
-    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character, bgLoop: loop?.file});
+    out.push({env, pal: (i + (g.length % 4)) % 4, camera, zoom: i % 2 ? 'close' : 'wide', layout, shots, companion, character, bgLoop: loop?.file, ...(dropped[i] ? {noStock: true} : {})});
     prevEnv = env; prevLayout = layout; prevCam = camera;
   });
   // palettes: never the same index twice in a row

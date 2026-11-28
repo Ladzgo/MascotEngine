@@ -368,10 +368,11 @@ const HookOverlay: React.FC<{text: string; t: number; w: number; h: number; top:
   );
 };
 
-export const FullBleedScene: React.FC<FBProps> = ({scene, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0, plan: planIn, hook}) => {
+export const FullBleedScene: React.FC<FBProps> = ({scene: sceneIn, dec, frame, fps, accent, w, h, words, index, episodeTitle, prevKind, preroll = 0, plan: planIn, hook}) => {
   const f = frame + preroll, t = f / fps, dur = Math.max(1, dec.durSec), p = clamp(t / dur);
   const tall = h > w;
-  const plan = planIn ?? planEpisode([scene], [words], [dur])[0];
+  const plan = planIn ?? planEpisode([sceneIn], [words], [dur], {wide: !tall})[0];
+  const scene = plan.noStock ? ({...sceneIn, stockFile: undefined} as Scene) : sceneIn; // 16:9 weak clip -> drawn hero (wideStockDrop)
   const shots = plan.shots;
   const active = Math.max(0, shots.reduce((a, s, i) => (t >= s.at ? i : a), 0));
   const kindAt = (tt: number) => shots[Math.max(0, shots.reduce((a, s, i) => (tt >= s.at ? i : a), 0))].kind;

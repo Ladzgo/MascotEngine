@@ -5,7 +5,13 @@
 import fs from 'node:fs';
 import {episodeDir, loadEpisode} from '../../src/schema.js';
 import {beatZoom, subShots} from '../../src/fullbleed/FullBleedScene.js';
-import {planEpisode} from '../../src/fullbleed/episodePlan.js';
+import {planEpisode, wideStockDrop} from '../../src/fullbleed/episodePlan.js';
+
+/** Scenes with their stock clip as the renderer shows it (a weak 16:9 clip is dropped for a drawn hero). */
+const withStock = (ep: ReturnType<typeof loadEpisode>, stock: {scene: number; file: string; score?: number}[]) => ep.scenes.map((s, i) => {
+  const it = stock.find(x => x.scene === i), x = {...s, stockFile: it?.file, stockScore: it?.score};
+  return wideStockDrop(x, ep.format === 'wide') ? {...x, stockFile: undefined} : x;
+});
 
 export const ZOOM_LIMITS = {move: 0.062, photo: 0.046, cut: 0.05, layers: 1}; // |log scale|: drawn push, photo Ken Burns, scale jump at a sub-shot cut, layers zooming at once
 
@@ -16,7 +22,7 @@ export function visualChanges(id: string): number[] {
   const dec = JSON.parse(fs.readFileSync(`${b}decisions.json`, 'utf8')), tim = JSON.parse(fs.readFileSync(`${b}timings.json`, 'utf8'));
   let stock: {scene: number; file: string}[] = [];
   try { stock = JSON.parse(fs.readFileSync(`${dir}stock.json`, 'utf8')).items ?? []; } catch { /* no stock */ }
-  const scenes = ep.scenes.map((s, i) => ({...s, stockFile: stock.find(x => x.scene === i)?.file}));
+  const scenes = withStock(ep, stock);
   const words = scenes.map((_, i) => { const d = dec.scenes[i], tm = tim.scenes[i]; return (tm?.words ?? []).map((w: any) => ({w: w.w, start: w.start - tm.start + d.speechStart, end: w.end - tm.start + d.speechStart})); });
   const plans = planEpisode(scenes, words, dec.scenes.map((d: any) => d.durSec));
   return scenes.map((s, i) => {
@@ -31,7 +37,7 @@ export function zoomRows(id: string): BeatZoomRow[] {
   const dec = JSON.parse(fs.readFileSync(`${b}decisions.json`, 'utf8')), tim = JSON.parse(fs.readFileSync(`${b}timings.json`, 'utf8'));
   let stock: {scene: number; file: string}[] = [];
   try { stock = JSON.parse(fs.readFileSync(`${dir}stock.json`, 'utf8')).items ?? []; } catch { /* no stock */ }
-  const scenes = ep.scenes.map((s, i) => ({...s, stockFile: stock.find(x => x.scene === i)?.file}));
+  const scenes = withStock(ep, stock);
   const words = scenes.map((_, i) => { const d = dec.scenes[i], tm = tim.scenes[i]; return (tm?.words ?? []).map((w: any) => ({w: w.w, start: w.start - tm.start + d.speechStart, end: w.end - tm.start + d.speechStart})); });
   const plans = planEpisode(scenes, words, dec.scenes.map((d: any) => d.durSec));
   return scenes.map((s, i) => {

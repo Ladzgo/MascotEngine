@@ -205,3 +205,10 @@ test('homographs never pick a literal picture: prices rose (no flower), camel tr
   assert.equal(objectAsset('prices on average rose perhaps sixfold'), undefined);
   assert.ok(!'a king with a camel train'.split(' ').flatMap(candidatesFor).includes('dumbbell'));
 });
+test('16:9 stock rule: score >= 7 full-frame alone, <= 5 a drawn hero, Shorts unchanged', () => {
+  const mk = (score: number) => ({type: 'talk', narration: 'Savings in a bank are safe.', emphasis: [], emotion: 'neutral', stockFile: 'a.mp4', stockScore: score, shot: {subject: 'bank'}});
+  const sc3 = [mk(8), mk(4), mk(6)], ws = sc3.map(s => words(s.narration));
+  const wide = planEpisode(sc3, ws, [4, 4, 4], {wide: true}), tall = planEpisode(sc3, ws, [4, 4, 4]);
+  assert.deepEqual(wide.map(p => [p.layout, !!p.noStock]), [['broll', false], ['hero', true], ['pip', false]]);
+  assert.deepEqual(tall.map(p => p.layout), ['pip', 'pip', 'pip']);
+});

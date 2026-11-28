@@ -60,7 +60,7 @@ export const EpisodeVideo: React.FC<EpisodeProps> = ({episode, timings, decision
     return tm.words.map(w => ({w: w.w, start: w.start - tm.start + d.speechStart, end: w.end - tm.start + d.speechStart}));
   }), [decisions, timings]);
 
-  const fbPlan = useMemo(() => (fullbleed ? planEpisode(episode.scenes, sceneWordsRel, decisions.scenes.map(d => d.durSec)) : []), [fullbleed, episode, sceneWordsRel, decisions]);
+  const fbPlan = useMemo(() => (fullbleed ? planEpisode(episode.scenes, sceneWordsRel, decisions.scenes.map(d => d.durSec), {wide: width > height}) : []), [fullbleed, episode, sceneWordsRel, decisions, width, height]);
   const phrases = useMemo(() => (fullbleed ? buildPunchPhrases : buildPhrases)(
     decisions.scenes.map((d, i): CaptionWord[] => sceneWordsRel[i].map(w => ({w: w.w, start: d.startSec + w.start, end: d.startSec + w.end}))),
   ), [decisions, sceneWordsRel, fullbleed]);
