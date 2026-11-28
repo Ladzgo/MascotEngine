@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {arithmeticOk, danglingPronoun, ratioOk, truthGates, numbersIn, digits} from './truth.js';
+import {arithmeticOk, danglingPronoun, ratioOk, truthGates, numbersIn, digits, mergeFragments} from './truth.js';
+
+test('mergeFragments joins continuation beats while short enough', () => {
+  const s = (narration: string) => ({type: 'talk', emotion: 'neutral', emphasis: [], narration});
+  const ep = {scenes: [s('Hook.'), s('Mike drinks coffee.'), s('Over 25 years,'), s('365 times 25.'), s('Equals 9125 days.'), s('A long sentence that should stay on its own here.'), s('End.')]} as any;
+  const out = mergeFragments(ep, x => x.narration.split(' ').length * 0.4).ep.scenes.map((x: any) => x.narration);
+  assert.deepEqual(out, ['Hook.', 'Mike drinks coffee.', 'Over 25 years, 365 times 25 equals 9125 days.', 'A long sentence that should stay on its own here.', 'End.']);
+});
 
 test('numbersIn reads money, percent, decimals and scales', () => {
   assert.deepEqual(numbersIn('$1,825 a year, 17%, 2.5 million, 27.3 days'), [1825, 17, 2.5e6, 27.3]);

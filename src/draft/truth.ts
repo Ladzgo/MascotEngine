@@ -49,6 +49,21 @@ const U = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight
 /** numeralize plus the small counts it leaves as words ("times fifty-two weeks" must be checkable). */
 export const digits = (t: string) => numeralize(t).replace(new RegExp(`\\b(${T.slice(2).join('|')})(?:[\\s-](${U.slice(1, 10).join('|')}))?\\b|\\b(${U.join('|')})\\b`, 'gi'), (_m, t1?: string, u1?: string, u2?: string) => String(t1 ? T.indexOf(t1.toLowerCase()) * 10 + (u1 ? U.indexOf(u1.toLowerCase()) : 0) : U.indexOf(u2!.toLowerCase())));
 
+const CONT = /^\s*(?:to|of|and|or|nor|than|equals|which|who)\b/i;
+/** A beat that only continues the previous sentence ("Over 25 years," / "365 times 25." / "Equals 9125 days.") joins it while the pair stays under maxSec spoken. */
+export function mergeFragments(ep: Episode, est: (s: {narration: string}) => number, maxSec = 4.4): {ep: Episode; merged: number} {
+  const out: Sc[] = []; let merged = 0;
+  for (const [i, s] of ep.scenes.entries()) {
+    const prev = out.at(-1), t = s.narration.trim();
+    const frag = i > 1 && i < ep.scenes.length - 1 && prev && (/[,:;]$/.test(prev.narration.trim()) || /^[a-z]/.test(t) || CONT.test(t) || t.split(/\s+/).length <= 2);
+    const glue = CONT.test(t) || /^[a-z]/.test(t) || /[,:;]$/.test(prev?.narration.trim() ?? ''); // a continuation reads as one sentence; a short full sentence ("Meet Sarah.") just follows
+    const joined = !prev ? '' : glue ? `${prev.narration.trim().replace(/\.$/, '')} ${t.replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase())}` : `${prev.narration.trim()} ${t}`;
+    // shortcut: the joined line keeps prev's visuals; a data beat's own fields are lost only when the fragment itself was the data beat
+    if (frag && s.type === 'talk' && est({narration: joined}) <= maxSec) { out[out.length - 1] = {...prev, narration: joined} as Sc; merged++; } else out.push(s);
+  }
+  return {ep: {...ep, scenes: out as Episode['scenes']}, merged};
+}
+
 /** Drop middle beats that fail a gate (hook and last line stay); returns the reasons for the log. */
 export function truthGates(ep: Episode, allowed: number[]): {ep: Episode; dropped: string[]} {
   const sc = ep.scenes, dropped: string[] = [], keep: Sc[] = [], said = sc.flatMap(s => numbersIn(digits(s.narration).replace(RATIO, '')));

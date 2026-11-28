@@ -175,11 +175,12 @@ async function rankOpenAiModels(p: keyof typeof OPENAI_COMPAT, key: string): Pro
   return out;
 }
 /** Groq (gsk_ keys, free tier), Cerebras (csk- keys, free tier) and OpenRouter speak the OpenAI chat format. */
-async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv): Promise<string> {
+async function viaOpenAi(p: keyof typeof OPENAI_COMPAT, system: string, messages: ChatMsg[], json: boolean, env: NodeJS.ProcessEnv, stageModel?: string): Promise<string> {
   const c = OPENAI_COMPAT[p], key = env[c.key]?.trim();
   if (!key) throw new Error(`${c.key} is missing (only needed when LLM_PROVIDER=${p}).`);
   const forced = env[c.model]?.trim();
-  const models = forced ? [forced] : [...(await rankOpenAiModels(p, key)), c.def].filter((m, i, a) => a.indexOf(m) === i);
+  // GROQ_MODEL pins everything; else the stage's model first (each Groq model has its own 8k tokens/min), then the ranked rest
+  const models = forced ? [forced] : [...(stageModel ? [stageModel] : []), ...(await rankOpenAiModels(p, key)), c.def].filter((m, i, a) => a.indexOf(m) === i);
   let res: Response | undefined;
   for (const model of models) {
     const body = JSON.stringify({model, temperature: 0.6, max_tokens: 4096, ...(json ? {response_format: {type: 'json_object'}} : {}), messages: [{role: 'system', content: system}, ...messages]});
@@ -259,7 +260,7 @@ export async function fastestOllama(env: NodeJS.ProcessEnv = process.env): Promi
 }
 
 /** Multi-turn variant used by retry-with-errors loops. */
-export async function chat(o: {system: string; messages: ChatMsg[]; json?: boolean; env?: NodeJS.ProcessEnv}): Promise<string> {
+export async function chat(o: {system: string; messages: ChatMsg[]; json?: boolean; env?: NodeJS.ProcessEnv; /** a Groq model id for this stage (see STAGE_MODELS); other providers ignore it */ model?: string}): Promise<string> {
   const env = o.env ?? process.env;
   const p = await resolveProvider(env);
   if (p === 'ollama') return viaOllama(o.system, o.messages, !!o.json, env);
@@ -268,7 +269,7 @@ export async function chat(o: {system: string; messages: ChatMsg[]; json?: boole
     const chain = env.LLM_FALLBACK === '0' ? [p] : [p, ...(['groq', 'cerebras', 'openrouter'] as const).filter(x => x !== p && env[OPENAI_COMPAT[x].key]?.trim())];
     let first: Error | undefined;
     for (const q of chain) {
-      try { return q === 'gemini' ? await viaGemini(o.system, o.messages, !!o.json, env) : await viaOpenAi(q as keyof typeof OPENAI_COMPAT, o.system, o.messages, !!o.json, env); }
+      try { return q === 'gemini' ? await viaGemini(o.system, o.messages, !!o.json, env) : await viaOpenAi(q as keyof typeof OPENAI_COMPAT, o.system, o.messages, !!o.json, env, q === 'groq' ? o.model : undefined); }
       catch (e) { first ??= e as Error; }
     }
     if (env.LLM_FALLBACK === '0') throw first!;
@@ -291,7 +292,7 @@ export type Client = {
 };
 export function providerClient(json = true): Client {
   return {messages: {async create(a: any) {
-    return {content: [{type: 'text', text: await chat({system: a.system, messages: a.messages, json})}]};
+    return {content: [{type: 'text', text: await chat({system: a.system, messages: a.messages, json, ...(typeof a.model === 'string' && a.model.includes('/') ? {model: a.model} : {})})}]}; // Anthropic-style names ("claude-...") are not provider ids
   }}};
 }
 
