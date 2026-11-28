@@ -65,6 +65,15 @@ try {
     await shot(`dark-${r.replace(/\//g, '_')}`);
   });
   await page.emulateMedia({colorScheme: 'light'});
+  // phone width: nothing scrolls sideways
+  await page.setViewportSize({width: 390, height: 844});
+  for (const r of pages.filter(p => /^(today|new|library|pipeline|calendar)$|\/(script|visuals)$/.test(p))) await step(`phone ${r}`, async () => {
+    await page.goto(`${base}/#/${r}`); await page.waitForSelector('main', {timeout: 15000}); await page.waitForTimeout(800);
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    if (wide > 1) throw new Error(`page scrolls sideways by ${wide}px`);
+    await shot(`phone-${r.replace(/\//g, '_')}`);
+  });
+  await page.setViewportSize({width: 1280, height: 860});
 
   await step('path: Today shows a New video button', async () => {
     await page.goto(`${base}/#/today`); await page.waitForSelector('main');

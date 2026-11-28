@@ -38,6 +38,7 @@
 .d-side { display: flex; flex-direction: column; gap: var(--s4); }
 .d-side h2 { font-size: var(--t-md); }
 .d-pick { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.d-pick li { max-width: 100%; } .d-pick .btn { white-space: normal; height: auto; min-height: var(--h-sm); padding: 5px 10px; line-height: 1.3; text-align: left; justify-content: flex-start; max-width: 100%; }
 .d-pad { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s2); }
 .d-pad .label { margin: 0; }
 .d-month { min-width: 130px; text-align: center; font-weight: 600; }
