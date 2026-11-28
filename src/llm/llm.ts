@@ -259,6 +259,14 @@ export async function fastestOllama(env: NodeJS.ProcessEnv = process.env): Promi
   return fastCache ?? undefined;
 }
 
+/** Groq model per stage, from the free-model bake-off (3 topics x 3 models, two fixed judges): qwen3.8-27b drafted best (story 60/58/63 vs gpt-oss-20b 35/40/55, gpt-oss-120b 8/30/23) and fastest;
+ *  the judges run on gpt-oss-120b (harsh, did not favour its own drafts), quick line checks on gpt-oss-20b. Separate models = separate 8k tokens/min buckets. DRAFT_MODEL / JUDGE_MODEL / CHECK_MODEL override. */
+export const STAGE_MODELS = {
+  draft: process.env.DRAFT_MODEL?.includes('/') ? process.env.DRAFT_MODEL : 'qwen/qwen3.8-27b',
+  judge: process.env.JUDGE_MODEL || 'openai/gpt-oss-120b',
+  check: process.env.CHECK_MODEL || 'openai/gpt-oss-20b',
+};
+
 /** Multi-turn variant used by retry-with-errors loops. */
 export async function chat(o: {system: string; messages: ChatMsg[]; json?: boolean; env?: NodeJS.ProcessEnv; /** a Groq model id for this stage (see STAGE_MODELS); other providers ignore it */ model?: string}): Promise<string> {
   const env = o.env ?? process.env;

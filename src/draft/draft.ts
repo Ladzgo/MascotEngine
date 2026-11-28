@@ -4,9 +4,9 @@ import {Episode, VISUAL_KINDS} from '../schema.js';
 import {HU_SHAPE_EXAMPLE, LANG_RULES, isHu} from './lang.js';
 import {styleGaps} from './critic.js';
 import {autoFixEpisode, lintEpisode, repeatedPhrases, spokenNumbers} from './lint.js';
-import {extractJson, type Client} from '../llm/llm.js';
+import {extractJson, STAGE_MODELS, type Client} from '../llm/llm.js';
 
-export const MODEL = 'claude-sonnet-5-5';
+export const MODEL = STAGE_MODELS.draft; // a Groq id: the provider client only applies ids with a '/', Ollama ignores it
 
 export const FALLBACK_VOICE = `Tone: casual, dry humour, no hype. Never promise or guarantee returns, never give personalised advice. Short sentences. Explain like to a smart friend. Numbers always sourced.`;
 
