@@ -1,0 +1,46 @@
+{
+  "topic": "Why we always see the same side of the Moon",
+  "facts": [
+    {
+      "text": "The discovery of fault scarp cliffs suggest that the Moon has shrunk by about 90 meters (300 ft) within the past billion years.",
+      "numbers": [
+        90,
+        300
+      ],
+      "source": "https://en.wikipedia.org/wiki/Moon",
+      "title": "Moon"
+    },
+    {
+      "text": "Mercury completes three rotations for every two revolutions around the Sun, a 3:2 spin–orbit resonance.",
+      "numbers": [
+        3,
+        2,
+        3,
+        2
+      ],
+      "source": "https://en.wikipedia.org/wiki/Tidal_locking",
+      "title": "Tidal locking"
+    },
+    {
+      "text": "Currently, atomic clocks show that Earth's day lengthens, on average, by about 2. 3 milliseconds per century.",
+      "numbers": [
+        2,
+        3
+      ],
+      "source": "https://en.wikipedia.org/wiki/Tidal_locking",
+      "title": "Tidal locking"
+    },
+    {
+      "text": "Radar observations in 1965 demonstrated instead that Mercury has a 3:2 spin–orbit resonance, rotating three times for every two revolutions around the Sun, which results in the same positioning at those observation points.",
+      "numbers": [
+        1965,
+        3,
+        2,
+        3,
+        2
+      ],
+      "source": "https://en.wikipedia.org/wiki/Tidal_locking",
+      "title": "Tidal locking"
+    }
+  ]
+}

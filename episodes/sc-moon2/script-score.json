@@ -1,0 +1,74 @@
+{
+  "total": 80,
+  "items": [
+    {
+      "name": "hook",
+      "got": 20,
+      "max": 20,
+      "note": "8 words; 10/10 on length, number, plain opener, person/stake"
+    },
+    {
+      "name": "concrete",
+      "got": 20,
+      "max": 20,
+      "note": "7/12 beats carry a number, 4 a name"
+    },
+    {
+      "name": "voice",
+      "got": 9.2,
+      "max": 15,
+      "note": "1/12 address the viewer, 5/12 use contractions"
+    },
+    {
+      "name": "rhythm",
+      "got": 7,
+      "max": 15,
+      "note": "sentence length sd 2.0, 5 short, 0 long"
+    },
+    {
+      "name": "clean",
+      "got": 8,
+      "max": 10,
+      "note": "0 stock phrases, 1 filler openers"
+    },
+    {
+      "name": "payoff",
+      "got": 10,
+      "max": 10,
+      "note": "the ending echoes the hook"
+    },
+    {
+      "name": "variety",
+      "got": 6,
+      "max": 10,
+      "note": "2 beats start like the one before, 5 scene types"
+    }
+  ],
+  "weak": [
+    {
+      "beat": 11,
+      "why": "filler opener"
+    }
+  ],
+  "pass": true,
+  "hook": {
+    "hook": "Three things you didn't know about the Moon.",
+    "score": 70,
+    "formula": "list_tease",
+    "tried": 4
+  },
+  "story": {
+    "score": 80,
+    "weakest": "It's always the same face.",
+    "fix": "It always shows the same side to Earth. (weakest criterion: person 0/20)",
+    "history": [
+      48,
+      80
+    ]
+  },
+  "title": {
+    "title": "Why the Moon Always Shows the Same Side",
+    "score": 85
+  },
+  "concreteGaps": []
+}

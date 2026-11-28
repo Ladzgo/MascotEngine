@@ -1,0 +1,282 @@
+{
+  "id": "sc-moon2",
+  "title": "Why the Moon Always Shows the Same Side",
+  "channel": "default",
+  "series": "money-myths",
+  "seed": 0,
+  "scenes": [
+    {
+      "type": "title",
+      "narration": "Three things you didn't know about the Moon.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "shot": {
+        "subject": "moon",
+        "action": "drops",
+        "setting": "space",
+        "label": "Moon",
+        "mood": "curious",
+        "camera": "push",
+        "at": "moon"
+      },
+      "stock": {
+        "query": "moon always things",
+        "kind": "photo"
+      },
+      "visuals": [
+        {
+          "kind": "moon"
+        }
+      ]
+    },
+    {
+      "type": "talk",
+      "narration": "Everyone believes the Moon's spinning slows.",
+      "emotion": "worried",
+      "emphasis": [],
+      "visual": {
+        "kind": "calendar"
+      },
+      "shot": {
+        "subject": "sun",
+        "action": "drains",
+        "setting": "lecture hall",
+        "mood": "upbeat",
+        "camera": "tilt_down",
+        "at": "everyone"
+      },
+      "stock": {
+        "query": "moon always everyone",
+        "kind": "video"
+      }
+    },
+    {
+      "type": "big_number",
+      "narration": "Not true. It takes 27.3 days.",
+      "emotion": "shocked",
+      "emphasis": [],
+      "value": 27.3,
+      "prefix": "The Moon completes one rotation every",
+      "suffix": " days",
+      "label": "rotation period",
+      "decimals": 1,
+      "shot": {
+        "subject": "clock",
+        "action": "counts",
+        "setting": "lecture hall",
+        "number": 27.3,
+        "mood": "serious",
+        "camera": "tilt_up",
+        "at": "273"
+      },
+      "visuals": [
+        {
+          "kind": "clock"
+        }
+      ]
+    },
+    {
+      "type": "talk",
+      "narration": "She sees the same face every night.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "clock"
+      },
+      "shot": {
+        "subject": "bed",
+        "action": "splits",
+        "setting": "space",
+        "mood": "curious",
+        "camera": "tilt_down"
+      }
+    },
+    {
+      "type": "talk",
+      "narration": "For 27.3 days.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "shot": {
+        "subject": "donut",
+        "action": "stacks",
+        "setting": "lecture hall",
+        "mood": "upbeat",
+        "camera": "tilt_up"
+      },
+      "stock": {
+        "query": "moon always days",
+        "kind": "photo"
+      },
+      "visuals": [
+        {
+          "kind": "donut"
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "narration": "That's 27.3 times 3600.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "items": [
+        "27.3 days",
+        "3600 seconds",
+        "24 hours"
+      ],
+      "shot": {
+        "subject": "moon",
+        "action": "counts",
+        "setting": "space",
+        "mood": "serious",
+        "camera": "orbit",
+        "at": "273"
+      },
+      "visuals": [
+        {
+          "kind": "moon"
+        }
+      ]
+    },
+    {
+      "type": "big_number",
+      "narration": "That's 1.5 times as fast as it orbits.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "value": 1.5,
+      "prefix": "",
+      "suffix": "",
+      "label": "Mercury's Twist",
+      "decimals": 1,
+      "shot": {
+        "subject": "burger",
+        "action": "drops",
+        "setting": "lecture hall",
+        "number": 1.5,
+        "mood": "serious",
+        "camera": "tilt_up",
+        "at": "15"
+      },
+      "visuals": [
+        {
+          "kind": "burger"
+        }
+      ]
+    },
+    {
+      "type": "talk",
+      "narration": "But Earth’s gravity locks the Moon.",
+      "emotion": "thinking",
+      "emphasis": [],
+      "visual": {
+        "kind": "shield"
+      },
+      "shot": {
+        "subject": "lock",
+        "action": "slides",
+        "setting": "lecture hall",
+        "mood": "serious",
+        "camera": "tilt_down",
+        "at": "earths"
+      }
+    },
+    {
+      "type": "compare",
+      "narration": "It spins once every 27.3 days.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "left": {
+        "title": "Moon’s spin",
+        "value": "27.3 days"
+      },
+      "right": {
+        "title": "Orbit time",
+        "value": "27.3 days"
+      },
+      "shot": {
+        "subject": "bank",
+        "action": "spins",
+        "setting": "space",
+        "label": "27.3 days",
+        "number": 27.3,
+        "mood": "upbeat",
+        "camera": "orbit",
+        "at": "spins"
+      },
+      "stock": {
+        "query": "moon orbit space",
+        "kind": "video"
+      },
+      "visuals": [
+        {
+          "kind": "bank"
+        }
+      ]
+    },
+    {
+      "type": "talk",
+      "emotion": "explaining",
+      "emphasis": [],
+      "narration": "Same as its orbit.",
+      "shot": {
+        "subject": "groceries",
+        "action": "pops",
+        "setting": "space",
+        "mood": "calm",
+        "camera": "tilt_down",
+        "at": "orbit"
+      },
+      "visuals": [
+        {
+          "kind": "groceries"
+        }
+      ]
+    },
+    {
+      "type": "talk",
+      "narration": "Same as its orbit, 27.3 days.",
+      "emotion": "explaining",
+      "emphasis": [],
+      "visual": {
+        "kind": "shield"
+      },
+      "shot": {
+        "subject": "moon",
+        "action": "drops",
+        "setting": "space",
+        "mood": "calm",
+        "camera": "tilt_down",
+        "at": "orbit"
+      },
+      "stock": {
+        "query": "moon always orbit",
+        "kind": "photo"
+      }
+    },
+    {
+      "type": "talk",
+      "emotion": "neutral",
+      "emphasis": [],
+      "narration": "So remember, it's not the Moon, it's the spin.",
+      "shot": {
+        "subject": "brain",
+        "action": "splits",
+        "setting": "space",
+        "mood": "serious",
+        "camera": "push",
+        "at": "moon"
+      },
+      "visuals": [
+        {
+          "kind": "brain"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    "https://www.nasa.gov/feature/goddard/2016/mercury-rotation-new-data-keeps-mission-scientists-guessing"
+  ],
+  "disclaimer": true,
+  "format": "short",
+  "look": "fullbleed",
+  "device": "myth_reality"
+}
