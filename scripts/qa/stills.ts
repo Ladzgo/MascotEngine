@@ -16,7 +16,7 @@ const ep0 = loadEpisode(id), dir = episodeDir(ep0.id), out = outArg ?? `${dir}bu
 fs.mkdirSync(out, {recursive: true});
 const {episode, publicDir, cleanup} = withArt(withStock(ep0, dir), dir);
 let bundled: string;
-try { bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir}); } finally { cleanup(); }
+try { bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir, symlinkPublicDir: publicDir.endsWith('assets')}); } finally { cleanup(); }
 const timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
 const decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8'));
 const inputProps = {episode, timings, decisions, assets: loadCharacterAssets()};

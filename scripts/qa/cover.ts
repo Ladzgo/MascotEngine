@@ -12,7 +12,7 @@ if (!id) { console.error('usage: tsx scripts/qa/cover.ts <episode-id>'); process
 const ep0 = loadEpisode(id), dir = episodeDir(ep0.id);
 const {episode, publicDir, cleanup} = withArt(withStock(ep0, dir), dir);
 let bundled: string;
-try { bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir}); } finally { cleanup(); }
+try { bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir, symlinkPublicDir: publicDir.endsWith('assets')}); } finally { cleanup(); }
 try {
   const timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8')), decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8'));
   const inputProps = {episode, timings, decisions, assets: loadCharacterAssets()}, comp = await selectComposition({serveUrl: bundled, id: 'Episode', inputProps});

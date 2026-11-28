@@ -8,7 +8,7 @@ const root = new URL('../../', import.meta.url).pathname;
 const [id, out, idx, sc] = process.argv.slice(2);
 const ep = loadEpisode(id), dir = episodeDir(ep.id);
 const decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8')), timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
-const serveUrl = await bundle({entryPoint: `${root}src/index.ts`, publicDir: `${root}assets`});
+const serveUrl = await bundle({entryPoint: `${root}src/index.ts`, publicDir: `${root}assets`, symlinkPublicDir: true});
 const inputProps = {episode: ep, timings, decisions, assets: loadCharacterAssets()};
 const composition = await selectComposition({serveUrl, id: 'Episode', inputProps});
 fs.mkdirSync(out, {recursive: true});

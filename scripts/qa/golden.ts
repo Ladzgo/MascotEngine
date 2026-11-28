@@ -33,7 +33,7 @@ try {
   Object.assign(dec, {accent: 'tomato', background: 'grid', captionStyle: 'bar', intro: 'pop'});
   fs.writeFileSync(decFile, JSON.stringify(dec));
   const timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8')), decisions = parseDecisions(JSON.stringify(dec));
-  const bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir: `${root}assets`});
+  const bundled = await bundle({entryPoint: `${root}src/index.ts`, publicDir: `${root}assets`, symlinkPublicDir: true});
   const inputProps = {episode: ep, timings, decisions, assets: loadCharacterAssets()};
   const comp = await selectComposition({serveUrl: bundled, id: 'Episode', inputProps});
   const tmp = fs.mkdtempSync(path.join(root, 'out-golden-'));

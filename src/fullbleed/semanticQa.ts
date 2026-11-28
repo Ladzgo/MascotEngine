@@ -20,7 +20,7 @@ async function rescore(raw: unknown, beats: number[]): Promise<Map<number, numbe
   const e1 = {...st, scenes: st.scenes.map((x, i) => (beats.includes(i) && !(e0.scenes[i] as {stock?: unknown}).stock ? {...x, stockFile: undefined} : x))} as typeof st;
   const {episode, publicDir, cleanup} = withArt(e1, dir), root = new URL('../../', import.meta.url).pathname;
   let served: string;
-  try { served = await bundle({entryPoint: `${root}src/index.ts`, publicDir}); } finally { cleanup(); }
+  try { served = await bundle({entryPoint: `${root}src/index.ts`, publicDir, symlinkPublicDir: publicDir.endsWith('assets')}); } finally { cleanup(); }
   const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'semfix-'));
   try {
     const timings = JSON.parse(fs.readFileSync(`${b}timings.json`, 'utf8')), decisions = parseDecisions(fs.readFileSync(`${b}decisions.json`, 'utf8'));

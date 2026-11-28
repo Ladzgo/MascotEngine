@@ -11,7 +11,7 @@ const ep = loadEpisode(id), dir = episodeDir(ep.id);
 const timings = JSON.parse(fs.readFileSync(`${dir}build/timings.json`, 'utf8'));
 const decisions = parseDecisions(fs.readFileSync(`${dir}build/decisions.json`, 'utf8'));
 const inputProps = {episode: ep, timings, decisions, assets: loadCharacterAssets()};
-const serveUrl = await bundle({entryPoint: `${ROOT}src/index.ts`, publicDir: `${ROOT}assets`});
+const serveUrl = await bundle({entryPoint: `${ROOT}src/index.ts`, publicDir: `${ROOT}assets`, symlinkPublicDir: true});
 const comp = await selectComposition({serveUrl, id: 'Episode', inputProps});
 const from = Math.floor(comp.durationInFrames / 3);
 const variants: {name: string; o: Record<string, unknown>}[] = JSON.parse(process.env.VARIANTS ?? '[{"name":"default","o":{}}]');

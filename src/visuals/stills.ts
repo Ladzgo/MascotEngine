@@ -3,7 +3,7 @@ import {bundle} from '@remotion/bundler';
 import {renderStill, selectComposition} from '@remotion/renderer';
 const root = new URL('../../', import.meta.url).pathname;
 const out = process.argv[2] ?? '/tmp/visuals', t = Number(process.argv[3] ?? 3), accent = process.argv[4] ?? '#e4572e';
-const serveUrl = await bundle({entryPoint: `${root}src/visuals/gallery.tsx`, publicDir: `${root}assets`});
+const serveUrl = await bundle({entryPoint: `${root}src/visuals/gallery.tsx`, publicDir: `${root}assets`, symlinkPublicDir: true});
 for (const mode of ['a', 'b', 'stage']) {
   const inputProps = {t, accent, mode};
   const composition = await selectComposition({serveUrl, id: 'Gallery', inputProps});
