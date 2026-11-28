@@ -48,7 +48,7 @@ try {
   // outline first, then one call per section (progress lines feed the Studio); the one-shot storyboard prompt is the fallback
   // free fact research (Wikipedia) first: the outline and the story rewrites may use these sourced numbers
   const facts: Fact[] = !values.legacy && !values['no-facts'] ? await researchFacts(client, topic, {model, log}) : [];
-  const angle = [values.angle, facts.length ? `Sourced facts (use their exact numbers; at least one should be the surprising fact of the video): ${facts.map(f => f.text).join(' ')}` : ''].filter(Boolean).join('\n') || undefined;
+  const angle = [values.angle, facts.length ? `Sourced facts (use their exact numbers where they fit the topic's point; never bend the story to fit one in, and never mix their units with the viewer's own numbers — sc-coffee said "your $5 coffee saves 876,000 cups"):${facts.map(f => f.text).join(' ')}` : ''].filter(Boolean).join('\n') || undefined;
   const ep0 = values.legacy && !values.short ? await legacy() : await draftByOutline({client, topic, id, angle, voice, channel: channelId, channelContext: ctx, lang, model, log, short: values.short, device: values.device, epsRoot: path.join(root, 'episodes'), progress: (d, n, label) => console.log(`DRAFT_PROGRESS ${d}/${n} ${label}`)}).catch(e => { log(`outline draft failed (${(e as Error).message.replace(/\s*\n- /g, ' | ').slice(0, 300)}); using the one-shot prompt`); return legacy(); });
   log(`first draft: ${ep0.scenes.length} beats, ${ep0.scenes.reduce((n, s) => n + s.narration.split(/\s+/).length, 0)} words`);
   // the one-shot fallback knows nothing about Shorts: a --short draft is a 9:16 full-bleed episode whichever path wrote it (ep014 came out 16:9)
