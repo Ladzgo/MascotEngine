@@ -3,6 +3,7 @@ import {withOllamaLock} from '../llm/ollamaLock.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {contentWords} from '../fullbleed/assetPick.js';
 import {openverse, pexels, pixabay, setApiCacheDir, wikimedia, type Fetcher, type Query, type StockHit} from './providers.js';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
@@ -134,7 +135,8 @@ export async function vlmScore(hit: StockHit, sentence: string, format: Format, 
   } catch { return null; }
 }
 
-export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]; exclude?: Set<string>; sentence?: string; vlm?: boolean; log?: (m: string) => void}): Promise<Fetched | null> {
+/** want: a vision score that ends the search at once (16:9 uses 7: a 5 is dropped there anyway); below it the search goes on and the best checked hit wins at the end. */
+export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; format: Format; env?: Env; fetcher?: Fetcher; cacheDir?: string; topic?: string[]; exclude?: Set<string>; sentence?: string; vlm?: boolean; want?: number; budget?: number; log?: (m: string) => void}): Promise<Fetched | null> {
   const f = o.fetcher ?? fetch, env = o.env ?? process.env, dir = o.cacheDir ?? CACHE_DIR, topic = o.topic ?? [];
   setApiCacheDir(path.join(dir, 'api'));
   const a: Query = {query: o.query, kind: o.kind, orientation: o.format === 'short' ? 'portrait' : 'landscape'};
@@ -145,8 +147,9 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
   // the last two are plain topic b-roll ("sleep"): semantic QA scores an on-topic picture far above a drawn shield on an abstract sentence
   const tries = [...new Set(qs.map(x => x.trim()))].map(query => ({...a, query})).flatMap(x => (o.kind === 'video' ? [x, {...x, kind: 'photo' as const}] : [x])); // a video query falls back to a photo
   const keyed = PROVIDERS.some(p => p.needsKey && env[p.needsKey]);
-  let checked = 0;
-  for (const kinds of tries) {
+  let checked = 0, best: {hit: StockHit; score: number} | undefined;
+  const want = o.want ?? VLM_MIN, budget = o.budget ?? VLM_BUDGET;
+  search: for (const kinds of tries) {
     for (const p of PROVIDERS) {
       if (p.needsKey && !env[p.needsKey]) continue;
       if (topic.length && keyed && !p.needsKey) continue; // with a Pixabay key the keyless archives only add paintings and plaques (en-sleep)
@@ -156,10 +159,11 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
       let cands = rank(hits, kinds, o.format, topic).filter(h => !o.exclude?.has(h.pageUrl)).slice(0, o.vlm && o.sentence ? 4 : 3); // one picture once per video
       const sc = new Map<StockHit, number>();
       if (o.vlm && o.sentence && cands.length) { // the vision model re-orders the top candidates by how well their frame shows the sentence and drops weak ones
-        if (checked >= VLM_BUDGET) return null;
+        if (checked >= budget) break search;
         for (const h of cands) { const v = await vlmScore(h, o.sentence, o.format, dir, f); checked++; sc.set(h, v ?? VLM_MIN); }
         o.log?.(`  vlm "${kinds.query}" ${kinds.kind}: ${cands.map(h => sc.get(h)).join(', ')}`);
         cands = cands.filter(h => sc.get(h)! >= VLM_MIN).sort((x, y) => sc.get(y)! - sc.get(x)!);
+        if (cands.length && sc.get(cands[0])! < want) { if (!best || sc.get(cands[0])! > best.score) best = {hit: cands[0], score: sc.get(cands[0])!}; continue; }
       }
       for (const hit of cands) {
         const file = await downloadHit(hit, f, dir, o.format);
@@ -167,7 +171,8 @@ export async function fetchStock(o: {query: string; kind: 'photo' | 'video'; for
       }
     }
   }
-  return null;
+  const file = best && await downloadHit(best.hit, f, dir, o.format);
+  return best && file ? {file, hit: best.hit, score: best.score} : null;
 }
 
 export type StockRecord = {scene: number; query: string; file: string; provider: string; pageUrl: string; author: string; license: string; title: string; kind: string; /** vision score 0-10 against the sentence, when checked */ score?: number};
@@ -180,27 +185,37 @@ export function creditLines(items: StockRecord[]): string[] {
 /** Fetch stock for every scene with `stock`, write episodes/<id>/stock.json and return the records.
  *  Idempotent: a beat whose query is unchanged and whose file still exists keeps its record (so a "Swap image" choice survives re-runs).
  *  A beat without a result is skipped silently (procedural visuals stay). Progress goes to `o.progress(done, total, query)`. */
-export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}; narration?: string}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void; progress?: (done: number, total: number, query: string) => void} = {}): Promise<StockRecord[]> {
-  const items: StockRecord[] = [], prev = readStock(epDir).items, total = scenes.filter(s => s.stock).length, cache = o.cacheDir ?? CACHE_DIR, topic = topicWords(epDir);
+export async function stockForEpisode(epDir: string, scenes: {stock?: {query: string; kind: 'photo' | 'video'}; narration?: string; type?: string}[], format: Format, o: {env?: Env; fetcher?: Fetcher; cacheDir?: string; log?: (m: string) => void; progress?: (done: number, total: number, query: string) => void} = {}): Promise<StockRecord[]> {
+  const items: StockRecord[] = [], prev = readStock(epDir).items, cache = o.cacheDir ?? CACHE_DIR, topic = topicWords(epDir);
   let done = 0;
   // vision check of candidates: on for real runs (no env passed, model pulled; STOCK_VLM=0 turns it off), opt-in (STOCK_VLM=1) when a caller passes its own env (tests)
-  const vlm = (o.env ? o.env.STOCK_VLM === '1' : process.env.STOCK_VLM !== '0') && await vlmAvailable();
+  const vlm = (o.env ? o.env.STOCK_VLM === '1' : process.env.STOCK_VLM !== '0') && await vlmAvailable(), wide = format === 'wide' && vlm;
+  // 16:9 with the vision check: a talk beat without a query searches its own sentence; only a match (>= 7) is kept, it plays full-frame (lf-inflation-fb: 59 of 90 beats had no query)
+  const jobs = scenes.map(s => s.stock ?? (wide && s.type === 'talk' && autoQuery(s.narration ?? '') ? {query: autoQuery(s.narration ?? ''), kind: 'video' as const, auto: true} : undefined));
+  const total = jobs.filter(Boolean).length;
   for (const [i, s] of scenes.entries()) {
-    if (!s.stock) continue;
-    const keep = prev.find(x => x.scene === i && x.query === s.stock!.query && x.kind === s.stock!.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
-    const got = keep ? null : await fetchStock({query: s.stock.query, kind: s.stock.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic, exclude: new Set(items.map(x => x.pageUrl)), sentence: s.narration, vlm, log: o.log});
-    o.progress?.(++done, total, s.stock.query);
+    const st = jobs[i];
+    if (!st) continue;
+    const prior = prev.find(x => x.scene === i && x.query === st.query && x.kind === st.kind && fs.existsSync(path.join(cache, path.basename(x.file))));
+    const keep = prior && !(wide && typeof prior.score === 'number' && prior.score < WIDE_WANT) ? prior : undefined; // 16:9 drops a 5 anyway: look again for a match
+    const got0 = keep ? null : await fetchStock({query: st.query, kind: st.kind, format, env: o.env, fetcher: o.fetcher, cacheDir: o.cacheDir, topic, exclude: new Set(items.map(x => x.pageUrl)), sentence: s.narration, vlm, log: o.log, ...(wide ? {want: WIDE_WANT, budget: 16} : {})});
+    o.progress?.(++done, total, st.query);
     if (keep) { // a kept record from before the vision check gets its score from the local file (16:9 uses it: >= 7 full-frame, <= 5 drawn hero)
       const lp = path.join(cache, path.basename(keep.file)), v = vlm && typeof keep.score !== 'number' && s.narration ? await vlmScore({thumb: lp} as StockHit, s.narration, format, cache, async u => new Response(fs.readFileSync(u))) : null;
       items.push(typeof v === 'number' ? {...keep, score: v} : keep); continue;
     }
-    if (!got) { o.log?.(`scene ${i + 1}: no licensed match for "${s.stock.query}", procedural visuals stay`); continue; }
-    items.push({scene: i, query: s.stock.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind, ...(typeof got.score === 'number' ? {score: got.score} : {})});
+    const got = got0 && (!prior || (got0.score ?? 0) > (prior.score ?? 0)) ? got0 : null;
+    if (!got && prior) { items.push(prior); continue; }
+    if (!got || ('auto' in st && (got.score ?? 0) < WIDE_WANT)) { o.log?.(`scene ${i + 1}: no licensed match for "${st.query}", procedural visuals stay`); continue; }
+    items.push({scene: i, query: st.query, file: `stock-cache/${path.basename(got.file)}`, provider: got.hit.provider, pageUrl: got.hit.pageUrl, author: got.hit.author, license: got.hit.license, title: got.hit.title, kind: got.hit.kind, ...(typeof got.score === 'number' ? {score: got.score} : {})});
   }
   fs.writeFileSync(path.join(epDir, 'stock.json'), JSON.stringify({items, credits: creditLines(items)}, null, 2));
   return items;
 }
 
+const WIDE_WANT = 7;
+/** A b-roll query from the sentence itself: its first three content words ("Imagine a king traveling with a camel train" -> "king traveling camel"). */
+export const autoQuery = (t: string) => [...new Set(contentWords(t).filter(w => !/^(imagine|picture|think|remember|maybe|perhaps|means|equals|happened)$/.test(w)))].slice(0, 3).join(' ');
 const TOPIC_STOP = new Set('your this that with what when why how does from into will about tricking really actually truth secret adds year years makes make costs cost every daily quietly'.split(' '));
 /** The episode title's content words ("Sleep & Memory" -> sleep, memory): every stock hit must carry one of them. */
 export function topicWords(epDir: string): string[] {

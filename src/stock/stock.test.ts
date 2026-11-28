@@ -108,3 +108,17 @@ test('topic gate: a hit must name the video topic; the retry anchors the query o
   assert.equal(got?.hit.id, 'pixabay-9');
   assert.deepEqual(seen, ['open book desk', 'sleep open book']);
 });
+
+test('16:9 want: a loosely related hit (5) does not end the search, a match (7) does; with no match the best checked hit wins; autoQuery', async () => {
+  const {autoQuery} = await import('./index.js');
+  const crypto = await import('node:crypto');
+  const hit = (id: number) => ({id, largeImageURL: `https://x/img/${id}.jpg`, webformatURL: `https://x/img/t${id}.jpg`, imageWidth: 1920, imageHeight: 1080, pageURL: `p${id}`, user: 'u', tags: 'camel, desert, caravan'});
+  const run = async (later: boolean, want?: number) => {
+    const dir = tmp(), sentence = 'A king with a camel caravan.';
+    for (const [id, score] of [[1, 5], [2, 7]]) { const k = crypto.createHash('sha1').update(`https://x/img/t${id}.jpg|${sentence}|wide`).digest('hex').slice(0, 20); fs.mkdirSync(path.join(dir, 'vlm'), {recursive: true}); fs.writeFileSync(path.join(dir, 'vlm', `${k}.json`), JSON.stringify({score})); }
+    const {fetcher} = net({'pixabay.com': (u: string) => ({hits: new URL(u).searchParams.get('q') === 'camel caravan' ? [hit(1)] : later ? [hit(2)] : []})});
+    return fetchStock({query: 'camel caravan', kind: 'photo', format: 'wide', env: {PIXABAY_API_KEY: 'k'}, fetcher, cacheDir: dir, topic: ['camel'], sentence, vlm: true, want});
+  };
+  assert.deepEqual([(await run(true))?.score, (await run(true, 7))?.score, (await run(false, 7))?.score], [5, 7, 5]);
+  assert.equal(autoQuery('Imagine a king traveling with a camel train the size of a city.'), 'king traveling camel');
+});

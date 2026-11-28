@@ -128,7 +128,8 @@ export function planEpisode(scenesIn: any[], wordsPer: W[][], durs: number[], o:
     if (camera === prevCam) camera = (camera + 1) % 4;
     // layout: content decides first, talk beats rotate through the composed layouts
     let layout: Layout;
-    const companion = GROUPS[g]?.find(k => OBJECTS[k] && !METAPHOR.has(k) && (!LITERAL.has(k) || said.includes(k)) && (money || !MONEY_ONLY.has(k)) &&!shots.some(x => x.kind === k) && !lastSix().includes(k));
+    // another theme's literal picture only when the sentence names it (lf-inflation-fb: a bed beside a brain for 'doing okay with your savings', shorts + gas pump for 'buying power')
+    const companion = GROUPS[g]?.find(k => OBJECTS[k] && !METAPHOR.has(k) && (!LITERAL.has(k) && !(money && THEMED.has(k)) || said.includes(k)) && (money || !MONEY_ONLY.has(k)) &&!shots.some(x => x.kind === k) && !lastSix().includes(k));
     if (typeof sh.layout === 'string' && (LAYOUTS as readonly string[]).includes(sh.layout)) layout = sh.layout as Layout;
     else if (s.type === 'chart') layout = 'dataviz';
     else if (s.stockFile) layout = shots[0]?.why?.startsWith('shot.') ? 'pip' : 'broll'; // footage + the named object as an accent reads as "exactly this" (semantic QA: bare snow footage for "zero degrees" scored 5)
