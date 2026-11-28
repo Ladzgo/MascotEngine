@@ -57,9 +57,9 @@ export function Library({route, eps, chans, loaded, onChanged}: {route: Route; e
   return (
     <div className="page">
       <div className="page-head"><div><h1 className="display" tabIndex={-1}>{t('Library')}</h1><p className="muted">Every episode{ch === 'all' ? ' in every channel' : ` in ${chName(ch)}`}. Press Enter on a row to open it.</p></div>
-        <button type="button" className="btn" aria-pressed={!!pick} onClick={() => { setPick(p => (p ? null : new Set())); setMsg(null); }}>{pick ? t('Done selecting') : t('Select')}</button>
+        <div className="page-actions"><button type="button" className="btn" aria-pressed={!!pick} onClick={() => { setPick(p => (p ? null : new Set())); setMsg(null); }}>{pick ? t('Done selecting') : t('Select')}</button>
         <label className="btn" aria-disabled={busy}>{t('Import ZIP')}<input type="file" accept=".zip,application/zip" className="sr" disabled={busy} onChange={e => { void importZip(e.target.files?.[0]); e.target.value = ''; }} /></label>
-        <a className="btn primary" href={`${hashFor({page: 'today', ch})}`} onClick={() => setTimeout(() => document.getElementById('new')?.scrollIntoView(), 50)}><Plus size={16} />{t('New episode')}</a></div>
+        <a className="btn primary" href={hashFor({page: 'new', ch})}><Plus size={16} />{t('New episode')}</a></div></div>
       <div className="lib-tools">
         <label className="field lib-q"><span className="sr">Search episodes</span><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search title, id or channel')} /></label>
         <div className="seg" role="radiogroup" aria-label="Status">

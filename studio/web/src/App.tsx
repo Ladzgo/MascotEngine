@@ -45,11 +45,6 @@ function Soon({name, hint}: {name: string; hint: string}) {
   return <div className="page"><div className="page-head"><div><h1 className="display" tabIndex={-1}>{name}</h1></div></div><div className="panel empty-box"><h2 className="display">{name} is not ready yet</h2><p>{hint}</p><a className="btn primary" href="#/library">Open Library</a></div></div>;
 }
 
-const PURPOSE: Partial<Record<string, string>> = {
-  pipeline: 'See every idea and episode by stage and what each one needs next.', library: 'Every episode in one place: search, filter, open or archive.',
-  channels: 'Each channel has its own voice, topics and look.', settings: 'Voice, script model and keys. Defaults work; change only what you need.', queue: 'Renders run one at a time; the rest wait here.',
-  calendar: 'Schedule finished videos and record what went live.', clipper: 'Cut a long video into vertical clips.', analytics: 'What keeps viewers watching, from YouTube Studio exports.',
-};
 
 export function App() {
   const route = useRoute();
@@ -124,13 +119,13 @@ export function App() {
       default: page = Workspace && route.ep
         ? <Boundary name="Episode"><Suspense fallback={<Loading />}><Workspace key={route.ep} id={route.ep} step={route.step} scene={route.scene} onRoute={onRoute} /></Suspense></Boundary> : null;
     }
-    body = <main className="main" id="main" tabIndex={-1}>{PURPOSE[route.page] && <p className="purpose">{t(PURPOSE[route.page]!)}</p>}{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<Loading />}><Boundary name={pageName}>{page}</Boundary></Suspense></main>;
+    body = <main className="main" id="main" tabIndex={-1}>{err && <div className="alert" role="alert"><Alert size={18} /><span>{err}</span><button className="btn ghost sm" onClick={() => setErr(null)}>Dismiss</button></div>}<Suspense fallback={<Loading />}><Boundary name={pageName}>{page}</Boundary></Suspense></main>;
   }
 
   return (
     <div className="app" key={lang}>
       <a className="skip" href="#main" onClick={e => { e.preventDefault(); document.getElementById('main')?.focus(); }}>Skip to content</a>
-      <Rail route={route} />
+      <Rail route={route} chans={chans} />
       <TopBar route={route} chans={chans} epTitle={ep?.title} epChannel={ep?.channel} jobs={jobs} onPalette={openPalette} />
       {body}
       <Palette open={pal} onClose={() => setPal(false)} eps={eps} chans={chans} ch={route.ch} onHelp={() => setHelp(true)} />

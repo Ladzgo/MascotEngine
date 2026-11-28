@@ -54,8 +54,17 @@ try {
     const txt = (await page.locator('main').first().innerText()).trim();
     if (!txt) throw new Error('empty main');
     if (await page.locator('main .alert').count()) throw new Error('alert shown');
+    const wide = await page.evaluate(() => { const m = document.querySelector('main')!; return Math.max(document.documentElement.scrollWidth - innerWidth, m.scrollWidth - m.clientWidth); });
+    if (wide > 1) throw new Error(`page scrolls sideways by ${wide}px`);
     await shot(`page-${r.replace(/\//g, '_')}`);
   });
+  // dark theme: same pages under prefers-color-scheme: dark
+  await page.emulateMedia({colorScheme: 'dark'});
+  for (const r of pages.filter(p => /^(today|new|library|pipeline|settings)$|\/(script|visuals|publish)$/.test(p))) await step(`dark ${r}`, async () => {
+    await page.goto(`${base}/#/${r}`); await page.waitForSelector('main', {timeout: 15000}); await page.waitForTimeout(800);
+    await shot(`dark-${r.replace(/\//g, '_')}`);
+  });
+  await page.emulateMedia({colorScheme: 'light'});
 
   await step('path: Today shows a New video button', async () => {
     await page.goto(`${base}/#/today`); await page.waitForSelector('main');

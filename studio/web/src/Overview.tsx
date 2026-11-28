@@ -31,14 +31,13 @@ export function Overview({ch, chans, eps, cfg}: {ch: string; chans: ChannelRow[]
       ) : (
         <>
           <div className="page-head"><div><h1 className="display" tabIndex={-1}>{t('Today')}</h1><p className="muted">{t('Pick up where you left off, or start something new.')}</p></div><NewVideoButton ch={target} /></div>
-          <h2 className="display">{t('Continue')}</h2>
+          <div className="section-h"><h2 className="display">{t('Continue')}</h2><a className="link small" href={hashFor({page: 'library', ch})}>{t('See every episode')}</a></div>
           <ul className="continue">{latest.map(e => (
             <li key={e.id} className="panel">
               <b>{e.title}</b>
               <span className="small muted">{t(DONE_TEXT(e))}</span>
               <div className="row"><a className="btn primary sm" href={hashFor({page: 'ep', ep: e.id, step: nextStep(e), ch})}>{e.stages.final ? <Check size={15} /> : <Play size={15} />}{e.stages.final ? t('Open') : `${t('Next')}: ${t(STEP_LABEL[nextStep(e)])}`}</a></div>
             </li>))}</ul>
-          <p className="small"><a className="link" href={hashFor({page: 'library', ch})}>{t('See every episode')}</a> · <a className="link" href={hashFor({page: 'ideas', ch})}>{t('Ideas')}</a></p>
         </>
       )}
     </div>

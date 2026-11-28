@@ -3,6 +3,10 @@ type P = {size?: number};
 const I = (d: React.ReactNode) => ({size = 18}: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
 );
+export const Sun = I(<><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" /></>);
+export const Moon = I(<path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z" />);
+export const Monitor = I(<><rect x="3" y="4.5" width="18" height="12" rx="2" /><path d="M9 20h6M12 16.5V20" /></>);
+export const Search = I(<><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>);
 export const Menu = I(<path d="M4 7h16M4 12h16M4 17h16" />);
 export const Play = I(<path d="M7 4.5v15l12-7.5-12-7.5z" />);
 export const Plus = I(<path d="M12 5v14M5 12h14" />);

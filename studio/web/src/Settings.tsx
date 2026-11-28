@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {api, type LlmStatus, type Readiness, type Settings as S} from './api';
 import {Check, Alert} from './icons';
 import {resetOnboarding} from './Onboarding';
-import {t} from './i18n';
+import {getLang, setLang, t, type Lang} from './i18n';
 import {Loading} from './Loading';
 import {StockPanel} from './StockPanel';
 
@@ -44,9 +44,9 @@ export function Settings({onSaved}: {onSaved: () => void}) {
     catch (err) { setMsg({ok: false, text: (err as Error).message}); }
   };
   return (
-    <form className="settings panel" onSubmit={save}>
-      <h1 className="display" tabIndex={-1}>{t('Settings')}</h1>
-      <p className="muted">Stored in the project's <code>.env</code> file. The API key never leaves this computer and is never shown again.</p>
+    <form className="settings" onSubmit={save}>
+      <div className="page-head"><div><h1 className="display" tabIndex={-1}>{t('Settings')}</h1>
+        <p className="muted">Voice, script model and keys. Defaults work; change only what you need. Stored in the project's <code>.env</code> file; the API key never leaves this computer.</p></div></div>
       {readiness(s, engine).some(c => !c.ok) && <div className="ready" aria-label="Readiness">
         <h2 className="label">Readiness</h2>
         <ul>{readiness(s, engine).map(c => <li key={c.key} className={c.ok ? 'ok' : 'bad'}>{c.ok ? <Check size={14} /> : <Alert size={14} />}<b>{c.label}</b><span>{c.ok ? 'ready' : c.fix}</span></li>)}</ul>
@@ -83,6 +83,8 @@ export function Settings({onSaved}: {onSaved: () => void}) {
         <span className={`pill ${s.ffmpeg ? 'ok' : 'bad'}`}>{s.ffmpeg ? <Check size={14} /> : <Alert size={14} />}ffmpeg {s.ffmpeg ? 'found' : 'not found. Install it to render audio'}</span>
       </div>
       {msg && <p className={msg.ok ? 'ok-text' : 'err-text'} role="status">{msg.text}</p>}
+      <label className="field"><span>{t('UI language')}</span>
+        <select value={getLang()} onChange={e => setLang(e.target.value as Lang)}><option value="en">English</option><option value="hu">Magyar</option></select></label>
     </form>
   );
 }

@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {api, type ChannelRow, type JobState, type QueueItem} from './api';
-import {PAGE_LABEL, STEP_LABEL, hashFor, setRoute, type Route} from './router';
+import {PAGE_LABEL, STEP_LABEL, hashFor, type Route} from './router';
+import {Search} from './icons';
 import {t} from './i18n';
 
 // ---- jobs ----
@@ -105,21 +106,10 @@ export function TopBar({route, chans, epTitle, epChannel, jobs, onPalette}: {rou
       <nav className="crumbs" aria-label="Breadcrumb">
         <ol>{crumbs.map((c, i) => <li key={i} aria-current={i === crumbs.length - 1 ? 'page' : undefined}>{c.href && i < crumbs.length - 1 ? <a href={c.href}>{c.label}</a> : <span>{c.label}</span>}</li>)}</ol>
       </nav>
-      <span className="grow" />
-      <div className="scope">
-        <label className="sr" htmlFor="scope">Channel scope</label>
-        <select id="scope" value={route.ch} onChange={e => setRoute({ch: e.target.value})}>
-          <option value="all">All channels</option>
-          {chans.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          {route.ch !== 'all' && !chans.some(c => c.id === route.ch) && <option value={route.ch}>{route.ch}</option>}
-        </select>
-      </div>
       <button type="button" className="pal-btn" onClick={onPalette} aria-keyshortcuts="Control+K Meta+K" aria-label="Search and commands">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
-        <span className="pal-ph">Search or run a command</span><kbd>{mac ? '⌘' : 'Ctrl'} K</kbd>
+        <Search size={15} /><span className="pal-ph">Search or run a command</span><kbd>{mac ? '⌘' : 'Ctrl'} K</kbd>
       </button>
       <JobsChip jobs={jobs} />
-      {route.page !== 'today' && route.page !== 'new' && <a className="btn primary plus-btn" href={hashFor({page: 'new', ch: route.ch})}>+ {t('New video')}</a>}
     </header>
   );
 }

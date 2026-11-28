@@ -227,8 +227,9 @@ export default function Workspace({id, step, scene, onRoute}: WorkspaceProps) {
   const restore = async (vid: string) => { try { clearTimeout(timer.current); await apiWs.restore(id, vid); hist.current = {past: [], future: [], last: 0}; await load(id); refreshVersions(id); } catch (x) { setErr((x as Error).message); } };
 
   return (
-    <div className="ws" style={{'--accent': accent, '--on-accent': onAccent} as React.CSSProperties}>
+    <div className="ws" style={{'--ep': accent, '--on-ep': onAccent} as React.CSSProperties}>
       <header className="ws-head">
+        <span className="ep-swatch" aria-hidden="true" />
         <h1 className="display title" title={doc.title} tabIndex={-1}>{doc.title}</h1>
         <span className={`save ${saved}`} role="status">{saved === 'saved' ? 'Saved' : saved === 'saving' ? 'Saving…' : 'Not saved'}</span>
         <span className="grow" />
@@ -297,7 +298,7 @@ export default function Workspace({id, step, scene, onRoute}: WorkspaceProps) {
           </>
         )}
       </div>
-      <StageTrack summary={data.summary} job={job && job.episode === data.summary.id ? job : null} onCancel={() => job && api.cancel(job.id)} onRetry={retry} />
+      {job && job.episode === data.summary.id && <StageTrack summary={data.summary} job={job} onCancel={() => api.cancel(job.id)} onRetry={retry} />}
     </div>
   );
 }
